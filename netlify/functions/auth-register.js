@@ -45,6 +45,6 @@ export const handler = async (event) => {
     return cors({ token, gebruiker: { id: user.id, email: user.email, naam: user.naam } })
   } catch (err) {
     console.error('Register error:', err)
-    return cors({ error: 'Registratie mislukt' }, 500)
+    return cors({ error: 'Registratie mislukt: ' + (err.message || err) }, 500)
   }
 }
