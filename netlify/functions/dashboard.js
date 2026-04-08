@@ -3,7 +3,6 @@ import { requireAuth, cors } from './_auth.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
-
   const auth = requireAuth(event)
   if (auth.error) return auth.response
 
@@ -14,52 +13,69 @@ export const handler = async (event) => {
   const vandaag = new Date().toISOString().split('T')[0]
 
   try {
-    const [latestMeasurement] = await sql`
-      SELECT gewicht_kg, vetpercentage, spiermassa_kg, datum
-      FROM measurements WHERE user_id = ${userId}
+    const [profiel] = await sql`
+      SELECT u.name, p.* FROM users u
+      LEFT JOIN user_profile p ON p.user_id = u.id
+      WHERE u.id = ${userId}
+    `
+
+    const [recenteInbody] = await sql`
+      SELECT * FROM inbody_metingen WHERE user_id = ${userId}
       ORDER BY datum DESC LIMIT 1
     `
 
-    const vandaagMeals = await sql`
-      SELECT kcal, eiwitten_g, koolhydraten_g, vetten_g, maaltijd_type
-      FROM meals WHERE user_id = ${userId} AND datum = ${vandaag}
+    const vandaagMaaltijden = await sql`
+      SELECT kcal, eiwit_g, koolhydraten_g, vetten_g FROM maaltijden
+      WHERE user_id = ${userId} AND datum = ${vandaag}
     `
 
-    const vandaagWorkout = await sql`
-      SELECT naam, type, duur_minuten, verbrande_kcal
-      FROM workouts WHERE user_id = ${userId} AND datum = ${vandaag}
-      ORDER BY created_at DESC
+    const weektrainingen = await sql`
+      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
+      FROM trainingen WHERE user_id = ${userId}
+      AND datum >= (CURRENT_DATE - INTERVAL '7 days')
+      ORDER BY datum DESC
     `
 
-    const [settings] = await sql`
-      SELECT dagelijks_calorie_doel, dagelijks_eiwitdoel_g, doel, doelgewicht_kg
-      FROM user_settings WHERE user_id = ${userId}
+    // Meest recente HRV/slaap
+    const [recentTraining] = await sql`
+      SELECT hrv_ochtend, slaap_uur, slaapscore, herstelbalans, datum
+      FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
+      ORDER BY datum DESC LIMIT 1
     `
 
-    // Gewichtstrend laatste 7 metingen
-    const weightTrend = await sql`
-      SELECT datum, gewicht_kg FROM measurements
+    const actieveDoelen = await sql`
+      SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE
+      ORDER BY deadline ASC NULLS LAST LIMIT 5
+    `
+
+    const gewichtTrend = await sql`
+      SELECT datum, gewicht_kg FROM inbody_metingen
       WHERE user_id = ${userId} AND gewicht_kg IS NOT NULL
-      ORDER BY datum DESC LIMIT 7
+      ORDER BY datum DESC LIMIT 8
     `
 
-    const totaalKcal = vandaagMeals.reduce((s, m) => s + (m.kcal || 0), 0)
-    const totaalEiwit = vandaagMeals.reduce((s, m) => s + (parseFloat(m.eiwitten_g) || 0), 0)
+    const gegeten = vandaagMaaltijden.reduce((s, m) => ({
+      kcal: s.kcal + (m.kcal || 0),
+      eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
+      koolhydraten: s.koolhydraten + (parseFloat(m.koolhydraten_g) || 0),
+      vetten: s.vetten + (parseFloat(m.vetten_g) || 0),
+    }), { kcal: 0, eiwit: 0, koolhydraten: 0, vetten: 0 })
 
     return cors({
+      profiel: profiel || {},
       vandaag: {
         datum: vandaag,
-        kcal_gegeten: totaalKcal,
-        eiwit_gegeten: Math.round(totaalEiwit),
-        maaltijden: vandaagMeals.length,
-        trainingen: vandaagWorkout,
+        maaltijden: vandaagMaaltijden.length,
+        ...gegeten,
       },
-      laatste_meting: latestMeasurement || null,
-      instellingen: settings || null,
-      gewicht_trend: weightTrend.reverse(),
+      herstel: recentTraining || null,
+      inbody: recenteInbody || null,
+      week_trainingen: weektrainingen,
+      doelen: actieveDoelen,
+      gewicht_trend: gewichtTrend.reverse(),
     })
   } catch (err) {
     console.error('Dashboard error:', err)
-    return cors({ error: 'Fout bij dashboard data' }, 500)
+    return cors({ error: 'Fout bij dashboard: ' + err.message }, 500)
   }
 }

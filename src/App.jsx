@@ -1,44 +1,69 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
-import Layout from './components/Layout.jsx'
-import Login from './pages/Login.jsx'
-import Register from './pages/Register.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Coach from './pages/Coach.jsx'
-import Measurements from './pages/Measurements.jsx'
-import Meals from './pages/Meals.jsx'
-import Workouts from './pages/Workouts.jsx'
-import Settings from './pages/Settings.jsx'
+import { useState, useEffect } from 'react'
+import Login from './components/Login.jsx'
+import Dashboard from './components/Dashboard.jsx'
+import Coach from './components/Coach.jsx'
+import Training from './components/Training.jsx'
+import Voeding from './components/Voeding.jsx'
+import Lichaam from './components/Lichaam.jsx'
+import Doelen from './components/Doelen.jsx'
+import Profiel from './components/Profiel.jsx'
 
-function PrivateRoute({ children }) {
-  const { gebruiker, laden } = useAuth()
-  if (laden) return <div className="loading-screen"><div className="spinner" /></div>
-  return gebruiker ? children : <Navigate to="/login" replace />
-}
-
-function PublicRoute({ children }) {
-  const { gebruiker, laden } = useAuth()
-  if (laden) return <div className="loading-screen"><div className="spinner" /></div>
-  return gebruiker ? <Navigate to="/" replace /> : children
-}
+const NAV = [
+  { id: 'dashboard', label: 'Dashboard', icon: '⚡' },
+  { id: 'coach', label: 'Coach', icon: '💬' },
+  { id: 'training', label: 'Training', icon: '🏋️' },
+  { id: 'voeding', label: 'Voeding', icon: '🍽️' },
+  { id: 'lichaam', label: 'Lichaam', icon: '📊' },
+]
 
 export default function App() {
+  const [user, setUser] = useState(null)
+  const [laden, setLaden] = useState(true)
+  const [scherm, setScherm] = useState('dashboard')
+
+  useEffect(() => {
+    const token = localStorage.getItem('apex_token')
+    const saved = localStorage.getItem('apex_user')
+    if (token && saved) {
+      try { setUser(JSON.parse(saved)) } catch { localStorage.clear() }
+    }
+    setLaden(false)
+  }, [])
+
+  function inloggen(token, userData) {
+    localStorage.setItem('apex_token', token)
+    localStorage.setItem('apex_user', JSON.stringify(userData))
+    setUser(userData)
+    setScherm('dashboard')
+  }
+
+  function uitloggen() {
+    localStorage.removeItem('apex_token')
+    localStorage.removeItem('apex_user')
+    setUser(null)
+  }
+
+  if (laden) return <div className="loading-screen"><div className="spinner" /></div>
+  if (!user) return <Login onInloggen={inloggen} />
+
+  const schermen = { dashboard: Dashboard, coach: Coach, training: Training, voeding: Voeding, lichaam: Lichaam, doelen: Doelen, profiel: Profiel }
+  const Scherm = schermen[scherm] || Dashboard
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/registreren" element={<PublicRoute><Register /></PublicRoute>} />
-          <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route index element={<Dashboard />} />
-            <Route path="coach" element={<Coach />} />
-            <Route path="metingen" element={<Measurements />} />
-            <Route path="voeding" element={<Meals />} />
-            <Route path="trainingen" element={<Workouts />} />
-            <Route path="instellingen" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <div className="app">
+      <Scherm user={user} onNavigeer={setScherm} onUitloggen={uitloggen} />
+      <nav className="bottom-nav">
+        {NAV.map(item => (
+          <button
+            key={item.id}
+            className={`nav-btn ${scherm === item.id ? 'active' : ''}`}
+            onClick={() => setScherm(item.id)}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-label">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
   )
 }

@@ -4,8 +4,8 @@
   "description": "Jouw AI Personal Trainer",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
+  "background_color": "#F5F5F5",
+  "theme_color": "#1D9E75",
   "orientation": "portrait-primary",
   "lang": "nl",
   "icons": [
@@ -24,15 +24,7 @@
   ],
   "categories": ["health", "fitness"],
   "shortcuts": [
-    {
-      "name": "Coach",
-      "url": "/coach",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Meting toevoegen",
-      "url": "/metingen",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
-    }
+    { "name": "Coach", "url": "/", "description": "Open AI Coach" },
+    { "name": "Training loggen", "url": "/", "description": "Log een training" }
   ]
 }

@@ -1,155 +1,117 @@
--- APEX Coach Database Schema
+-- APEX Coach v2 — Database Schema
 -- Neon PostgreSQL
 
--- Gebruikers
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  naam VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Gebruikersinstellingen
-CREATE TABLE IF NOT EXISTS user_settings (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL,
-  geboortedatum DATE,
-  geslacht VARCHAR(10),
+CREATE TABLE IF NOT EXISTS user_profile (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  geboortejaar INTEGER,
   lengte_cm INTEGER,
-  doel VARCHAR(50),                    -- 'afvallen', 'spiermassa', 'conditie', 'onderhoud'
-  activiteits_niveau VARCHAR(50),      -- 'sedentair', 'licht', 'matig', 'actief', 'zeer_actief'
-  dieet_wensen TEXT[],                 -- bijv. ['vegetarisch', 'glutenvrij']
-  allergenen TEXT[],
-  doelgewicht_kg DECIMAL(5,2),
-  dagelijks_calorie_doel INTEGER,
-  dagelijks_eiwitdoel_g INTEGER,
-  coach_naam VARCHAR(100) DEFAULT 'APEX',
-  coach_stijl VARCHAR(50) DEFAULT 'motiverend',  -- 'motiverend', 'streng', 'vriendelijk', 'wetenschappelijk'
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  gewicht_kg NUMERIC(5,1),
+  doel_kcal INTEGER DEFAULT 2400,
+  doel_eiwit_g INTEGER DEFAULT 160,
+  doel_koolhydraten_g INTEGER DEFAULT 250,
+  doel_vetten_g INTEGER DEFAULT 80,
+  sporten TEXT[] DEFAULT '{fitness,padel,fietsen}',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Metingen (gewicht, InBody data, etc.)
-CREATE TABLE IF NOT EXISTS measurements (
+CREATE TABLE IF NOT EXISTS inbody_metingen (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   datum DATE NOT NULL DEFAULT CURRENT_DATE,
-  gewicht_kg DECIMAL(5,2),
-  vetpercentage DECIMAL(4,1),
-  spiermassa_kg DECIMAL(5,2),
-  vetmassa_kg DECIMAL(5,2),
-  bmr INTEGER,                         -- Basaal Metabolisme (kcal)
-  bmi DECIMAL(4,1),
-  viscerale_vet_score INTEGER,
-  lichaamsvocht_procent DECIMAL(4,1),
-  botmassa_kg DECIMAL(4,2),
-  metabolische_leeftijd INTEGER,
-  -- Extra meetpunten (omtrekken in cm)
-  buikomvang_cm DECIMAL(5,1),
-  heupomvang_cm DECIMAL(5,1),
-  borstomvang_cm DECIMAL(5,1),
-  bovenbeen_links_cm DECIMAL(5,1),
-  bovenbeen_rechts_cm DECIMAL(5,1),
-  bovenarm_links_cm DECIMAL(5,1),
-  bovenarm_rechts_cm DECIMAL(5,1),
+  gewicht_kg NUMERIC(5,1),
+  vetmassa_kg NUMERIC(5,1),
+  vetpercentage NUMERIC(4,1),
+  spiermassa_kg NUMERIC(5,1),
+  visceraal_vet INTEGER,
+  bmr_kcal INTEGER,
+  vochtbalans_pct NUMERIC(4,1),
+  inbody_score INTEGER,
+  bron TEXT DEFAULT 'handmatig',
   notities TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Maaltijden
-CREATE TABLE IF NOT EXISTS meals (
+CREATE TABLE IF NOT EXISTS trainingen (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   datum DATE NOT NULL DEFAULT CURRENT_DATE,
-  maaltijd_type VARCHAR(20) NOT NULL,  -- 'ontbijt', 'lunch', 'diner', 'snack', 'pre_workout', 'post_workout'
-  omschrijving TEXT,
-  foto_url TEXT,
-  -- Voedingswaarden (ingeschat via AI analyse)
+  sport TEXT NOT NULL,
+  duur_min INTEGER,
   kcal INTEGER,
-  eiwitten_g DECIMAL(6,1),
-  koolhydraten_g DECIMAL(6,1),
-  vetten_g DECIMAL(6,1),
-  vezels_g DECIMAL(6,1),
-  suikers_g DECIMAL(6,1),
-  ai_analyse TEXT,                     -- Volledige AI analyse tekst
-  handmatig_ingevoerd BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Trainingen
-CREATE TABLE IF NOT EXISTS workouts (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  datum DATE NOT NULL DEFAULT CURRENT_DATE,
-  naam VARCHAR(255),
-  type VARCHAR(50),                    -- 'kracht', 'cardio', 'hiit', 'yoga', 'sport', 'anders'
-  duur_minuten INTEGER,
-  intensiteit VARCHAR(20),             -- 'laag', 'matig', 'hoog', 'maximaal'
-  verbrande_kcal INTEGER,
+  gem_hartslag INTEGER,
+  max_hartslag INTEGER,
+  hrv_ochtend INTEGER,
+  slaap_uur NUMERIC(4,1),
+  slaapscore INTEGER,
+  herstelbalans NUMERIC(4,2),
+  zone2_min INTEGER,
+  zone3_min INTEGER,
+  zone4_min INTEGER,
   notities TEXT,
-  oefeningen JSONB,                    -- Array van oefeningen met sets/reps/gewicht
-  -- Bijv: [{"naam": "Squat", "sets": [{"gewicht": 80, "reps": 10}, ...]}]
-  ai_samenvatting TEXT,               -- AI gegenereerde samenvatting/feedback
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Gesprekshistorie met AI coach
-CREATE TABLE IF NOT EXISTS conversation_history (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  rol VARCHAR(10) NOT NULL,            -- 'user' of 'assistant'
-  bericht TEXT NOT NULL,
-  context_data JSONB,                  -- Contextdata die met dit bericht meegestuurd werd
+  bron TEXT DEFAULT 'handmatig',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Dagelijkse doelen/voortgang
-CREATE TABLE IF NOT EXISTS daily_progress (
+CREATE TABLE IF NOT EXISTS maaltijden (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   datum DATE NOT NULL DEFAULT CURRENT_DATE,
-  water_ml INTEGER DEFAULT 0,
-  stappen INTEGER,
-  slaap_uren DECIMAL(3,1),
-  energie_niveau INTEGER CHECK (energie_niveau BETWEEN 1 AND 10),
-  stemming INTEGER CHECK (stemming BETWEEN 1 AND 10),
-  notities TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, datum)
+  maaltijd_type TEXT,
+  beschrijving TEXT,
+  kcal INTEGER,
+  eiwit_g NUMERIC(6,1),
+  koolhydraten_g NUMERIC(6,1),
+  vetten_g NUMERIC(6,1),
+  foto_analyse TEXT,
+  ai_notities TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexen voor performance
-CREATE INDEX IF NOT EXISTS idx_measurements_user_datum ON measurements(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_meals_user_datum ON meals(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_workouts_user_datum ON workouts(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_conversation_user ON conversation_history(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_daily_progress_user_datum ON daily_progress(user_id, datum DESC);
+CREATE TABLE IF NOT EXISTS doelen (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  titel TEXT NOT NULL,
+  sport TEXT,
+  beschrijving TEXT,
+  doel_waarde NUMERIC(8,2),
+  huidige_waarde NUMERIC(8,2),
+  eenheid TEXT,
+  deadline DATE,
+  actief BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Trigger: update updated_at automatisch
-CREATE OR REPLACE FUNCTION update_updated_at()
+CREATE TABLE IF NOT EXISTS gesprekken (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  rol TEXT NOT NULL,
+  bericht TEXT NOT NULL,
+  is_ai BOOLEAN NOT NULL,
+  upload_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexen
+CREATE INDEX IF NOT EXISTS idx_inbody_user_datum ON inbody_metingen(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_gesprekken_user ON gesprekken(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_doelen_user ON doelen(user_id, actief);
+
+-- Auto-update user_profile timestamp
+CREATE OR REPLACE FUNCTION update_profile_timestamp()
 RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER user_settings_updated_at BEFORE UPDATE ON user_settings
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER meals_updated_at BEFORE UPDATE ON meals
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER workouts_updated_at BEFORE UPDATE ON workouts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER daily_progress_updated_at BEFORE UPDATE ON daily_progress
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS profile_updated_at ON user_profile;
+CREATE TRIGGER profile_updated_at BEFORE UPDATE ON user_profile
+  FOR EACH ROW EXECUTE FUNCTION update_profile_timestamp();
