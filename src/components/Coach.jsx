@@ -225,7 +225,11 @@ export default function Coach({ user }) {
   )
 }
 
-function formatBericht(tekst) {
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function formatTekstBlok(tekst) {
   return tekst
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -234,5 +238,39 @@ function formatBericht(tekst) {
     .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
     .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br>')
-    .replace(/^(.+)$/, '<p>$1</p>')
+}
+
+function markdownTabelNaarHtml(tabelTekst) {
+  const rijen = tabelTekst.trim().split('\n').filter(r => r.trim().startsWith('|'))
+  if (rijen.length < 2) return formatTekstBlok(tabelTekst)
+
+  const parseRij = r => r.split('|').slice(1, -1).map(cel =>
+    escHtml(cel.trim()).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  )
+
+  const isScheidingslijn = r => /^\|[\s\-:|]+\|/.test(r)
+  const kopRij = rijen[0]
+  const datarijen = rijen.slice(1).filter(r => !isScheidingslijn(r))
+
+  const koppen = parseRij(kopRij).map(k => `<th>${k}</th>`).join('')
+  const rijHtml = datarijen.map(r =>
+    `<tr>${parseRij(r).map(cel => `<td>${cel}</td>`).join('')}</tr>`
+  ).join('')
+
+  return `<div class="tabel-wrapper"><table class="coach-tabel"><thead><tr>${koppen}</tr></thead><tbody>${rijHtml}</tbody></table></div>`
+}
+
+function formatBericht(tekst) {
+  // Splits tekst in tabel-blokken en gewone tekst-blokken
+  const blokken = []
+  const tabelRe = /^(\|.+\|[ \t]*\n?){2,}/gm
+  let lastIdx = 0, m
+  while ((m = tabelRe.exec(tekst)) !== null) {
+    if (m.index > lastIdx) blokken.push({ tabel: false, s: tekst.slice(lastIdx, m.index) })
+    blokken.push({ tabel: true, s: m[0] })
+    lastIdx = m.index + m[0].length
+  }
+  if (lastIdx < tekst.length) blokken.push({ tabel: false, s: tekst.slice(lastIdx) })
+
+  return blokken.map(b => b.tabel ? markdownTabelNaarHtml(b.s) : formatTekstBlok(b.s)).join('')
 }

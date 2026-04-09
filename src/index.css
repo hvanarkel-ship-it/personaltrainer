@@ -244,6 +244,38 @@ body {
 .bericht-tekst li { margin-bottom: 2px; }
 .bericht-tekst strong { font-weight: 600; }
 
+.tabel-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 8px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.coach-tabel {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  min-width: 260px;
+}
+.coach-tabel th {
+  background: var(--border-light);
+  font-weight: 600;
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  color: var(--text);
+}
+.coach-tabel td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+  color: var(--text-2);
+}
+.coach-tabel tr:last-child td { border-bottom: none; }
+.coach-tabel tr:nth-child(even) td { background: #fafafa; }
+
 .opgeslagen-pill {
   align-self: center; padding: 7px 14px; border-radius: 20px;
   font-size: 0.78rem; text-align: center; animation: slideIn 0.2s ease;
