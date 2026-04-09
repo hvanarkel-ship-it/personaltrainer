@@ -36,7 +36,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
 
   async function laadProfiel() {
     try {
-      const data = await api.get('/api/profiel')
+      const data = await api.get('/profiel')
       setProfiel({
         name: data.name || '',
         geboortejaar: data.geboortejaar || '',
@@ -65,7 +65,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
     setOpslaan(true)
     setMelding(null)
     try {
-      await api.put('/api/profiel', { ...profiel, ...extra })
+      await api.put('/profiel', { ...profiel, ...extra })
       setMelding({ type: 'success', tekst: '✓ Opgeslagen' })
       setTimeout(() => setMelding(null), 3000)
     } catch (err) {
@@ -82,12 +82,12 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
 
   function koppelStrava() {
     const token = localStorage.getItem('apex_token')
-    window.location.href = `/api/strava-auth?token=${token}`
+    window.location.href = `/api/strava-auth?token=${encodeURIComponent(token)}`
   }
 
   async function ontkoppelStrava() {
     try {
-      await api.put('/api/profiel', { ontkoppel_strava: true })
+      await api.put('/profiel', { ontkoppel_strava: true })
       setProfiel(p => ({ ...p, strava_verbonden: false, strava_athlete_id: null }))
       setMelding({ type: 'success', tekst: 'Strava ontkoppeld.' })
     } catch (err) {
@@ -99,7 +99,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
     setSyncing(true)
     setMelding(null)
     try {
-      const res = await api.post('/api/strava-sync', {})
+      const res = await api.post('/strava-sync', {})
       setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuwe trainingen gesynchroniseerd` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Sync mislukt: ' + err.message })
