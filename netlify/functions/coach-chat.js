@@ -107,22 +107,26 @@ Geef UITSLUITEND geldig JSON:
 
 // ── Maaltijd tekst detectie + opslaan ──
 async function detecteerMaaltijdTekst(sql, userId, bericht) {
-  // Snel pre-filter: sla de haiku-call over als het duidelijk geen voeding is
-  if (bericht.length < 10) return null
-  const voedingKeywords = /\b(gegeten|geëten|gegeten|ontbijt|lunch|diner|avondeten|snack|maaltijd|kcal|calorieën|eiwit|proteïne|gram|\d+\s*g\b|koolhydraten|vetten|brood|rijst|pasta|vlees|kip|vis|ei|melk|yogurt|kwark|kaas|fruit|groente|soep|shake|smoothie|havermout|noten|amandelen|avocado|hummus|salade|wrap|boterham|appel|banaan|bier|wijn)\b/i
-  if (!voedingKeywords.test(bericht)) return null
+  if (bericht.length < 8) return null
+
+  // Pre-filter: eetverleden, maaltijdmoment, of hoeveelheden met voeding
+  const eetPatroon = /\b(gegeten|geëten|at\s|at$|ontbijt|geluncht|gedinet|gesnackt|lunch|diner|avondeten|snack|kcal|calorieën|\d+\s*gram|\d+\s*g\s|\d+g\b)\b/i
+  if (!eetPatroon.test(bericht)) return null
 
   const res = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 300,
+    max_tokens: 500,
     messages: [{
       role: 'user',
-      content: `Is dit bericht een beschrijving van gegeten voeding/maaltijden? Zo ja, extraheer de nutritionele waarden zo nauwkeurig mogelijk.
-Geef UITSLUITEND geldig JSON:
-{"is_voeding":true,"beschrijving":"korte naam","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0,"ai_notities":"kort advies NL"}
-of als het GEEN voedingsbeschrijving is: {"is_voeding":false}
+      content: `Is dit bericht een beschrijving van wat iemand daadwerkelijk gegeten of gedronken heeft (niet een vraag, recept, of gesprek over eten)?
 
-Bericht: "${bericht.slice(0, 500)}"`
+Als JA: bereken de macro's zo nauwkeurig mogelijk op basis van standaard portiegroottes.
+Keuze maaltijd_type: ontbijt | lunch | diner | snack | pre-workout | post-workout
+Geef UITSLUITEND geldig JSON:
+{"is_voeding":true,"maaltijd_type":"snack","beschrijving":"korte naam","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0,"ai_notities":"kort voedingsadvies NL"}
+Als NEE: {"is_voeding":false}
+
+Bericht: "${bericht.slice(0, 800)}"`
     }]
   })
 
@@ -130,7 +134,7 @@ Bericht: "${bericht.slice(0, 500)}"`
   if (!d.is_voeding) return null
 
   const vandaag = new Date().toISOString().split('T')[0]
-  const maaltijdType = getMaaltijdType()
+  const maaltijdType = d.maaltijd_type || getMaaltijdType()
 
   const [row] = await sql`
     INSERT INTO maaltijden (user_id, datum, maaltijd_type, beschrijving, kcal,

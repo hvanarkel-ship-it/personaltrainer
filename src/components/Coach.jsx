@@ -142,7 +142,7 @@ export default function Coach({ user }) {
               }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }
               return (
                 <div key={i} className="opgeslagen-pill" style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.kleur }}>
-                  {cfg.icoon} <strong>Opgeslagen in logboek:</strong> {b.opgeslagen.label}
+                  {cfg.icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.type === 'maaltijd' ? b.opgeslagen.samenvatting : b.opgeslagen.label}
                 </div>
               )
             }
@@ -213,7 +213,7 @@ export default function Coach({ user }) {
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Stel een vraag..."
+          placeholder="Stel een vraag of beschrijf wat je at..."
           disabled={laden}
           className="chat-input"
         />
