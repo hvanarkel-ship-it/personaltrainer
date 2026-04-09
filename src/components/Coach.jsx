@@ -11,13 +11,14 @@ const UPLOAD_TYPES = [
 ]
 
 const SNELLE_VRAGEN = [
-  'Wat moet ik eten voor mijn training?',
   'Analyseer mijn herstel van de afgelopen 7 dagen',
+  'Wat moet ik eten voor mijn training?',
   'Maak een weekschema op basis van mijn doelen',
   'Wat zijn mijn zwakste macro\'s vandaag?',
 ]
 
-export default function Coach({ user }) {
+
+export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   const [berichten, setBerichten] = useState([])
   const [input, setInput] = useState('')
   const [laden, setLaden] = useState(false)
@@ -35,6 +36,15 @@ export default function Coach({ user }) {
       .catch(console.error)
       .finally(() => setHistLaden(false))
   }, [])
+
+  // Auto-trigger upload wanneer we via dashboard navigeren (bijv. 'suunto')
+  useEffect(() => {
+    if (coachTrigger && !histLaden) {
+      setUploadType(coachTrigger)
+      fileRef.current?.click()
+      onCoachTriggerUsed?.()
+    }
+  }, [coachTrigger, histLaden])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [berichten])
 
@@ -124,6 +134,12 @@ export default function Coach({ user }) {
             <div className="coach-avatar">⚡</div>
             <h3>Hallo {user.name?.split(' ')[0]}!</h3>
             <p>Stel me een vraag, of upload een foto/screenshot voor analyse.</p>
+            <button
+              className="suunto-ochtend-btn"
+              onClick={() => { setUploadType('suunto'); fileRef.current?.click() }}
+            >
+              ⌚ Deel Suunto ochtend dashboard
+            </button>
             <div className="snelle-vragen">
               {SNELLE_VRAGEN.map(v => (
                 <button key={v} className="snelle-vraag-btn" onClick={() => { setInput(v); inputRef.current?.focus() }}>

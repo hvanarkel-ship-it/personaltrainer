@@ -243,9 +243,14 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </>
         )}
 
-        <button className="link-btn small" style={{ marginTop: 10 }} onClick={() => onNavigeer('coach')}>
-          💬 Vraag coach om analyse →
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+          <button className="link-btn small" onClick={() => onNavigeer('coach')}>
+            💬 Vraag coach om analyse →
+          </button>
+          <button className="link-btn small" onClick={() => onNavigeer('coach', 'suunto')}>
+            ⌚ Deel Suunto ochtend →
+          </button>
+        </div>
       </div>
 
       {/* Week training samenvatting */}

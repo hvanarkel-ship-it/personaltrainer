@@ -28,6 +28,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [laden, setLaden] = useState(true)
   const [scherm, setScherm] = useState('dashboard')
+  const [coachTrigger, setCoachTrigger] = useState(null)
   const [stravaStatus, setStravaStatus] = useState(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [installPrompt, setInstallPrompt] = useState(null)   // Android
@@ -143,9 +144,11 @@ export default function App() {
 
       <Scherm
         user={user}
-        onNavigeer={setScherm}
+        onNavigeer={(s, ctx) => { setScherm(s); if (s === 'coach' && ctx) setCoachTrigger(ctx) }}
         onUitloggen={uitloggen}
         stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
+        coachTrigger={scherm === 'coach' ? coachTrigger : undefined}
+        onCoachTriggerUsed={() => setCoachTrigger(null)}
       />
 
       <nav className="bottom-nav">

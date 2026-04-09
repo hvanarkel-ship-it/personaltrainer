@@ -56,14 +56,25 @@ async function extractInbody(sql, userId, bestanden) {
 async function extractSuunto(sql, userId, bestanden) {
   const content = [
     ...bestandenNaarContent(bestanden),
-    { type: 'text', text: `Extraheer alle Suunto trainings- en hersteldata. Geef UITSLUITEND geldig JSON:
-{"datum":"YYYY-MM-DD of null","sport":"activiteitstype NL","duur_min":0,"kcal":0,"gem_hartslag":0,"max_hartslag":0,"hrv_ochtend":0,"slaap_uur":0,"slaapscore":0,"herstelbalans":0,"zone2_min":0,"zone3_min":0,"zone4_min":0,"notities":"samenvatting NL"}` }
+    { type: 'text', text: `Analyseer dit Suunto scherm. Dit kan een trainingsoverzicht ZIJN of een ochtend/herstel/gereedheid dashboard.
+
+Extraheer alle beschikbare data. Geef UITSLUITEND geldig JSON:
+{"datum":"YYYY-MM-DD of null","scherm_type":"training|ochtend|herstel","sport":"sport NL of herstel als ochtend/herstel scherm","duur_min":0,"kcal":0,"gem_hartslag":0,"max_hartslag":0,"hrv_ochtend":0,"slaap_uur":0,"slaapscore":0,"herstelbalans":0,"zone2_min":0,"zone3_min":0,"zone4_min":0,"notities":"samenvatting NL"}
+
+Let op:
+- Body Battery, herstelstatus, gereedheid, nachtmeting = scherm_type "ochtend", sport = "herstel"
+- Training/activiteit = scherm_type "training", sport = werkelijke sport
+- Velden die niet zichtbaar zijn: gebruik null (niet 0)` }
   ]
-  const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content }] })
+  const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content }] })
   const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
   const vandaag = new Date().toISOString().split('T')[0]
   const datum = d.datum && d.datum !== 'null' ? d.datum : vandaag
-  const sport = d.sport || 'training'
+
+  // Ochtend/herstel schermen altijd opslaan als sport='herstel'
+  const isOchtend = d.scherm_type === 'ochtend' || d.scherm_type === 'herstel'
+    || (!d.duur_min && (d.hrv_ochtend || d.slaap_uur || d.slaapscore || d.herstelbalans))
+  const sport = isOchtend ? 'herstel' : (d.sport || 'training')
 
   const [row] = await sql`
     INSERT INTO trainingen (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
