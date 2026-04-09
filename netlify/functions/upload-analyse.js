@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
 const UPLOAD_PROMPTS = {
   maaltijd: `Analyseer deze maaltijdfoto. Identificeer alle ingrediënten, schat de portiegroottes en bereken de macronutriënten.
@@ -76,6 +76,9 @@ export const handler = async (event) => {
     }
   } catch (err) {
     console.error('Upload analyse error:', err)
-    return cors({ error: 'Analyse mislukt: ' + err.message }, 500)
+    const bericht = err.status === 529 || err.message?.includes('overloaded')
+      ? 'De AI is momenteel druk bezet. Probeer het over een minuut opnieuw.'
+      : 'Analyse mislukt: ' + err.message
+    return cors({ error: bericht }, err.status === 529 ? 503 : 500)
   }
 }

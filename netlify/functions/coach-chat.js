@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -146,6 +146,9 @@ Spreek altijd Nederlands. Wees direct en praktisch. Geef concrete getallen en ac
     return cors({ antwoord })
   } catch (err) {
     console.error('Coach chat error:', err)
-    return cors({ error: 'Coach fout: ' + err.message }, 500)
+    const bericht = err.status === 529 || err.message?.includes('overloaded')
+      ? 'De AI is momenteel druk bezet. Probeer het over een minuut opnieuw.'
+      : 'Coach fout: ' + err.message
+    return cors({ error: bericht }, err.status === 529 ? 503 : 500)
   }
 }
