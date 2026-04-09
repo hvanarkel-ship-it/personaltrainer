@@ -374,6 +374,64 @@ body {
 .sport-check.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
 .sport-check input { accent-color: var(--primary); width: 15px; height: 15px; }
 
+/* ===== OFFLINE / UPDATE / INSTALL ===== */
+.offline-banner {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px; z-index: 500;
+  background: #1e293b; color: #f8fafc;
+  padding: 9px 16px; font-size: 0.8rem; text-align: center;
+  font-weight: 500;
+}
+
+.update-banner {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px; z-index: 500;
+  background: var(--primary); color: white;
+  padding: 9px 16px; font-size: 0.82rem;
+  display: flex; align-items: center; gap: 10px;
+}
+.update-banner span { flex: 1; font-weight: 500; }
+.update-banner button {
+  background: rgba(255,255,255,0.2); border: none; color: white;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+  font-family: var(--font); font-weight: 600;
+}
+.update-banner button:last-child { background: none; padding: 4px 6px; }
+
+.install-banner {
+  position: fixed; bottom: calc(var(--nav-h) + 12px);
+  left: 50%; transform: translateX(-50%);
+  width: calc(100% - 32px); max-width: 448px; z-index: 300;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  box-shadow: var(--shadow-md);
+}
+.install-banner-content { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.install-banner-content div strong { display: block; font-size: 0.9rem; }
+.install-banner-content div p { font-size: 0.78rem; color: var(--text-2); margin-top: 2px; }
+.install-icon { font-size: 2rem; flex-shrink: 0; }
+.install-banner-acties { display: flex; gap: 8px; }
+.install-banner-acties .btn { flex: 1; }
+
+.ios-hint-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 600;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.ios-hint-sheet {
+  background: var(--card); border-radius: 20px 20px 0 0;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 480px;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
+}
+.ios-hint-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.ios-hint-header strong { font-size: 1.05rem; }
+.ios-hint-sheet p { font-size: 0.875rem; color: var(--text-2); margin-bottom: 16px; }
+.ios-stappen { padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.ios-stappen li { font-size: 0.875rem; color: var(--text); }
+.ios-share-icon { font-size: 1rem; }
+
 /* ===== SETTINGS ===== */
 .settings-tabs {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
