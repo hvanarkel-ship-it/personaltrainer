@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS user_profile (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   geboortejaar INTEGER,
+  geslacht TEXT,
   lengte_cm INTEGER,
   gewicht_kg NUMERIC(5,1),
   doel_kcal INTEGER DEFAULT 2400,
@@ -19,6 +20,13 @@ CREATE TABLE IF NOT EXISTS user_profile (
   doel_koolhydraten_g INTEGER DEFAULT 250,
   doel_vetten_g INTEGER DEFAULT 80,
   sporten TEXT[] DEFAULT '{fitness,padel,fietsen}',
+  coach_context TEXT,
+  coach_naam TEXT DEFAULT 'APEX Coach',
+  coach_stijl TEXT DEFAULT 'direct',
+  strava_access_token TEXT,
+  strava_refresh_token TEXT,
+  strava_token_expires_at BIGINT,
+  strava_athlete_id BIGINT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

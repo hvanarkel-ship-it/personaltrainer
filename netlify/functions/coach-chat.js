@@ -37,8 +37,9 @@ export const handler = async (event) => {
 
     // Gebruikersdata ophalen voor context
     const [profiel] = await sql`
-      SELECT u.name, p.geboortejaar, p.lengte_cm, p.gewicht_kg,
-        p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g, p.sporten
+      SELECT u.name, p.geboortejaar, p.geslacht, p.lengte_cm, p.gewicht_kg,
+        p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
+        p.sporten, p.coach_context, p.coach_naam, p.coach_stijl
       FROM users u LEFT JOIN user_profile p ON p.user_id = u.id
       WHERE u.id = ${userId}
     `
@@ -70,7 +71,15 @@ export const handler = async (event) => {
 
     // Dynamische systeem-prompt
     const naam = profiel?.name || 'gebruiker'
-    const systemPrompt = `Je bent APEX Coach, een persoonlijke AI-coachingassistent voor ${naam}.
+    const coachNaam = profiel?.coach_naam || 'APEX Coach'
+    const stijlInstructie = {
+      direct: 'Wees direct en bondig. Geef concrete getallen en acties zonder omhaal.',
+      motiverend: 'Wees enthousiast en motiverend. Moedig aan en vier successen.',
+      wetenschappelijk: 'Geef wetenschappelijk onderbouwde uitleg met referenties naar fysiologie en onderzoek.',
+      vriendelijk: 'Wees warm, ondersteunend en empathisch. Neem de tijd voor de persoon achter de vraag.'
+    }[profiel?.coach_stijl || 'direct'] || 'Wees direct en bondig.'
+
+    const systemPrompt = `Je bent ${coachNaam}, een persoonlijke AI-coachingassistent voor ${naam}.
 
 Je combineert vijf expertprofielen:
 
@@ -85,7 +94,7 @@ COACH: Motivatie, doelstelling, weekplanning, gewoontevorming, mentale begeleidi
 VOEDINGSDESKUNDIGE: Micronutriënten, bloedwaarden interpreteren, vitamines, mineralen, energiebalans op langere termijn.
 
 Gebruikersprofiel:
-- Naam: ${naam}
+- Naam: ${naam}${profiel?.geslacht ? ` | Geslacht: ${profiel.geslacht}` : ''}
 - Lengte: ${profiel?.lengte_cm || '?'} cm | Gewicht: ${profiel?.gewicht_kg || '?'} kg
 - Dagdoelen: ${profiel?.doel_kcal || 2400} kcal | ${profiel?.doel_eiwit_g || 160}g eiwit | ${profiel?.doel_koolhydraten_g || 250}g koolhyd | ${profiel?.doel_vetten_g || 80}g vet
 - Actieve sporten: ${profiel?.sporten?.join(', ') || 'fitness, padel, fietsen'}
@@ -94,8 +103,9 @@ ${herstel ? `- HRV gisteren: ${herstel.hrv_ochtend} ms | Slaap: ${herstel.slaap_
 - Gegeten vandaag: ${kcalVandaag} kcal / ${Math.round(eiwitVandaag)}g eiwit
 ${weektraining.length ? `- Trainingen deze week: ${weektraining.map(t => `${t.sport}(${t.duur_min}min)`).join(', ')}` : ''}
 ${actieveDoelen.length ? `- Actieve doelen: ${actieveDoelen.map(d => `${d.titel} ${d.huidige_waarde||'?'}/${d.doel_waarde} ${d.eenheid||''}`).join(', ')}` : ''}
+${profiel?.coach_context ? `\nPersoonlijke context van ${naam}:\n${profiel.coach_context}` : ''}
 
-Spreek altijd Nederlands. Wees direct en praktisch. Geef concrete getallen en acties. Combineer rollen wanneer relevant.`
+Spreek altijd Nederlands. ${stijlInstructie} Combineer rollen wanneer relevant.`
 
     // Gesprekshistorie
     const history = await sql`
