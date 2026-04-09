@@ -188,8 +188,9 @@ export const handler = async (event) => {
 
     // ── Alle data parallel ophalen ──
     const vandaag = new Date().toISOString().split('T')[0]
+    let opgeslagen
     const [
-      opgeslagen,
+      _opgeslagen,
       [profiel],
       inbodyTrend,
       hrvTrend,
@@ -222,6 +223,7 @@ export const handler = async (event) => {
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
       sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 30`
     ])
+    opgeslagen = _opgeslagen
 
     // Nieuw opgeslagen maaltijd meenemen in vandaag-lijst
     const alleMealsVandaag = [...vandaagMeals]
