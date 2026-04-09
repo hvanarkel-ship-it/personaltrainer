@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 
-// Trainingsgereedheid op basis van HRV, slaap, herstelbalans, slaapscore
 function berekenGereedheid(h) {
   if (!h) return null
   const scores = []
@@ -27,22 +26,57 @@ function berekenGereedheid(h) {
 }
 
 function gereedheidsInfo(score) {
-  if (score >= 75) return { kleur: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', label: 'Klaar voor intensief', icon: '🟢' }
-  if (score >= 50) return { kleur: '#ca8a04', bg: '#fefce8', border: '#fde047', label: 'Matige intensiteit', icon: '🟡' }
-  return { kleur: '#dc2626', bg: '#fef2f2', border: '#fecaca', label: 'Herstel aanbevolen', icon: '🔴' }
+  if (score >= 75) return {
+    kleur: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', ring: '#86efac',
+    label: 'Klaar voor intensief',
+    advies: 'Je lichaam is goed hersteld. Ideaal voor een zware training of nieuwe prikkel.',
+    icon: '🟢',
+  }
+  if (score >= 50) return {
+    kleur: '#b45309', bg: '#fffbeb', border: '#fcd34d', ring: '#fde68a',
+    label: 'Matige intensiteit',
+    advies: 'Houd het bij rustige duur, techniek of mobiliteit. Vermijd maximale inspanning.',
+    icon: '🟡',
+  }
+  return {
+    kleur: '#dc2626', bg: '#fef2f2', border: '#fca5a5', ring: '#fecaca',
+    label: 'Herstel aanbevolen',
+    advies: 'Intensief trainen vertraagt je herstel. Kies voor rust, wandelen of yoga.',
+    icon: '🔴',
+  }
 }
 
-const SPORT_ICONS_MAP = { fitness:'🏋️', hardlopen:'🏃', fietsen:'🚴', padel:'🎾', zwemmen:'🏊', tennis:'🎾', wandelen:'🚶', yoga:'🧘', wielrennen:'🚵', voetbal:'⚽' }
+const SPORT_ICONS_MAP = { fitness:'🏋️', hardlopen:'🏃', fietsen:'🚴', padel:'🎾', zwemmen:'🏊', tennis:'🎾', wandelen:'🚶', yoga:'🧘', wielrennen:'🚵', voetbal:'⚽', herstel:'🛌' }
 
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [data, setData] = useState(null)
   const [laden, setLaden] = useState(true)
+  const [toonOchtendForm, setToonOchtendForm] = useState(false)
+  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '' })
+  const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
-    api.get('/dashboard').then(setData).catch(console.error).finally(() => setLaden(false))
+    api.get('/dashboard').then(d => { setData(d); setLaden(false) }).catch(console.error)
   }, [])
 
   const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  async function logOchtend() {
+    if (!oForm.hrv_ochtend && !oForm.slaap_uur) return
+    setOOpslaan(true)
+    try {
+      await api.post('/training', {
+        sport: 'herstel',
+        datum: new Date().toISOString().split('T')[0],
+        ...Object.fromEntries(Object.entries(oForm).filter(([, v]) => v !== ''))
+      })
+      const nieuw = await api.get('/dashboard')
+      setData(nieuw)
+      setToonOchtendForm(false)
+      setOForm({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '' })
+    } catch (err) { console.error(err) }
+    finally { setOOpslaan(false) }
+  }
 
   if (laden) return <div className="page page-loading"><div className="spinner" /></div>
 
@@ -60,15 +94,26 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   const gereedheid = berekenGereedheid(h)
   const gInfo = gereedheid !== null ? gereedheidsInfo(gereedheid) : null
+  const heeftHerstelData = !!(h.hrv_ochtend || h.slaap_uur)
 
-  // Hersteldata staleness check
   const herstelDagen = h?.datum
     ? Math.floor((Date.now() - new Date(h.datum + 'T12:00:00').getTime()) / 86400000)
     : null
 
-  // Weektraining samenvatting
-  const weekMinuten = weekTrainingen.reduce((s, t) => s + (t.duur_min || 0), 0)
-  const weekKcal = weekTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
+  // 7-daagse HRV trend vanuit weektrainingen
+  const vandaag = new Date().toISOString().split('T')[0]
+  const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+    const ds = d.toISOString().split('T')[0]
+    const record = weekTrainingen.filter(t => t.datum === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
+    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: record?.hrv_ochtend || null, isVandaag: ds === vandaag }
+  })
+  const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
+
+  // Weektraining stats (excl. herstel-only records)
+  const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
+  const weekMinuten = echteTrainingen.reduce((s, t) => s + (t.duur_min || 0), 0)
+  const weekKcal = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
 
   return (
     <div className="page">
@@ -77,50 +122,134 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           <h1>Hey, {(p.name || user.name)?.split(' ')[0]} 👋</h1>
           <p className="subtitle">{dag}</p>
         </div>
-        <button className="icon-btn" onClick={onUitloggen} title="Uitloggen">
-          <span>⎋</span>
-        </button>
+        <button className="icon-btn" onClick={onUitloggen} title="Uitloggen"><span>⎋</span></button>
       </header>
 
-      {/* Herstel & gereedheid */}
-      <div className="card">
-        <div className="card-header" style={{ marginBottom: 10 }}>
-          <h3>Herstel & gereedheid</h3>
-          {gInfo && (
-            <span className="gereedheid-badge" style={{ background: gInfo.bg, color: gInfo.kleur, border: `1px solid ${gInfo.border}` }}>
-              {gInfo.icon} {gereedheid}% — {gInfo.label}
-            </span>
-          )}
+      {/* ══ HERSTEL & GEREEDHEID — Hero card ══ */}
+      <div className="card herstel-hero-card">
+        <div className="card-header">
+          <h3>Herstel & Gereedheid</h3>
+          <button
+            className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
+            onClick={() => setToonOchtendForm(f => !f)}
+          >
+            {toonOchtendForm ? 'Annuleer' : '+ Log ochtend'}
+          </button>
         </div>
-        {herstelDagen > 1 && (
-          <p className="stale-warning">⚠️ Hersteldata van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden</p>
+
+        {/* Inline ochtend log form */}
+        {toonOchtendForm && (
+          <div className="ochtend-form">
+            <p className="ochtend-form-intro">Log je ochtendmetingen voor trainingsadvies op maat:</p>
+            <div className="ochtend-form-grid">
+              <div className="form-group">
+                <label>HRV (ms) *</label>
+                <input type="number" value={oForm.hrv_ochtend} onChange={e => setOForm(f => ({ ...f, hrv_ochtend: e.target.value }))} placeholder="65" autoFocus />
+              </div>
+              <div className="form-group">
+                <label>Slaap (uur) *</label>
+                <input type="number" step="0.1" value={oForm.slaap_uur} onChange={e => setOForm(f => ({ ...f, slaap_uur: e.target.value }))} placeholder="7.5" />
+              </div>
+              <div className="form-group">
+                <label>Slaapscore</label>
+                <input type="number" value={oForm.slaapscore} onChange={e => setOForm(f => ({ ...f, slaapscore: e.target.value }))} placeholder="78" />
+              </div>
+              <div className="form-group">
+                <label>Herstelbalans</label>
+                <input type="number" step="0.1" value={oForm.herstelbalans} onChange={e => setOForm(f => ({ ...f, herstelbalans: e.target.value }))} placeholder="+5.2" />
+              </div>
+            </div>
+            <button className="btn btn-primary btn-full" onClick={logOchtend} disabled={oOpslaan || (!oForm.hrv_ochtend && !oForm.slaap_uur)}>
+              {oOpslaan ? 'Opslaan...' : 'Opslaan & ververs gereedheid'}
+            </button>
+          </div>
         )}
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-icon">💓</div>
-            <div className="metric-value">{h.hrv_ochtend || '—'}</div>
-            <div className="metric-label">HRV (ms)</div>
+
+        {/* Leeg staat */}
+        {!heeftHerstelData && !toonOchtendForm && (
+          <div className="herstel-leeg">
+            <div className="herstel-leeg-icon">📊</div>
+            <div>
+              <strong>Log dagelijks je ochtenddata</strong>
+              <p>HRV en slaap vormen de basis van je trainingsplanning. Zonder deze data kan de coach geen gerichte adviezen geven.</p>
+            </div>
+            <button className="btn btn-primary" onClick={() => setToonOchtendForm(true)}>
+              Start: log HRV & slaap
+            </button>
           </div>
-          <div className="metric-card">
-            <div className="metric-icon">😴</div>
-            <div className="metric-value">{h.slaap_uur || '—'}</div>
-            <div className="metric-label">Slaap (uur)</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-icon">📈</div>
-            <div className="metric-value">{h.herstelbalans ? `${h.herstelbalans > 0 ? '+' : ''}${h.herstelbalans}` : '—'}</div>
-            <div className="metric-label">Herstel</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-icon">🏆</div>
-            <div className="metric-value">{h.slaapscore || '—'}</div>
-            <div className="metric-label">Slaapscore</div>
-          </div>
-        </div>
+        )}
+
+        {/* Gereedheid score + advies */}
+        {heeftHerstelData && !toonOchtendForm && (
+          <>
+            {herstelDagen > 1 && (
+              <p className="stale-warning">⚠️ Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden — log vandaag je ochtenddata</p>
+            )}
+
+            {gInfo && (
+              <div className="gereedheid-banner" style={{ background: gInfo.bg, borderColor: gInfo.border }}>
+                <div className="gereedheid-ring" style={{ borderColor: gInfo.ring, color: gInfo.kleur }}>
+                  <span className="gereedheid-pct">{gereedheid}</span>
+                  <span className="gereedheid-sym">%</span>
+                </div>
+                <div className="gereedheid-tekst">
+                  <strong style={{ color: gInfo.kleur }}>{gInfo.icon} {gInfo.label}</strong>
+                  <p>{gInfo.advies}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="metrics-grid" style={{ marginTop: 12 }}>
+              <div className="metric-card">
+                <div className="metric-icon">💓</div>
+                <div className="metric-value">{h.hrv_ochtend || '—'}</div>
+                <div className="metric-label">HRV (ms)</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">😴</div>
+                <div className="metric-value">{h.slaap_uur || '—'}</div>
+                <div className="metric-label">Slaap (uur)</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">📈</div>
+                <div className="metric-value">{h.herstelbalans != null ? `${h.herstelbalans > 0 ? '+' : ''}${h.herstelbalans}` : '—'}</div>
+                <div className="metric-label">Herstel</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">🏆</div>
+                <div className="metric-value">{h.slaapscore || '—'}</div>
+                <div className="metric-label">Slaapscore</div>
+              </div>
+            </div>
+
+            {/* 7-daagse HRV trend */}
+            {heeftHrvTrend && (
+              <div className="hrv-trend">
+                {hrv7Dagen.map((d, i) => {
+                  const kleur = !d.hrv ? '#e5e7eb'
+                    : d.hrv >= 60 ? '#22c55e'
+                    : d.hrv >= 45 ? '#eab308'
+                    : '#ef4444'
+                  return (
+                    <div key={i} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
+                      <div className="hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
+                      {d.hrv && <span className="hrv-val">{d.hrv}</span>}
+                      <span className="hrv-label">{d.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        <button className="link-btn small" style={{ marginTop: 10 }} onClick={() => onNavigeer('coach')}>
+          💬 Vraag coach om analyse →
+        </button>
       </div>
 
       {/* Week training samenvatting */}
-      {weekTrainingen.length > 0 && (
+      {echteTrainingen.length > 0 && (
         <div className="card">
           <div className="card-header">
             <h3>Training deze week</h3>
@@ -128,8 +257,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
           <div className="week-stats-grid">
             <div className="week-stat">
-              <span className="week-stat-val">{weekTrainingen.length}</span>
-              <span className="week-stat-label">{weekTrainingen.length === 1 ? 'sessie' : 'sessies'}</span>
+              <span className="week-stat-val">{echteTrainingen.length}</span>
+              <span className="week-stat-label">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</span>
             </div>
             <div className="week-stat">
               <span className="week-stat-val">
@@ -147,7 +276,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             )}
           </div>
           <div className="week-sports-strip">
-            {weekTrainingen.slice(0, 7).map((t, i) => (
+            {echteTrainingen.slice(0, 7).map((t, i) => (
               <span key={i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + t.duur_min + 'min' : ''}`}>
                 {SPORT_ICONS_MAP[t.sport] || '⚽'}
               </span>
@@ -162,7 +291,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           <h3>Voeding vandaag</h3>
           <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Bekijk alles →</button>
         </div>
-
         <div className="dash-macro-blokken">
           <div className="dash-macro-blok">
             <span className="dash-macro-val">{v.kcal || 0}</span>
@@ -181,14 +309,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             <span className="dash-macro-sub">/ {p.doel_vetten_g || 80}g vet</span>
           </div>
         </div>
-
         <div style={{ marginTop: 10 }}>
           <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={p.doel_kcal||2400} eenheid="kcal" pct={kcalPct} kleur="primary" />
           <MacroBalk label="Eiwit" huidig={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} eenheid="g" pct={eiwitPct} kleur="green" />
           <MacroBalk label="Koolhydraten" huidig={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} eenheid="g" pct={khPct} kleur="blue" />
           <MacroBalk label="Vetten" huidig={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} eenheid="g" pct={vetPct} kleur="orange" />
         </div>
-
         {v.maaltijden_lijst?.length > 0 && (
           <div className="dash-maaltijd-lijst">
             {v.maaltijden_lijst.map((m, i) => (
@@ -228,7 +354,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
       )}
 
-      {/* Doelen voortgang */}
+      {/* Doelen */}
       {doelen.length > 0 && (
         <div className="card">
           <div className="card-header">

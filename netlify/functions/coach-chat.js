@@ -251,10 +251,25 @@ export const handler = async (event) => {
       eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
     }), { kcal: 0, eiwit: 0 })
 
-    // ── Systeem-prompt ──
+    // ── TDEE berekening (Mifflin-St Jeor) ──
     const naam = profiel?.name || 'gebruiker'
     const coachNaam = profiel?.coach_naam || 'APEX Coach'
     const leeftijd = profiel?.geboortejaar ? new Date().getFullYear() - profiel.geboortejaar : null
+
+    let tdeeStr = ''
+    if (profiel?.gewicht_kg && profiel?.lengte_cm && leeftijd) {
+      const bmr = profiel.geslacht?.toLowerCase() === 'vrouw'
+        ? (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijd) - 161
+        : (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijd) + 5
+      const echteT = weektraining.filter(t => t.sport !== 'herstel')
+      const actFactor = echteT.length >= 5 ? 1.725 : echteT.length >= 3 ? 1.55 : echteT.length >= 1 ? 1.375 : 1.2
+      const tdee = Math.round(bmr * actFactor)
+      const balans = totVandaag.kcal ? totVandaag.kcal - tdee : null
+      tdeeStr = `Geschatte TDEE: ~${tdee} kcal/dag (BMR × ${actFactor}, ${echteT.length} trainingen/week)
+Voedingsbalans vandaag: ${balans !== null ? `${balans > 0 ? '+' : ''}${balans} kcal` : 'onbekend'}${balans !== null ? ` (${balans > 400 ? 'grote surplus' : balans > 0 ? 'lichte surplus' : balans > -400 ? 'licht tekort' : 'groot tekort'})` : ''}
+Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toFixed(1) : '?'} g/kg (aanbevolen: 1.6–2.2 g/kg voor sporters)`
+    }
+
     const stijlInstructie = {
       direct: 'Wees direct en bondig. Geef concrete getallen en acties.',
       motiverend: 'Wees enthousiast en motiverend. Moedig aan en vier successen.',
@@ -336,9 +351,24 @@ export const handler = async (event) => {
         }).join('\n')
       : '  Geen actieve doelen'
 
+    const minEiwit = profiel?.gewicht_kg ? Math.round(profiel.gewicht_kg * 1.6) : 120
+    const echteTrainingenW = weektraining.filter(t => t.sport !== 'herstel')
+    const recentHrv = hrvTrend[0]?.hrv_ochtend || null
+    const recentSlaap = hrvTrend[0]?.slaap_uur || null
+
     const systemPrompt = `Je bent ${coachNaam}, een persoonlijke AI-coachingassistent voor ${naam}.
 
-ROL: Combineer trainer, diëtist, fysioloog, coach en voedingsdeskundige. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief in je antwoorden.
+ROL: Combineer trainer, diëtist, fysioloog en coach. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief.
+
+═══ PROACTIEVE COACHINGSINSTRUCTIES ═══
+Wacht NOOIT tot de gebruiker vraagt. Analyseer de data en reageer proactief:
+• HRV < 45ms of slaap < 6u → waarschuw direct: geen intensieve training, prioriteit herstel
+• HRV > 55ms + minder dan 2 trainingen/week → daag uit: "Je lichaam is klaar, wanneer ga je trainen?"
+• Kcal < TDEE − 400 op een trainingsdag → wijs op ondervoedering en herstelrisico
+• Eiwit < ${minEiwit}g/dag (1.6g/kg) → geef concreet plan om dit aan te vullen
+• Zone2-training < 60min/week → adviseer aerobe basis opbouwen voor vetverbranding en herstel
+• Geen hersteldata gelogd → herinner aan ochtend HRV/slaap log
+Geef altijd een concrete aanbeveling voor de VOLGENDE 24 uur als dat relevant is.
 
 ═══ AUTOMATISCH OPSLAAN VAN VOEDING ═══
 Als de gebruiker beschrijft dat hij/zij iets heeft GEGETEN of GEDRONKEN (een feit, geen vraag), voeg dan ACHTERIN je antwoord dit blok toe — onzichtbaar voor de gebruiker:
@@ -350,6 +380,7 @@ Naam: ${naam}${leeftijd ? ` | ${leeftijd} jaar` : ''}${profiel?.geslacht ? ` | $
 Lengte: ${profiel?.lengte_cm || '?'}cm | Gewicht: ${profiel?.gewicht_kg || '?'}kg
 Sporten: ${profiel?.sporten?.join(', ') || 'fitness, padel, fietsen'}
 Dagdoelen: ${dagdoelKcal}kcal | ${dagdoelEiwit}g eiwit | ${dagdoelKh}g koolhyd | ${dagdoelVet}g vet
+${tdeeStr ? `\n${tdeeStr}` : ''}
 ${profiel?.coach_context ? `Persoonlijke context: ${profiel.coach_context}` : ''}
 
 ═══ VOEDING VANDAAG (${vandaag}) ═══
@@ -362,6 +393,7 @@ ${gisterMeals.length ? `Gisteren: ${Math.round(totGister.kcal)}kcal | ${Math.rou
 ${hrvRegels}
 
 ═══ TRAININGEN DEZE WEEK ═══
+Aantal sessies: ${echteTrainingenW.length} | Zone2 totaal: ${echteTrainingenW.reduce((s, t) => s + (t.zone2_min || 0), 0)}min | Meest recente HRV: ${recentHrv ? `${recentHrv}ms` : 'geen'} | Slaap: ${recentSlaap ? `${recentSlaap}u` : 'geen'}
 ${trainingRegels}
 
 ═══ LICHAAM / INBODY TREND ═══
@@ -370,7 +402,7 @@ ${inbodyRegels}
 ═══ ACTIEVE DOELEN ═══
 ${doelenRegels}
 
-Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Combineer expertprofielen wanneer relevant.`
+Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), begin dan daarmee voordat je de vraag van de gebruiker beantwoordt.`
 
     // ── Bouw user bericht op (afbeeldingen + tekst + geëxtraheerde context) ──
     const userContent = bestandenNaarContent(bestanden || [])
