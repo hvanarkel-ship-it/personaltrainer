@@ -24,11 +24,43 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   const [laden, setLaden] = useState(false)
   const [histLaden, setHistLaden] = useState(true)
   const [toonUploadMenu, setToonUploadMenu] = useState(false)
-  const [uploads, setUploads] = useState([]) // { bestand, preview, type, base64 }
+  const [uploads, setUploads] = useState([])
   const [uploadType, setUploadType] = useState(null)
+  const [opname, setOpname] = useState(false)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const fileRef = useRef(null)
+  const recognitionRef = useRef(null)
+
+  const heeftStem = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+
+  function toggleOpname() {
+    if (opname) {
+      recognitionRef.current?.stop()
+      return
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    const rec = new SR()
+    rec.lang = 'nl-NL'
+    rec.continuous = false
+    rec.interimResults = true
+    recognitionRef.current = rec
+
+    let interimTekst = ''
+    rec.onstart = () => setOpname(true)
+    rec.onresult = (e) => {
+      let interim = '', final = ''
+      for (const res of e.results) {
+        if (res.isFinal) final += res[0].transcript
+        else interim += res[0].transcript
+      }
+      interimTekst = interim
+      if (final) setInput(prev => (prev + ' ' + final).trimStart())
+    }
+    rec.onerror = () => { setOpname(false) }
+    rec.onend = () => { setOpname(false); inputRef.current?.focus() }
+    rec.start()
+  }
 
   useEffect(() => {
     api.get('/coach-chat')
@@ -224,6 +256,16 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
         >
           📎
         </button>
+        {heeftStem && (
+          <button
+            type="button"
+            className={`mic-btn ${opname ? 'mic-btn--actief' : ''}`}
+            onClick={toggleOpname}
+            title={opname ? 'Stop opname' : 'Inspreken'}
+          >
+            🎙️
+          </button>
+        )}
         <input
           ref={inputRef}
           type="text"
