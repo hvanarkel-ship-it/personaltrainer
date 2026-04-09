@@ -5,7 +5,55 @@ const SPORT_MAP = {
   Run: 'hardlopen', Ride: 'fietsen', VirtualRide: 'fietsen', Swim: 'zwemmen',
   WeightTraining: 'fitness', Workout: 'fitness', Tennis: 'tennis', Padel: 'padel',
   Walk: 'wandelen', Yoga: 'yoga', Soccer: 'voetbal', Football: 'voetbal',
-  Cycling: 'fietsen', Running: 'hardlopen'
+  Cycling: 'fietsen', Running: 'hardlopen', TrailRun: 'hardlopen',
+  MountainBikeRide: 'fietsen', GravelRide: 'fietsen', EBikeRide: 'fietsen',
+}
+
+async function haalZonesOp(activityId, accessToken) {
+  try {
+    const res = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/zones`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+    if (!res.ok) return null
+    const zones = await res.json()
+    const hrZone = Array.isArray(zones) ? zones.find(z => z.type === 'heartrate') : null
+    if (!hrZone?.distribution_buckets) return null
+
+    const buckets = hrZone.distribution_buckets
+    // Strava zones: 0=rust, 1=actief herstel, 2=aerobic, 3=tempo, 4=drempel, 5=anaeroob
+    return {
+      zone2_min: buckets[2] ? Math.round(buckets[2].time / 60) : 0,
+      zone3_min: buckets[3] ? Math.round(buckets[3].time / 60) : 0,
+      zone4_min: (buckets[4] ? Math.round(buckets[4].time / 60) : 0)
+               + (buckets[5] ? Math.round(buckets[5].time / 60) : 0),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function vernieuwToken(sql, userId, profiel) {
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: process.env.STRAVA_CLIENT_ID,
+      client_secret: process.env.STRAVA_CLIENT_SECRET,
+      refresh_token: profiel.strava_refresh_token,
+      grant_type: 'refresh_token'
+    })
+  })
+  const tokens = await res.json()
+  if (!tokens.access_token) throw new Error('Token vernieuwen mislukt')
+  await sql`
+    UPDATE user_profile SET
+      strava_access_token = ${tokens.access_token},
+      strava_refresh_token = ${tokens.refresh_token},
+      strava_token_expires_at = ${tokens.expires_at},
+      updated_at = NOW()
+    WHERE user_id = ${userId}
+  `
+  return tokens.access_token
 }
 
 export const handler = async (event) => {
@@ -22,76 +70,76 @@ export const handler = async (event) => {
       SELECT strava_access_token, strava_refresh_token, strava_token_expires_at
       FROM user_profile WHERE user_id = ${userId}
     `
+    if (!profiel?.strava_access_token) return cors({ error: 'Strava niet gekoppeld' }, 400)
 
-    if (!profiel?.strava_access_token) {
-      return cors({ error: 'Strava niet gekoppeld' }, 400)
-    }
-
+    // Token verversen indien verlopen
     let accessToken = profiel.strava_access_token
-
-    // Refresh token if expired
     if (profiel.strava_token_expires_at < Math.floor(Date.now() / 1000)) {
-      const res = await fetch('https://www.strava.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: process.env.STRAVA_CLIENT_ID,
-          client_secret: process.env.STRAVA_CLIENT_SECRET,
-          refresh_token: profiel.strava_refresh_token,
-          grant_type: 'refresh_token'
-        })
-      })
-      const tokens = await res.json()
-      if (!tokens.access_token) return cors({ error: 'Token vernieuwen mislukt' }, 500)
-      accessToken = tokens.access_token
-      await sql`
-        UPDATE user_profile SET
-          strava_access_token = ${tokens.access_token},
-          strava_refresh_token = ${tokens.refresh_token},
-          strava_token_expires_at = ${tokens.expires_at},
-          updated_at = NOW()
-        WHERE user_id = ${userId}
-      `
+      accessToken = await vernieuwToken(sql, userId, profiel)
     }
 
+    // Laatste 30 activiteiten ophalen
     const res = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=30&page=1', {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
     const activities = await res.json()
-
-    if (!Array.isArray(activities)) {
-      return cors({ error: 'Strava API fout', detail: activities }, 500)
-    }
+    if (!Array.isArray(activities)) return cors({ error: 'Strava API fout', detail: activities }, 500)
 
     let gesynchroniseerd = 0
+    let overgeslagen = 0
+
     for (const act of activities) {
-      const sport = SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig'
       const datum = act.start_date_local?.split('T')[0]
       if (!datum) continue
 
-      const duur_min = Math.round((act.moving_time || 0) / 60)
-      const kcal = act.kilojoules ? Math.round(act.kilojoules / 4.184) : null
-      const gem_hartslag = act.average_heartrate ? Math.round(act.average_heartrate) : null
-      const max_hartslag = act.max_heartrate ? Math.round(act.max_heartrate) : null
-
-      // Deduplicate by strava activity ID stored in notities or by checking date+sport+bron
+      // Deduplicatie op Strava ID
       const [existing] = await sql`
         SELECT id FROM trainingen
         WHERE user_id = ${userId} AND bron = 'strava'
         AND notities LIKE ${`%[strava:${act.id}]%`}
         LIMIT 1
       `
-      if (existing) continue
+      if (existing) { overgeslagen++; continue }
 
-      const notities = `${act.name || sport}  [strava:${act.id}]`
+      const sport     = SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig'
+      const duur_min  = Math.round((act.moving_time || 0) / 60)
+      const kcal      = act.kilojoules ? Math.round(act.kilojoules / 4.184) : null
+      const gem_hr    = act.average_heartrate ? Math.round(act.average_heartrate) : null
+      const max_hr    = act.max_heartrate     ? Math.round(act.max_heartrate)     : null
+      const afstand_m = act.distance          ? Math.round(act.distance)           : null
+      const hoogte_m  = act.total_elevation_gain ? Math.round(act.total_elevation_gain) : null
+
+      // Notities: naam + afstand + hoogte + strava ID
+      const notitiesDelen = [act.name || sport]
+      if (afstand_m && afstand_m > 0) notitiesDelen.push(`${(afstand_m / 1000).toFixed(1)}km`)
+      if (hoogte_m  && hoogte_m > 0)  notitiesDelen.push(`↑${hoogte_m}m`)
+      notitiesDelen.push(`[strava:${act.id}]`)
+      const notities = notitiesDelen.join(' — ')
+
+      // Hartslagzones ophalen voor activiteiten met HR data (max 10 zone-calls per sync)
+      let zones = null
+      if (gem_hr && gesynchroniseerd < 10) {
+        zones = await haalZonesOp(act.id, accessToken)
+      }
+
       await sql`
-        INSERT INTO trainingen (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, notities, bron)
-        VALUES (${userId}, ${datum}, ${sport}, ${duur_min}, ${kcal}, ${gem_hartslag}, ${max_hartslag}, ${notities}, 'strava')
+        INSERT INTO trainingen
+          (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
+           zone2_min, zone3_min, zone4_min, notities, bron)
+        VALUES
+          (${userId}, ${datum}, ${sport}, ${duur_min}, ${kcal}, ${gem_hr}, ${max_hr},
+           ${zones?.zone2_min ?? null}, ${zones?.zone3_min ?? null}, ${zones?.zone4_min ?? null},
+           ${notities}, 'strava')
       `
       gesynchroniseerd++
     }
 
-    return cors({ success: true, gesynchroniseerd, totaal: activities.length })
+    return cors({
+      success: true,
+      gesynchroniseerd,
+      overgeslagen,
+      totaal: activities.length
+    })
   } catch (err) {
     console.error('Strava sync error:', err)
     return cors({ error: 'Sync fout: ' + err.message }, 500)
