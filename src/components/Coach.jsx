@@ -84,7 +84,12 @@ export default function Coach({ user }) {
 
     try {
       const res = await api.post('/coach-chat', { bericht: tekst, bestanden, upload_type: type })
-      setBerichten(b => [...b, { rol: 'ai', tekst: res.antwoord }])
+      const nieuweB = []
+      if (res.opgeslagen) {
+        nieuweB.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
+      }
+      nieuweB.push({ rol: 'ai', tekst: res.antwoord })
+      setBerichten(b => [...b, ...nieuweB])
     } catch (err) {
       setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
     } finally {
@@ -128,16 +133,29 @@ export default function Coach({ user }) {
             </div>
           </div>
         ) : (
-          berichten.map((b, i) => (
-            <div key={i} className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
-              {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
-              <div className="bericht-bubble">
-                <div className="bericht-tekst" dangerouslySetInnerHTML={{
-                  __html: formatBericht(b.tekst)
-                }} />
+          berichten.map((b, i) => {
+            if (b.rol === 'systeem' && b.opgeslagen) {
+              const icoon = b.opgeslagen.type === 'inbody' ? '📊' : '⌚'
+              const kleur = b.opgeslagen.type === 'inbody' ? '#166534' : '#1e40af'
+              const bg = b.opgeslagen.type === 'inbody' ? '#f0fdf4' : '#eff6ff'
+              const border = b.opgeslagen.type === 'inbody' ? '#bbf7d0' : '#bfdbfe'
+              return (
+                <div key={i} className="opgeslagen-pill" style={{ background: bg, border: `1px solid ${border}`, color: kleur }}>
+                  {icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.label}
+                </div>
+              )
+            }
+            return (
+              <div key={i} className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
+                {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
+                <div className="bericht-bubble">
+                  <div className="bericht-tekst" dangerouslySetInnerHTML={{
+                    __html: formatBericht(b.tekst)
+                  }} />
+                </div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
 
         {laden && (

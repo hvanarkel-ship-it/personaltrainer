@@ -4,6 +4,94 @@ import { requireAuth, cors } from './_auth.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
+// Extractie-prompts voor auto-save (strakke JSON output)
+const EXTRACT_PROMPTS = {
+  inbody: `Extraheer alle waarden van dit InBody document. Geef UITSLUITEND geldig JSON, geen andere tekst:
+{"datum":"YYYY-MM-DD of null","gewicht_kg":0,"vetmassa_kg":0,"vetpercentage":0,"spiermassa_kg":0,"visceraal_vet":0,"bmr_kcal":0,"vochtbalans_pct":0,"inbody_score":0,"notities":"korte duiding NL"}`,
+
+  suunto: `Extraheer alle waarden van dit Suunto scherm. Geef UITSLUITEND geldig JSON, geen andere tekst:
+{"datum":"YYYY-MM-DD of null","sport":"activiteitstype NL","duur_min":0,"kcal":0,"gem_hartslag":0,"max_hartslag":0,"hrv_ochtend":0,"slaap_uur":0,"slaapscore":0,"herstelbalans":0,"zone2_min":0,"zone3_min":0,"zone4_min":0,"notities":"samenvatting NL"}`
+}
+
+async function extracteerEnSlaOp(sql, userId, uploadType, bestanden) {
+  const prompt = EXTRACT_PROMPTS[uploadType]
+  if (!prompt) return null
+
+  // Bouw image content op
+  const content = []
+  for (const b of bestanden) {
+    const [header, data] = b.base64.split(',')
+    const mediaType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg'
+    if (mediaType === 'application/pdf') {
+      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } })
+    } else {
+      content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } })
+    }
+  }
+  content.push({ type: 'text', text: prompt })
+
+  // Gebruik haiku voor snelle JSON extractie
+  const res = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 600,
+    messages: [{ role: 'user', content }]
+  })
+
+  const raw = res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim()
+  const d = JSON.parse(raw)
+
+  const vandaag = new Date().toISOString().split('T')[0]
+  const datum = d.datum && d.datum !== 'null' ? d.datum : vandaag
+
+  if (uploadType === 'inbody') {
+    const [opgeslagen] = await sql`
+      INSERT INTO inbody_metingen
+        (user_id, datum, gewicht_kg, vetmassa_kg, vetpercentage, spiermassa_kg,
+         visceraal_vet, bmr_kcal, vochtbalans_pct, inbody_score, bron, notities)
+      VALUES
+        (${userId}, ${datum},
+         ${d.gewicht_kg || null}, ${d.vetmassa_kg || null}, ${d.vetpercentage || null},
+         ${d.spiermassa_kg || null}, ${d.visceraal_vet || null}, ${d.bmr_kcal || null},
+         ${d.vochtbalans_pct || null}, ${d.inbody_score || null},
+         'coach_upload', ${d.notities || null})
+      RETURNING id
+    `
+    return {
+      type: 'inbody',
+      id: opgeslagen.id,
+      data: d,
+      label: `InBody meting ${datum}`,
+      samenvatting: `Gewicht: ${d.gewicht_kg}kg | Vet: ${d.vetpercentage}% | Spier: ${d.spiermassa_kg}kg | Visceraal: ${d.visceraal_vet} | BMR: ${d.bmr_kcal}kcal | Score: ${d.inbody_score}`,
+    }
+  }
+
+  if (uploadType === 'suunto') {
+    const sport = d.sport || 'training'
+    const [opgeslagen] = await sql`
+      INSERT INTO trainingen
+        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
+         hrv_ochtend, slaap_uur, slaapscore, herstelbalans,
+         zone2_min, zone3_min, zone4_min, notities, bron)
+      VALUES
+        (${userId}, ${datum}, ${sport},
+         ${d.duur_min || null}, ${d.kcal || null}, ${d.gem_hartslag || null}, ${d.max_hartslag || null},
+         ${d.hrv_ochtend || null}, ${d.slaap_uur || null}, ${d.slaapscore || null}, ${d.herstelbalans || null},
+         ${d.zone2_min || null}, ${d.zone3_min || null}, ${d.zone4_min || null},
+         ${d.notities || null}, 'coach_upload')
+      RETURNING id
+    `
+    return {
+      type: 'suunto',
+      id: opgeslagen.id,
+      data: d,
+      label: `${sport} ${datum}`,
+      samenvatting: `Sport: ${sport} | Duur: ${d.duur_min}min | Kcal: ${d.kcal} | HRV: ${d.hrv_ochtend}ms | Slaap: ${d.slaap_uur}u | Herstelbalans: ${d.herstelbalans} | Zone2: ${d.zone2_min}min`,
+    }
+  }
+
+  return null
+}
+
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
   const auth = requireAuth(event)
@@ -11,7 +99,6 @@ export const handler = async (event) => {
 
   const sql = getDb()
   const userId = auth.user.userId
-  const pad = event.path.split('/')
 
   try {
     // Gesprekshistorie ophalen
@@ -35,6 +122,21 @@ export const handler = async (event) => {
     const { bericht, bestanden, upload_type } = JSON.parse(event.body || '{}')
     if (!bericht && !bestanden?.length) return cors({ error: 'Bericht of bestand verplicht' }, 400)
 
+    // ── AUTO-SAVE: InBody & Suunto ──
+    let opgeslagen = null
+    let extraContext = ''
+    if ((upload_type === 'inbody' || upload_type === 'suunto') && bestanden?.length) {
+      try {
+        opgeslagen = await extracteerEnSlaOp(sql, userId, upload_type, bestanden)
+        if (opgeslagen) {
+          extraContext = `\n\n[Geëxtraheerde data uit upload — automatisch opgeslagen in logboek]\n${opgeslagen.samenvatting}`
+        }
+      } catch (err) {
+        console.error('Auto-save extractie fout:', err)
+        // Doorgaan zonder auto-save — coach reageert nog steeds op de afbeelding
+      }
+    }
+
     // Gebruikersdata ophalen voor context
     const [profiel] = await sql`
       SELECT u.name, p.geboortejaar, p.geslacht, p.lengte_cm, p.gewicht_kg,
@@ -43,7 +145,7 @@ export const handler = async (event) => {
       FROM users u LEFT JOIN user_profile p ON p.user_id = u.id
       WHERE u.id = ${userId}
     `
-    const [inbody] = await sql`
+    const [inbodyContext] = await sql`
       SELECT gewicht_kg, vetpercentage, spiermassa_kg, visceraal_vet, datum
       FROM inbody_metingen WHERE user_id = ${userId}
       ORDER BY datum DESC LIMIT 1
@@ -69,7 +171,6 @@ export const handler = async (event) => {
     const kcalVandaag = vandaagMeals.reduce((s, m) => s + (m.kcal || 0), 0)
     const eiwitVandaag = vandaagMeals.reduce((s, m) => s + (parseFloat(m.eiwit_g) || 0), 0)
 
-    // Dynamische systeem-prompt
     const naam = profiel?.name || 'gebruiker'
     const coachNaam = profiel?.coach_naam || 'APEX Coach'
     const stijlInstructie = {
@@ -98,7 +199,7 @@ Gebruikersprofiel:
 - Lengte: ${profiel?.lengte_cm || '?'} cm | Gewicht: ${profiel?.gewicht_kg || '?'} kg
 - Dagdoelen: ${profiel?.doel_kcal || 2400} kcal | ${profiel?.doel_eiwit_g || 160}g eiwit | ${profiel?.doel_koolhydraten_g || 250}g koolhyd | ${profiel?.doel_vetten_g || 80}g vet
 - Actieve sporten: ${profiel?.sporten?.join(', ') || 'fitness, padel, fietsen'}
-${inbody ? `- Laatste InBody (${inbody.datum}): ${inbody.vetpercentage}% vet, ${inbody.spiermassa_kg}kg spier, ${inbody.gewicht_kg}kg` : ''}
+${inbodyContext ? `- Laatste InBody (${inbodyContext.datum}): ${inbodyContext.vetpercentage}% vet, ${inbodyContext.spiermassa_kg}kg spier, ${inbodyContext.gewicht_kg}kg` : ''}
 ${herstel ? `- HRV gisteren: ${herstel.hrv_ochtend} ms | Slaap: ${herstel.slaap_uur} uur | Herstelbalans: ${herstel.herstelbalans}` : ''}
 - Gegeten vandaag: ${kcalVandaag} kcal / ${Math.round(eiwitVandaag)}g eiwit
 ${weektraining.length ? `- Trainingen deze week: ${weektraining.map(t => `${t.sport}(${t.duur_min}min)`).join(', ')}` : ''}
@@ -113,25 +214,35 @@ Spreek altijd Nederlands. ${stijlInstructie} Combineer rollen wanneer relevant.`
       ORDER BY created_at DESC LIMIT 20
     `
 
-    // Bouw content op voor dit bericht
+    // Bouw content op — afbeeldingen + tekst + geëxtraheerde data als context
     const userContent = []
     if (bestanden?.length) {
       for (const b of bestanden) {
         const [header, data] = b.base64.split(',')
         const mediaType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg'
-        userContent.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } })
+        if (mediaType === 'application/pdf') {
+          userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } })
+        } else {
+          userContent.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } })
+        }
       }
     }
-    if (bericht) userContent.push({ type: 'text', text: bericht })
+    // Tekst inclusief geëxtraheerde data als context voor de coach
+    const berichtMetContext = (bericht || '') + extraContext
+    if (berichtMetContext.trim()) {
+      userContent.push({ type: 'text', text: berichtMetContext.trim() })
+    }
 
     const messages = [
       ...history.reverse().map(h => ({
         role: h.is_ai ? 'assistant' : 'user',
         content: h.bericht
       })),
-      { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text'
-        ? userContent[0].text
-        : userContent
+      {
+        role: 'user',
+        content: userContent.length === 1 && userContent[0].type === 'text'
+          ? userContent[0].text
+          : userContent
       }
     ]
 
@@ -149,16 +260,16 @@ Spreek altijd Nederlands. ${stijlInstructie} Combineer rollen wanneer relevant.`
     await sql`
       INSERT INTO gesprekken (user_id, rol, bericht, is_ai, upload_type)
       VALUES
-        (${userId}, 'user', ${berichtTekst}, false, ${upload_type||null}),
+        (${userId}, 'user', ${berichtTekst}, false, ${upload_type || null}),
         (${userId}, 'assistant', ${antwoord}, true, null)
     `
 
-    return cors({ antwoord })
+    return cors({ antwoord, opgeslagen })
   } catch (err) {
     console.error('Coach chat error:', err)
-    const bericht = err.status === 529 || err.message?.includes('overloaded')
+    const msg = err.status === 529 || err.message?.includes('overloaded')
       ? 'De AI is momenteel druk bezet. Probeer het over een minuut opnieuw.'
       : 'Coach fout: ' + err.message
-    return cors({ error: bericht }, err.status === 529 ? 503 : 500)
+    return cors({ error: msg }, err.status === 529 ? 503 : 500)
   }
 }

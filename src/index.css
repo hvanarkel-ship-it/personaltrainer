@@ -244,6 +244,11 @@ body {
 .bericht-tekst li { margin-bottom: 2px; }
 .bericht-tekst strong { font-weight: 600; }
 
+.opgeslagen-pill {
+  align-self: center; padding: 7px 14px; border-radius: 20px;
+  font-size: 0.78rem; text-align: center; animation: slideIn 0.2s ease;
+}
+
 .typing-indicator { display: flex; align-items: center; gap: 4px; min-width: 46px; }
 .typing-indicator span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: typing 1.2s infinite; display: block; }
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; } .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
