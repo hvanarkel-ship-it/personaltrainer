@@ -187,9 +187,10 @@ export const handler = async (event) => {
     const [
       opgeslagen,
       [profiel],
-      [inbodyCtx],
-      [herstel],
+      inbodyTrend,
+      hrvTrend,
       vandaagMeals,
+      gisterMeals,
       actieveDoelen,
       weektraining,
       history
@@ -199,55 +200,166 @@ export const handler = async (event) => {
         p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
         p.sporten, p.coach_context, p.coach_naam, p.coach_stijl
         FROM users u LEFT JOIN user_profile p ON p.user_id = u.id WHERE u.id = ${userId}`,
-      sql`SELECT gewicht_kg, vetpercentage, spiermassa_kg, visceraal_vet, datum
-        FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 1`,
-      sql`SELECT hrv_ochtend, slaap_uur, slaapscore, herstelbalans, datum
-        FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL ORDER BY datum DESC LIMIT 1`,
-      sql`SELECT kcal, eiwit_g FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag}`,
-      sql`SELECT titel, doel_waarde, huidige_waarde, eenheid FROM doelen WHERE user_id = ${userId} AND actief = TRUE LIMIT 5`,
-      sql`SELECT sport, duur_min, datum FROM trainingen WHERE user_id = ${userId}
+      sql`SELECT datum, gewicht_kg, vetpercentage, spiermassa_kg, visceraal_vet, inbody_score, bmr_kcal
+        FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 3`,
+      sql`SELECT datum, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
+        FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
-      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 20`
+      sql`SELECT maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
+        FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag} ORDER BY created_at ASC`,
+      sql`SELECT kcal, eiwit_g, koolhydraten_g, vetten_g
+        FROM maaltijden WHERE user_id = ${userId} AND datum = (CURRENT_DATE - INTERVAL '1 day')`,
+      sql`SELECT titel, beschrijving, doel_waarde, huidige_waarde, eenheid, deadline, sport
+        FROM doelen WHERE user_id = ${userId} AND actief = TRUE ORDER BY deadline ASC NULLS LAST LIMIT 8`,
+      sql`SELECT datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
+          hrv_ochtend, slaap_uur, slaapscore, herstelbalans,
+          zone2_min, zone3_min, zone4_min, notities
+        FROM trainingen WHERE user_id = ${userId}
+        AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
+      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 30`
     ])
 
-    // Totalen vandaag (inclusief nieuw opgeslagen maaltijd als die er is)
-    const kcalVandaag = vandaagMeals.reduce((s, m) => s + (m.kcal || 0), 0)
-      + (opgeslagen?.type === 'maaltijd' ? (opgeslagen.data.kcal || 0) : 0)
-    const eiwitVandaag = vandaagMeals.reduce((s, m) => s + (parseFloat(m.eiwit_g) || 0), 0)
-      + (opgeslagen?.type === 'maaltijd' ? (parseFloat(opgeslagen.data.eiwit_g) || 0) : 0)
+    // Nieuw opgeslagen maaltijd meenemen in vandaag-lijst
+    const alleMealsVandaag = [...vandaagMeals]
+    if (opgeslagen?.type === 'maaltijd') {
+      alleMealsVandaag.push({
+        maaltijd_type: opgeslagen.data.maaltijd_type || getMaaltijdType(),
+        beschrijving: opgeslagen.data.beschrijving,
+        kcal: opgeslagen.data.kcal,
+        eiwit_g: opgeslagen.data.eiwit_g,
+        koolhydraten_g: opgeslagen.data.koolhydraten_g,
+        vetten_g: opgeslagen.data.vetten_g,
+      })
+    }
+
+    // Bereken totalen
+    const totVandaag = alleMealsVandaag.reduce((s, m) => ({
+      kcal: s.kcal + (m.kcal || 0),
+      eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
+      kh: s.kh + (parseFloat(m.koolhydraten_g) || 0),
+      vet: s.vet + (parseFloat(m.vetten_g) || 0),
+    }), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
+
+    const totGister = gisterMeals.reduce((s, m) => ({
+      kcal: s.kcal + (m.kcal || 0),
+      eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
+    }), { kcal: 0, eiwit: 0 })
 
     // ── Systeem-prompt ──
     const naam = profiel?.name || 'gebruiker'
     const coachNaam = profiel?.coach_naam || 'APEX Coach'
+    const leeftijd = profiel?.geboortejaar ? new Date().getFullYear() - profiel.geboortejaar : null
     const stijlInstructie = {
-      direct: 'Wees direct en bondig. Geef concrete getallen en acties zonder omhaal.',
+      direct: 'Wees direct en bondig. Geef concrete getallen en acties.',
       motiverend: 'Wees enthousiast en motiverend. Moedig aan en vier successen.',
-      wetenschappelijk: 'Geef wetenschappelijk onderbouwde uitleg met referenties naar fysiologie en onderzoek.',
-      vriendelijk: 'Wees warm, ondersteunend en empathisch. Neem de tijd voor de persoon achter de vraag.'
+      wetenschappelijk: 'Geef wetenschappelijk onderbouwde uitleg met fysiologische onderbouwing.',
+      vriendelijk: 'Wees warm, ondersteunend en empathisch.'
     }[profiel?.coach_stijl || 'direct'] || 'Wees direct en bondig.'
+
+    // ── Voeding vandaag opbouwen ──
+    const dagdoelKcal = profiel?.doel_kcal || 2400
+    const dagdoelEiwit = profiel?.doel_eiwit_g || 160
+    const dagdoelKh = profiel?.doel_koolhydraten_g || 250
+    const dagdoelVet = profiel?.doel_vetten_g || 80
+    const restKcal = dagdoelKcal - totVandaag.kcal
+    const restEiwit = dagdoelEiwit - totVandaag.eiwit
+
+    const maaltijdRegels = alleMealsVandaag.length > 0
+      ? alleMealsVandaag.map(m => {
+          const macros = [
+            m.kcal != null ? `${m.kcal}kcal` : null,
+            m.eiwit_g != null ? `${parseFloat(m.eiwit_g).toFixed(1)}g eiwit` : null,
+            m.koolhydraten_g != null ? `${parseFloat(m.koolhydraten_g).toFixed(1)}g kh` : null,
+            m.vetten_g != null ? `${parseFloat(m.vetten_g).toFixed(1)}g vet` : null,
+          ].filter(Boolean).join(' | ')
+          return `  • ${m.maaltijd_type || 'maaltijd'}: ${m.beschrijving || '—'} — ${macros}`
+        }).join('\n')
+      : '  Nog geen maaltijden gelogd'
+
+    // ── InBody trend opbouwen ──
+    const inbodyRegels = inbodyTrend.length > 0
+      ? inbodyTrend.map(m => {
+          const parts = [
+            m.gewicht_kg ? `${m.gewicht_kg}kg` : null,
+            m.vetpercentage ? `${m.vetpercentage}% vet` : null,
+            m.spiermassa_kg ? `${m.spiermassa_kg}kg spier` : null,
+            m.visceraal_vet ? `visceraal ${m.visceraal_vet}` : null,
+            m.inbody_score ? `score ${m.inbody_score}` : null,
+          ].filter(Boolean).join(' | ')
+          return `  • ${m.datum}: ${parts}`
+        }).join('\n')
+      : '  Geen InBody metingen beschikbaar'
+
+    // ── HRV/slaap trend opbouwen ──
+    const hrvRegels = hrvTrend.length > 0
+      ? hrvTrend.map(m => {
+          const parts = [
+            m.hrv_ochtend ? `HRV ${m.hrv_ochtend}ms` : null,
+            m.slaap_uur ? `slaap ${m.slaap_uur}u` : null,
+            m.slaapscore ? `score ${m.slaapscore}` : null,
+            m.herstelbalans != null ? `balans ${m.herstelbalans > 0 ? '+' : ''}${m.herstelbalans}` : null,
+          ].filter(Boolean).join(' | ')
+          return `  • ${m.datum}: ${parts}`
+        }).join('\n')
+      : '  Geen hersteldata beschikbaar'
+
+    // ── Trainingen detail opbouwen ──
+    const trainingRegels = weektraining.length > 0
+      ? weektraining.map(t => {
+          const detail = [
+            t.duur_min ? `${t.duur_min}min` : null,
+            t.kcal ? `${t.kcal}kcal` : null,
+            t.gem_hartslag ? `gem HR ${t.gem_hartslag}bpm` : null,
+            t.max_hartslag ? `max ${t.max_hartslag}bpm` : null,
+            (t.zone2_min || t.zone3_min || t.zone4_min)
+              ? `zones Z2:${t.zone2_min||0} Z3:${t.zone3_min||0} Z4:${t.zone4_min||0}min` : null,
+          ].filter(Boolean).join(' | ')
+          const herstelInfo = t.hrv_ochtend ? ` [HRV ${t.hrv_ochtend}ms slaap ${t.slaap_uur}u]` : ''
+          return `  • ${t.datum} ${t.sport}: ${detail}${herstelInfo}${t.notities ? ` — "${t.notities}"` : ''}`
+        }).join('\n')
+      : '  Geen trainingen deze week'
+
+    // ── Doelen opbouwen ──
+    const doelenRegels = actieveDoelen.length > 0
+      ? actieveDoelen.map(d => {
+          const pct = d.doel_waarde && d.huidige_waarde
+            ? Math.round((d.huidige_waarde / d.doel_waarde) * 100) : 0
+          const deadline = d.deadline ? ` (deadline: ${d.deadline})` : ''
+          const sport = d.sport ? ` [${d.sport}]` : ''
+          return `  • ${d.titel}${sport}: ${d.huidige_waarde||'?'}/${d.doel_waarde} ${d.eenheid||''} (${pct}%)${deadline}${d.beschrijving ? ` — ${d.beschrijving}` : ''}`
+        }).join('\n')
+      : '  Geen actieve doelen'
 
     const systemPrompt = `Je bent ${coachNaam}, een persoonlijke AI-coachingassistent voor ${naam}.
 
-Je combineert vijf expertprofielen:
-TRAINER: Schema's, sets/reps, progressie, periodisering, warming-up, herstel, sport-specifiek (${profiel?.sporten?.join('/') || 'fitness/padel/fietsen'}).
-DIETIST: Macro-analyse, maaltijdplanning, eiwitdoelen, timing rondom training, foto-interpretatie, supplementadvies.
-FYSIOLOOG: HRV-interpretatie, hartslagzones, VO2max, belastingscurve, overtraining, InBody duiden.
-COACH: Motivatie, doelstelling, weekplanning, gewoontevorming, mentale begeleiding.
-VOEDINGSDESKUNDIGE: Micronutriënten, bloedwaarden, vitamines, mineralen, energiebalans.
+ROL: Combineer trainer, diëtist, fysioloog, coach en voedingsdeskundige. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief in je antwoorden.
 
-Gebruikersprofiel:
-- Naam: ${naam}${profiel?.geslacht ? ` | Geslacht: ${profiel.geslacht}` : ''}
-- Lengte: ${profiel?.lengte_cm || '?'} cm | Gewicht: ${profiel?.gewicht_kg || '?'} kg
-- Dagdoelen: ${profiel?.doel_kcal || 2400} kcal | ${profiel?.doel_eiwit_g || 160}g eiwit | ${profiel?.doel_koolhydraten_g || 250}g kh | ${profiel?.doel_vetten_g || 80}g vet
-- Actieve sporten: ${profiel?.sporten?.join(', ') || 'fitness, padel, fietsen'}
-${inbodyCtx ? `- Laatste InBody (${inbodyCtx.datum}): ${inbodyCtx.vetpercentage}% vet, ${inbodyCtx.spiermassa_kg}kg spier, ${inbodyCtx.gewicht_kg}kg` : ''}
-${herstel ? `- HRV: ${herstel.hrv_ochtend}ms | Slaap: ${herstel.slaap_uur}u | Herstelbalans: ${herstel.herstelbalans}` : ''}
-- Gegeten vandaag: ${kcalVandaag} kcal / ${Math.round(eiwitVandaag)}g eiwit
-${weektraining.length ? `- Trainingen deze week: ${weektraining.map(t => `${t.sport}(${t.duur_min}min)`).join(', ')}` : ''}
-${actieveDoelen.length ? `- Actieve doelen: ${actieveDoelen.map(d => `${d.titel} ${d.huidige_waarde||'?'}/${d.doel_waarde}${d.eenheid||''}`).join(', ')}` : ''}
-${profiel?.coach_context ? `\nPersoonlijke context:\n${profiel.coach_context}` : ''}
+═══ GEBRUIKERSPROFIEL ═══
+Naam: ${naam}${leeftijd ? ` | ${leeftijd} jaar` : ''}${profiel?.geslacht ? ` | ${profiel.geslacht}` : ''}
+Lengte: ${profiel?.lengte_cm || '?'}cm | Gewicht: ${profiel?.gewicht_kg || '?'}kg
+Sporten: ${profiel?.sporten?.join(', ') || 'fitness, padel, fietsen'}
+Dagdoelen: ${dagdoelKcal}kcal | ${dagdoelEiwit}g eiwit | ${dagdoelKh}g koolhyd | ${dagdoelVet}g vet
+${profiel?.coach_context ? `Persoonlijke context: ${profiel.coach_context}` : ''}
 
-Spreek altijd Nederlands. ${stijlInstructie} Combineer rollen wanneer relevant.`
+═══ VOEDING VANDAAG (${vandaag}) ═══
+${maaltijdRegels}
+Dagtotaal: ${Math.round(totVandaag.kcal)}kcal | ${Math.round(totVandaag.eiwit)}g eiwit | ${Math.round(totVandaag.kh)}g kh | ${Math.round(totVandaag.vet)}g vet
+Resterend: ${Math.round(restKcal)}kcal | ${Math.round(restEiwit)}g eiwit
+${gisterMeals.length ? `Gisteren: ${Math.round(totGister.kcal)}kcal | ${Math.round(totGister.eiwit)}g eiwit` : ''}
+
+═══ HERSTEL & HRV (afgelopen 7 dagen) ═══
+${hrvRegels}
+
+═══ TRAININGEN DEZE WEEK ═══
+${trainingRegels}
+
+═══ LICHAAM / INBODY TREND ═══
+${inbodyRegels}
+
+═══ ACTIEVE DOELEN ═══
+${doelenRegels}
+
+Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Combineer expertprofielen wanneer relevant.`
 
     // ── Bouw user bericht op (afbeeldingen + tekst + geëxtraheerde context) ──
     const userContent = bestandenNaarContent(bestanden || [])
