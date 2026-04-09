@@ -135,13 +135,14 @@ export default function Coach({ user }) {
         ) : (
           berichten.map((b, i) => {
             if (b.rol === 'systeem' && b.opgeslagen) {
-              const icoon = b.opgeslagen.type === 'inbody' ? '📊' : '⌚'
-              const kleur = b.opgeslagen.type === 'inbody' ? '#166534' : '#1e40af'
-              const bg = b.opgeslagen.type === 'inbody' ? '#f0fdf4' : '#eff6ff'
-              const border = b.opgeslagen.type === 'inbody' ? '#bbf7d0' : '#bfdbfe'
+              const cfg = {
+                inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
+                suunto:   { icoon: '⌚', bg: '#eff6ff', border: '#bfdbfe', kleur: '#1e40af' },
+                maaltijd: { icoon: '🍽️', bg: '#fff7ed', border: '#fed7aa', kleur: '#9a3412' },
+              }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }
               return (
-                <div key={i} className="opgeslagen-pill" style={{ background: bg, border: `1px solid ${border}`, color: kleur }}>
-                  {icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.label}
+                <div key={i} className="opgeslagen-pill" style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.kleur }}>
+                  {cfg.icoon} <strong>Opgeslagen in logboek:</strong> {b.opgeslagen.label}
                 </div>
               )
             }
