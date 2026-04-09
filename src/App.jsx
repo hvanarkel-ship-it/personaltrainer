@@ -7,6 +7,7 @@ import Voeding from './components/Voeding.jsx'
 import Lichaam from './components/Lichaam.jsx'
 import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
+import DbStatus from './components/DbStatus.jsx'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: '⚡' },
@@ -122,6 +123,8 @@ export default function App() {
 
   return (
     <div className="app">
+      <DbStatus />
+
       {/* Offline banner */}
       {!isOnline && (
         <div className="offline-banner">
