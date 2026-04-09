@@ -338,6 +338,11 @@ export const handler = async (event) => {
 
 ROL: Combineer trainer, diëtist, fysioloog, coach en voedingsdeskundige. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief in je antwoorden.
 
+═══ AUTOMATISCH OPSLAAN VAN VOEDING ═══
+Als de gebruiker beschrijft dat hij/zij iets heeft GEGETEN of GEDRONKEN (een feit, geen vraag), voeg dan ACHTERIN je antwoord dit blok toe — onzichtbaar voor de gebruiker:
+[AUTO_SAVE]{"beschrijving":"korte naam","maaltijd_type":"ontbijt|lunch|diner|snack|pre-workout|post-workout","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0}[/AUTO_SAVE]
+Combineer meerdere producten die samen gegeten zijn in één entry. Gebruik standaard porties als geen hoeveelheid gegeven is. Doe dit NIET bij vragen over voeding of macro-berekeningen zonder dat de gebruiker aangeeft het gegeten te hebben.
+
 ═══ GEBRUIKERSPROFIEL ═══
 Naam: ${naam}${leeftijd ? ` | ${leeftijd} jaar` : ''}${profiel?.geslacht ? ` | ${profiel.geslacht}` : ''}
 Lengte: ${profiel?.lengte_cm || '?'}cm | Gewicht: ${profiel?.gewicht_kg || '?'}kg
@@ -378,8 +383,34 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
       { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : userContent }
     ]
 
-    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1500, system: systemPrompt, messages })
-    const antwoord = response.content[0].text
+    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1600, system: systemPrompt, messages })
+    let antwoord = response.content[0].text
+
+    // ── Check voor AUTO_SAVE blok in AI response (fallback als haiku/regex niets vindt) ──
+    if (!opgeslagen) {
+      const autoSaveMatch = antwoord.match(/\[AUTO_SAVE\]([\s\S]*?)\[\/AUTO_SAVE\]/)
+      if (autoSaveMatch) {
+        try {
+          const d = JSON.parse(autoSaveMatch[1].trim())
+          if (d.beschrijving && (d.kcal || d.eiwit_g)) {
+            const vandaagStr = new Date().toISOString().split('T')[0]
+            const maaltijdType = d.maaltijd_type || getMaaltijdType()
+            const [row] = await sql`
+              INSERT INTO maaltijden (user_id, datum, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g)
+              VALUES (${userId}, ${vandaagStr}, ${maaltijdType}, ${d.beschrijving},
+                ${d.kcal || null}, ${d.eiwit_g || null}, ${d.koolhydraten_g || null}, ${d.vetten_g || null})
+              RETURNING id`
+            opgeslagen = {
+              type: 'maaltijd', id: row.id, data: d,
+              label: `${d.beschrijving} (${maaltijdType})`,
+              samenvatting: `${d.beschrijving} — ${d.kcal}kcal | ${d.eiwit_g}g eiwit | ${d.koolhydraten_g}g kh | ${d.vetten_g}g vet`
+            }
+          }
+        } catch (err) { console.error('AUTO_SAVE parse fout:', err) }
+        // Strip het blok uit het antwoord
+        antwoord = antwoord.replace(/\s*\[AUTO_SAVE\][\s\S]*?\[\/AUTO_SAVE\]/, '').trim()
+      }
+    }
 
     const opgeslagenTekst = bericht || (bestanden?.length ? `[${bestanden.length} bestand(en) geüpload: ${upload_type || 'upload'}]` : '')
     await sql`
