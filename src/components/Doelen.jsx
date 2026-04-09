@@ -14,6 +14,9 @@ export default function Doelen({ onNavigeer }) {
   const [form, setForm] = useState({ titel: '', sport: '', beschrijving: '', doel_waarde: '', huidige_waarde: '', eenheid: '', deadline: '' })
   const [opslaan, setOpslaan] = useState(false)
   const [fout, setFout] = useState('')
+  const [updateId, setUpdateId] = useState(null)
+  const [updateWaarde, setUpdateWaarde] = useState('')
+  const [updateLaden, setUpdateLaden] = useState(false)
 
   useEffect(() => {
     api.get('/doelen').then(setDoelen).catch(e => setFout(e.message)).finally(() => setLaden(false))
@@ -34,11 +37,21 @@ export default function Doelen({ onNavigeer }) {
     finally { setOpslaan(false) }
   }
 
-  async function updateVoortgang(id, huidige_waarde) {
-    const waarde = prompt('Huidige waarde:')
-    if (waarde === null) return
-    const updated = await api.put(`/doelen/${id}`, { huidige_waarde: parseFloat(waarde) })
-    setDoelen(d => d.map(x => x.id === id ? { ...x, huidige_waarde: parseFloat(waarde) } : x))
+  function startUpdate(doel) {
+    setUpdateId(doel.id)
+    setUpdateWaarde(doel.huidige_waarde ?? '')
+  }
+
+  async function slaUpdateOp(id) {
+    const val = parseFloat(updateWaarde)
+    if (isNaN(val)) return
+    setUpdateLaden(true)
+    try {
+      await api.put(`/doelen/${id}`, { huidige_waarde: val })
+      setDoelen(d => d.map(x => x.id === id ? { ...x, huidige_waarde: val } : x))
+      setUpdateId(null)
+    } catch (err) { setFout(err.message) }
+    finally { setUpdateLaden(false) }
   }
 
   async function toggleActief(id, actief) {
@@ -110,7 +123,16 @@ export default function Doelen({ onNavigeer }) {
         <>
           {actief.length > 0 && (
             <div className="lijst">
-              {actief.map(d => <DoelKaart key={d.id} doel={d} onVoortgang={updateVoortgang} onToggle={toggleActief} onVerwijder={verwijder} onCoach={() => onNavigeer('coach')} />)}
+              {actief.map(d => (
+                <DoelKaart key={d.id} doel={d}
+                  updateId={updateId} updateWaarde={updateWaarde} updateLaden={updateLaden}
+                  onStartUpdate={startUpdate}
+                  onUpdateWaarde={setUpdateWaarde}
+                  onSlaOp={slaUpdateOp}
+                  onAnnuleer={() => setUpdateId(null)}
+                  onToggle={toggleActief} onVerwijder={verwijder}
+                />
+              ))}
             </div>
           )}
 
@@ -118,7 +140,16 @@ export default function Doelen({ onNavigeer }) {
             <>
               <h4 className="sectie-titel">Archief</h4>
               <div className="lijst">
-                {archief.map(d => <DoelKaart key={d.id} doel={d} onVoortgang={updateVoortgang} onToggle={toggleActief} onVerwijder={verwijder} onCoach={() => onNavigeer('coach')} archief />)}
+                {archief.map(d => (
+                  <DoelKaart key={d.id} doel={d} archief
+                    updateId={updateId} updateWaarde={updateWaarde} updateLaden={updateLaden}
+                    onStartUpdate={startUpdate}
+                    onUpdateWaarde={setUpdateWaarde}
+                    onSlaOp={slaUpdateOp}
+                    onAnnuleer={() => setUpdateId(null)}
+                    onToggle={toggleActief} onVerwijder={verwijder}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -130,10 +161,11 @@ export default function Doelen({ onNavigeer }) {
   )
 }
 
-function DoelKaart({ doel: d, onVoortgang, onToggle, onVerwijder, onCoach, archief }) {
-  const pct = d.doel_waarde && d.huidige_waarde
+function DoelKaart({ doel: d, archief, updateId, updateWaarde, updateLaden, onStartUpdate, onUpdateWaarde, onSlaOp, onAnnuleer, onToggle, onVerwijder }) {
+  const pct = d.doel_waarde && d.huidige_waarde != null
     ? Math.min(100, Math.round((d.huidige_waarde / d.doel_waarde) * 100)) : 0
   const bereikt = pct >= 100
+  const isUpdating = updateId === d.id
 
   return (
     <div className={`card doel-kaart ${archief ? 'doel-kaart--archief' : ''} ${bereikt ? 'doel-kaart--bereikt' : ''}`}>
@@ -144,7 +176,7 @@ function DoelKaart({ doel: d, onVoortgang, onToggle, onVerwijder, onCoach, archi
           {d.sport && <span className="doel-sport">{d.sport}</span>}
         </div>
         <div className="doel-acties">
-          <button className="icon-btn sm" onClick={() => onVoortgang(d.id)} title="Update voortgang">✏️</button>
+          <button className="icon-btn sm" onClick={() => onStartUpdate(d)} title="Update voortgang">✏️</button>
           <button className="icon-btn sm" onClick={() => onToggle(d.id, d.actief)} title={d.actief ? 'Archiveren' : 'Activeren'}>{d.actief ? '📥' : '📤'}</button>
           <button className="verwijder-btn" onClick={() => onVerwijder(d.id)}>×</button>
         </div>
@@ -156,14 +188,34 @@ function DoelKaart({ doel: d, onVoortgang, onToggle, onVerwijder, onCoach, archi
             <div className={`voortgang-fill ${bereikt ? 'voortgang-bereikt' : 'voortgang-primary'}`} style={{ width: pct + '%' }} />
           </div>
           <div className="doel-waarden">
-            <span>{d.huidige_waarde || 0} {d.eenheid}</span>
+            <span>{d.huidige_waarde ?? 0} {d.eenheid}</span>
             <span className="doel-pct">{pct}%</span>
             <span>{d.doel_waarde} {d.eenheid}</span>
           </div>
         </>
       )}
 
-      {d.deadline && <p className="doel-deadline">📅 Deadline: {new Date(d.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+      {/* Inline voortgang update */}
+      {isUpdating && (
+        <div className="doel-update-rij">
+          <input
+            type="number"
+            step="any"
+            className="doel-update-input"
+            value={updateWaarde}
+            onChange={e => onUpdateWaarde(e.target.value)}
+            placeholder={`Nieuwe waarde (${d.eenheid || ''})`}
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') onSlaOp(d.id); if (e.key === 'Escape') onAnnuleer() }}
+          />
+          <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} onClick={() => onSlaOp(d.id)} disabled={updateLaden}>
+            {updateLaden ? '...' : 'Opslaan'}
+          </button>
+          <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: '0.82rem' }} onClick={onAnnuleer}>✕</button>
+        </div>
+      )}
+
+      {d.deadline && <p className="doel-deadline">📅 {new Date(d.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
       {d.beschrijving && <p className="doel-beschrijving">{d.beschrijving}</p>}
     </div>
   )

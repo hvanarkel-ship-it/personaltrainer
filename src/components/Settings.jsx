@@ -113,7 +113,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
   const TABS = [
     { id: 'profiel', label: 'Profiel', icon: '👤' },
     { id: 'coach', label: 'Coach', icon: '🤖' },
-    { id: 'doelen', label: 'Doelen', icon: '🎯' },
+    { id: 'doelen', label: "Macro's", icon: '🥗' },
     { id: 'integraties', label: 'Koppelingen', icon: '🔗' },
   ]
 

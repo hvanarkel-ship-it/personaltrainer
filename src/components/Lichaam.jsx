@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api.js'
 
-const vandaag = new Date().toISOString().split('T')[0]
-
 export default function Lichaam({ onNavigeer }) {
   const [metingen, setMetingen] = useState([])
   const [laden, setLaden] = useState(true)
   const [toonForm, setToonForm] = useState(false)
   const [analyseert, setAnalyseert] = useState(false)
   const [form, setForm] = useState({
-    datum: vandaag, gewicht_kg: '', vetmassa_kg: '', vetpercentage: '',
+    datum: new Date().toISOString().split('T')[0],
+    gewicht_kg: '', vetmassa_kg: '', vetpercentage: '',
     spiermassa_kg: '', visceraal_vet: '', bmr_kcal: '', vochtbalans_pct: '',
     inbody_score: '', notities: ''
   })
@@ -74,10 +73,18 @@ export default function Lichaam({ onNavigeer }) {
   const laatste = metingen[0]
   const vorige = metingen[1]
 
-  function delta(veld) {
+  // delta: positief getal = waarde is gestegen
+  // laagIsGoed=true: daling is groen (vet, gewicht, visceraal)
+  // laagIsGoed=false: stijging is groen (spiermassa, score)
+  function delta(veld, laagIsGoed = true) {
     if (!laatste?.[veld] || !vorige?.[veld]) return null
     const d = parseFloat(laatste[veld]) - parseFloat(vorige[veld])
-    return { waarde: Math.abs(d).toFixed(1), richting: d > 0 ? '↑' : '↓', pos: d < 0 }
+    if (Math.abs(d) < 0.05) return null
+    return {
+      waarde: Math.abs(d).toFixed(1),
+      richting: d > 0 ? '↑' : '↓',
+      goed: laagIsGoed ? d < 0 : d > 0,
+    }
   }
 
   return (
@@ -96,17 +103,17 @@ export default function Lichaam({ onNavigeer }) {
         <div className="card inbody-card">
           <div className="inbody-header">
             <h3>Meest recente meting</h3>
-            <span className="inbody-datum">{new Date(laatste.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            <span className="inbody-datum">{new Date(laatste.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
           <div className="inbody-grid">
-            {laatste.gewicht_kg && <InBodyStat label="Gewicht" waarde={laatste.gewicht_kg} eenheid="kg" delta={delta('gewicht_kg')} isGoed={v => v?.pos} />}
-            {laatste.vetpercentage && <InBodyStat label="Vetpercentage" waarde={laatste.vetpercentage} eenheid="%" delta={delta('vetpercentage')} isGoed={v => v?.pos} />}
-            {laatste.spiermassa_kg && <InBodyStat label="Spiermassa" waarde={laatste.spiermassa_kg} eenheid="kg" delta={delta('spiermassa_kg')} isGoed={v => !v?.pos} />}
-            {laatste.vetmassa_kg && <InBodyStat label="Vetmassa" waarde={laatste.vetmassa_kg} eenheid="kg" delta={delta('vetmassa_kg')} isGoed={v => v?.pos} />}
-            {laatste.visceraal_vet && <InBodyStat label="Visceraal vet" waarde={laatste.visceraal_vet} eenheid="" delta={delta('visceraal_vet')} isGoed={v => v?.pos} />}
-            {laatste.bmr_kcal && <InBodyStat label="BMR" waarde={laatste.bmr_kcal} eenheid="kcal" />}
+            {laatste.gewicht_kg    && <InBodyStat label="Gewicht"      waarde={laatste.gewicht_kg}    eenheid="kg" delta={delta('gewicht_kg')} />}
+            {laatste.vetpercentage && <InBodyStat label="Vetpercentage" waarde={laatste.vetpercentage} eenheid="%" delta={delta('vetpercentage')} />}
+            {laatste.spiermassa_kg && <InBodyStat label="Spiermassa"   waarde={laatste.spiermassa_kg} eenheid="kg" delta={delta('spiermassa_kg', false)} />}
+            {laatste.vetmassa_kg   && <InBodyStat label="Vetmassa"     waarde={laatste.vetmassa_kg}   eenheid="kg" delta={delta('vetmassa_kg')} />}
+            {laatste.visceraal_vet && <InBodyStat label="Visceraal vet" waarde={laatste.visceraal_vet} eenheid="" delta={delta('visceraal_vet')} />}
+            {laatste.bmr_kcal      && <InBodyStat label="BMR"          waarde={laatste.bmr_kcal}      eenheid="kcal" delta={delta('bmr_kcal', false)} />}
             {laatste.vochtbalans_pct && <InBodyStat label="Vochtbalans" waarde={laatste.vochtbalans_pct} eenheid="%" />}
-            {laatste.inbody_score && <InBodyStat label="InBody score" waarde={laatste.inbody_score} eenheid="" />}
+            {laatste.inbody_score  && <InBodyStat label="InBody score" waarde={laatste.inbody_score}  eenheid="" delta={delta('inbody_score', false)} />}
           </div>
           {laatste.notities && <p className="inbody-notities">{laatste.notities}</p>}
           <button className="link-btn small mt-2" onClick={() => onNavigeer('coach')}>
@@ -154,7 +161,7 @@ export default function Lichaam({ onNavigeer }) {
             {metingen.map(m => (
               <div key={m.id} className="card meting-rij">
                 <div className="meting-rij-kop">
-                  <strong>{new Date(m.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+                  <strong>{new Date(m.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
                   <button className="verwijder-btn" onClick={() => verwijder(m.id)}>×</button>
                 </div>
                 <div className="meting-mini-stats">
@@ -176,9 +183,9 @@ function InBodyStat({ label, waarde, eenheid, delta }) {
   return (
     <div className="inbody-stat">
       <div className="inbody-stat-waarde">
-        {waarde} <span>{eenheid}</span>
+        {waarde}<span className="inbody-eenheid">{eenheid}</span>
         {delta && (
-          <span className={`delta ${delta.pos ? 'delta--goed' : 'delta--slecht'}`}>
+          <span className={`delta ${delta.goed ? 'delta--goed' : 'delta--slecht'}`}>
             {delta.richting}{delta.waarde}
           </span>
         )}
