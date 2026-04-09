@@ -63,11 +63,56 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
       {/* Macro voortgang vandaag */}
       <div className="card">
-        <h3>Voeding vandaag</h3>
-        <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={p.doel_kcal||2400} eenheid="kcal" pct={kcalPct} kleur="primary" />
-        <MacroBalk label="Eiwit" huidig={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} eenheid="g" pct={eiwitPct} kleur="green" />
-        <MacroBalk label="Koolhydraten" huidig={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} eenheid="g" pct={khPct} kleur="blue" />
-        <MacroBalk label="Vetten" huidig={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} eenheid="g" pct={vetPct} kleur="orange" />
+        <div className="card-header">
+          <h3>Voeding vandaag</h3>
+          <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Bekijk alles →</button>
+        </div>
+
+        {/* Totaal blokken */}
+        <div className="dash-macro-blokken">
+          <div className="dash-macro-blok">
+            <span className="dash-macro-val">{v.kcal || 0}</span>
+            <span className="dash-macro-sub">/ {p.doel_kcal || 2400} kcal</span>
+          </div>
+          <div className="dash-macro-blok dash-macro-groen">
+            <span className="dash-macro-val">{Math.round(v.eiwit || 0)}g</span>
+            <span className="dash-macro-sub">/ {p.doel_eiwit_g || 160}g eiwit</span>
+          </div>
+          <div className="dash-macro-blok dash-macro-blauw">
+            <span className="dash-macro-val">{Math.round(v.koolhydraten || 0)}g</span>
+            <span className="dash-macro-sub">/ {p.doel_koolhydraten_g || 250}g kh</span>
+          </div>
+          <div className="dash-macro-blok dash-macro-oranje">
+            <span className="dash-macro-val">{Math.round(v.vetten || 0)}g</span>
+            <span className="dash-macro-sub">/ {p.doel_vetten_g || 80}g vet</span>
+          </div>
+        </div>
+
+        {/* Voortgangsbalken */}
+        <div style={{ marginTop: 10 }}>
+          <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={p.doel_kcal||2400} eenheid="kcal" pct={kcalPct} kleur="primary" />
+          <MacroBalk label="Eiwit" huidig={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} eenheid="g" pct={eiwitPct} kleur="green" />
+          <MacroBalk label="Koolhydraten" huidig={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} eenheid="g" pct={khPct} kleur="blue" />
+          <MacroBalk label="Vetten" huidig={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} eenheid="g" pct={vetPct} kleur="orange" />
+        </div>
+
+        {/* Vandaag gegeten lijst */}
+        {v.maaltijden_lijst?.length > 0 && (
+          <div className="dash-maaltijd-lijst">
+            {v.maaltijden_lijst.map((m, i) => (
+              <div key={i} className="dash-maaltijd-rij">
+                <div className="dash-maaltijd-naam">
+                  <span className="dash-maaltijd-type">{m.maaltijd_type || 'maaltijd'}</span>
+                  {m.beschrijving || 'Maaltijd'}
+                </div>
+                <div className="dash-maaltijd-macros">
+                  {m.kcal != null && <span>{m.kcal} kcal</span>}
+                  {m.eiwit_g != null && <span className="eiwit-tag">{parseFloat(m.eiwit_g).toFixed(0)}g eiwit</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Gewichtstrend */}

@@ -25,9 +25,9 @@ export const handler = async (event) => {
     `
 
     const vandaagMaaltijden = await sql`
-      SELECT kcal, eiwit_g, koolhydraten_g, vetten_g FROM maaltijden
-      WHERE user_id = ${userId} AND datum = ${vandaag}
-    `
+      SELECT id, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
+      FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag}
+      ORDER BY created_at ASC`
 
     const weektrainingen = await sql`
       SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
@@ -65,7 +65,7 @@ export const handler = async (event) => {
       profiel: profiel || {},
       vandaag: {
         datum: vandaag,
-        maaltijden: vandaagMaaltijden.length,
+        maaltijden_lijst: vandaagMaaltijden,
         ...gegeten,
       },
       herstel: recentTraining || null,

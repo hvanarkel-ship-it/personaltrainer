@@ -8,7 +8,9 @@ export const handler = async (event) => {
 
   const sql = getDb()
   const userId = auth.user.userId
-  const id = event.path.split('/').pop()
+  const parts = event.path.split('/')
+  const id = parts[parts.length - 1]
+  const hasId = id && id !== 'maaltijd'
 
   try {
     if (event.httpMethod === 'GET') {
@@ -28,12 +30,26 @@ export const handler = async (event) => {
         VALUES (${userId}, ${d.datum||null}, ${d.maaltijd_type||null}, ${d.beschrijving||null},
           ${d.kcal||null}, ${d.eiwit_g||null}, ${d.koolhydraten_g||null}, ${d.vetten_g||null},
           ${d.foto_analyse||null}, ${d.ai_notities||null})
-        RETURNING *
-      `
+        RETURNING *`
       return cors(row, 201)
     }
 
-    if (event.httpMethod === 'DELETE' && id !== 'maaltijd') {
+    if (event.httpMethod === 'PUT' && hasId) {
+      const d = JSON.parse(event.body || '{}')
+      const [row] = await sql`
+        UPDATE maaltijden SET
+          maaltijd_type = COALESCE(${d.maaltijd_type||null}, maaltijd_type),
+          beschrijving   = COALESCE(${d.beschrijving||null}, beschrijving),
+          kcal           = ${d.kcal != null ? d.kcal : null},
+          eiwit_g        = ${d.eiwit_g != null ? d.eiwit_g : null},
+          koolhydraten_g = ${d.koolhydraten_g != null ? d.koolhydraten_g : null},
+          vetten_g       = ${d.vetten_g != null ? d.vetten_g : null}
+        WHERE id = ${id} AND user_id = ${userId}
+        RETURNING *`
+      return cors(row)
+    }
+
+    if (event.httpMethod === 'DELETE' && hasId) {
       await sql`DELETE FROM maaltijden WHERE id = ${id} AND user_id = ${userId}`
       return cors({ success: true })
     }

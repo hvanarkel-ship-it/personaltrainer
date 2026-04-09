@@ -302,6 +302,48 @@ body {
 .training-notities { font-size: 0.8rem; color: var(--text-3); margin-top: 7px; }
 .tip-tip { font-size: 0.78rem; color: var(--text-3); padding: 8px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 10px; }
 
+/* ===== DASHBOARD VOEDING ===== */
+.dash-macro-blokken {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px;
+}
+.dash-macro-blok {
+  background: var(--bg); border-radius: var(--radius-sm);
+  padding: 8px 6px; text-align: center;
+}
+.dash-macro-blok.dash-macro-groen { background: #f0fdf4; }
+.dash-macro-blok.dash-macro-blauw { background: #eff6ff; }
+.dash-macro-blok.dash-macro-oranje { background: #fff7ed; }
+.dash-macro-val {
+  display: block; font-size: 1rem; font-weight: 700; line-height: 1.2;
+  color: var(--text);
+}
+.dash-macro-groen .dash-macro-val { color: #166534; }
+.dash-macro-blauw .dash-macro-val { color: #1e40af; }
+.dash-macro-oranje .dash-macro-val { color: #9a3412; }
+.dash-macro-sub { font-size: 0.6rem; color: var(--text-3); }
+
+.dash-maaltijd-lijst {
+  margin-top: 12px; border-top: 1px solid var(--border);
+  padding-top: 10px; display: flex; flex-direction: column; gap: 7px;
+}
+.dash-maaltijd-rij {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.dash-maaltijd-naam {
+  font-size: 0.82rem; color: var(--text); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 6px;
+}
+.dash-maaltijd-type {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--primary); font-weight: 700; flex-shrink: 0;
+}
+.dash-maaltijd-macros {
+  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+}
+.dash-maaltijd-macros span { font-size: 0.75rem; color: var(--text-3); }
+.eiwit-tag { color: #166534 !important; background: #f0fdf4; padding: 1px 5px; border-radius: 10px; }
+
 /* ===== VOEDING ===== */
 .datum-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .datum-input { flex: 1; background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 8px 12px; font-size: 0.875rem; font-family: var(--font); text-align: center; }
@@ -329,6 +371,19 @@ body {
 .maaltijd-kaart { margin-bottom: 6px; }
 .maaltijd-kop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .maaltijd-naam { font-size: 0.875rem; font-weight: 500; }
+
+.dagtotaal-card h3 { margin-bottom: 10px; }
+.dagtotaal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+.maaltijd-macros { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.macro-tag {
+  display: inline-flex; align-items: baseline; gap: 2px;
+  padding: 3px 8px; border-radius: 20px;
+  font-size: 0.75rem; background: var(--bg); color: var(--text-2);
+}
+.macro-tag strong { font-weight: 700; font-size: 0.82rem; }
+
+.macro-invoer-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 
 /* ===== LICHAAM / INBODY ===== */
 .inbody-card {}
