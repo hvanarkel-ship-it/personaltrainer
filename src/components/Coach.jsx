@@ -67,8 +67,13 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
 
   useEffect(() => {
     api.get('/coach-chat')
-      .then(hist => setBerichten(hist.map(h => ({ rol: h.is_ai ? 'ai' : 'user', tekst: h.bericht, type: h.upload_type }))))
-      .catch(console.error)
+      .then(hist => setBerichten(hist.map(h => ({
+        rol: h.is_ai ? 'ai' : 'user',
+        tekst: h.bericht,
+        type: h.upload_type,
+        datum: h.created_at,
+      }))))
+      .catch(err => console.error('Geschiedenis laden mislukt:', err))
       .finally(() => setHistLaden(false))
   }, [])
 
@@ -122,7 +127,8 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       ? `${tekst ? tekst + '\n' : ''}📎 ${uploads.length} bestand(en): ${uploads.map(u => u.bestand.name).join(', ')}`
       : tekst
 
-    setBerichten(b => [...b, { rol: 'user', tekst: previewTekst }])
+    const nu = new Date().toISOString()
+    setBerichten(b => [...b, { rol: 'user', tekst: previewTekst, datum: nu }])
     setInput('')
     setUploads([])
     setLaden(true)
@@ -133,7 +139,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       if (res.opgeslagen) {
         nieuweB.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
       }
-      nieuweB.push({ rol: 'ai', tekst: res.antwoord })
+      nieuweB.push({ rol: 'ai', tekst: res.antwoord, datum: nu })
       setBerichten(b => [...b, ...nieuweB])
     } catch (err) {
       setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
@@ -183,8 +189,16 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
               ))}
             </div>
           </div>
-        ) : (
-          berichten.map((b, i) => {
+        ) : (() => {
+          // Groepeer berichten op datum met datum-scheidingslijn
+          let vorigeDatum = null
+          return berichten.map((b, i) => {
+            const datumLabel = b.datum
+              ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+              : null
+            const toonDatum = datumLabel && datumLabel !== vorigeDatum
+            if (toonDatum) vorigeDatum = datumLabel
+
             if (b.rol === 'systeem' && b.opgeslagen) {
               const cfg = {
                 inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
@@ -198,17 +212,20 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
               )
             }
             return (
-              <div key={i} className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
-                {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
-                <div className="bericht-bubble">
-                  <div className="bericht-tekst" dangerouslySetInnerHTML={{
-                    __html: formatBericht(b.tekst)
-                  }} />
+              <div key={i}>
+                {toonDatum && <div className="chat-datum-lijn"><span>{datumLabel}</span></div>}
+                <div className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
+                  {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
+                  <div className="bericht-bubble">
+                    <div className="bericht-tekst" dangerouslySetInnerHTML={{
+                      __html: formatBericht(b.tekst)
+                    }} />
+                  </div>
                 </div>
               </div>
             )
           })
-        )}
+        })()}
 
         {laden && (
           <div className="bericht bericht--ai">

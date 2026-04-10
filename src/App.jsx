@@ -117,10 +117,15 @@ export default function App() {
   if (!user) return <Login onInloggen={inloggen} />
 
   const schermen = {
-    dashboard: Dashboard, coach: Coach, training: Training,
+    dashboard: Dashboard, training: Training,
     voeding: Voeding, lichaam: Lichaam, doelen: Doelen, settings: Settings,
   }
-  const Scherm = schermen[scherm] || Dashboard
+  const Scherm = schermen[scherm]
+
+  const navProps = {
+    onNavigeer: (s, ctx) => { setScherm(s); if (s === 'coach' && ctx) setCoachTrigger(ctx) },
+    onUitloggen: uitloggen,
+  }
 
   return (
     <div className="app">
@@ -142,14 +147,24 @@ export default function App() {
         </div>
       )}
 
-      <Scherm
-        user={user}
-        onNavigeer={(s, ctx) => { setScherm(s); if (s === 'coach' && ctx) setCoachTrigger(ctx) }}
-        onUitloggen={uitloggen}
-        stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
-        coachTrigger={scherm === 'coach' ? coachTrigger : undefined}
-        onCoachTriggerUsed={() => setCoachTrigger(null)}
-      />
+      {/* Coach blijft altijd gemount zodat dialooghistorie niet verloren gaat */}
+      <div style={{ display: scherm === 'coach' ? 'contents' : 'none' }}>
+        <Coach
+          user={user}
+          {...navProps}
+          coachTrigger={coachTrigger}
+          onCoachTriggerUsed={() => setCoachTrigger(null)}
+        />
+      </div>
+
+      {/* Alle andere schermen mounten/unmounten normaal */}
+      {Scherm && scherm !== 'coach' && (
+        <Scherm
+          user={user}
+          {...navProps}
+          stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
+        />
+      )}
 
       <nav className="bottom-nav">
         {NAV.map(item => (

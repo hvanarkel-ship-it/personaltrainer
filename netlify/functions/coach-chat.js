@@ -173,7 +173,7 @@ export const handler = async (event) => {
       const rows = await sql`
         SELECT rol, bericht, is_ai, upload_type, created_at
         FROM gesprekken WHERE user_id = ${userId}
-        ORDER BY created_at ASC LIMIT 100`
+        ORDER BY created_at ASC, id ASC LIMIT 200`
       return cors(rows)
     }
 
@@ -232,7 +232,7 @@ export const handler = async (event) => {
           zone2_min, zone3_min, zone4_min, notities
         FROM trainingen WHERE user_id = ${userId}
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
-      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 30`
+      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 60`
     ])
     opgeslagen = _opgeslagen
 
@@ -458,10 +458,12 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
     }
 
     const opgeslagenTekst = bericht || (bestanden?.length ? `[${bestanden.length} bestand(en) geüpload: ${upload_type || 'upload'}]` : '')
-    await sql`
-      INSERT INTO gesprekken (user_id, rol, bericht, is_ai, upload_type) VALUES
-        (${userId}, 'user', ${opgeslagenTekst}, false, ${upload_type||null}),
-        (${userId}, 'assistant', ${antwoord}, true, null)`
+    // Twee aparte INSERTs zodat id-volgorde de chronologische volgorde garandeert
+    // (één VALUES-statement geeft beide rijen dezelfde created_at waardoor volgorde onbepaald is)
+    await sql`INSERT INTO gesprekken (user_id, rol, bericht, is_ai, upload_type)
+      VALUES (${userId}, 'user', ${opgeslagenTekst}, false, ${upload_type||null})`
+    await sql`INSERT INTO gesprekken (user_id, rol, bericht, is_ai, upload_type)
+      VALUES (${userId}, 'assistant', ${antwoord}, true, null)`
 
     return cors({ antwoord, opgeslagen })
   } catch (err) {

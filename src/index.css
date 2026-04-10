@@ -284,6 +284,14 @@ body {
 .coach-tabel tr:last-child td { border-bottom: none; }
 .coach-tabel tr:nth-child(even) td { background: #fafafa; }
 
+.chat-datum-lijn {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0 6px;
+  color: var(--text-3); font-size: 0.68rem;
+}
+.chat-datum-lijn::before, .chat-datum-lijn::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
 .opgeslagen-pill {
   align-self: center; padding: 7px 14px; border-radius: 20px;
   font-size: 0.78rem; text-align: center; animation: slideIn 0.2s ease;
