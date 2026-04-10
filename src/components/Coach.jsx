@@ -40,26 +40,29 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       return
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    const rec = new SR()
-    rec.lang = 'nl-NL'
-    rec.continuous = false
-    rec.interimResults = true
-    recognitionRef.current = rec
+    if (!SR) return
+    try {
+      const rec = new SR()
+      rec.lang = 'nl-NL'
+      rec.continuous = false
+      rec.interimResults = false
+      recognitionRef.current = rec
 
-    let interimTekst = ''
-    rec.onstart = () => setOpname(true)
-    rec.onresult = (e) => {
-      let interim = '', final = ''
-      for (const res of e.results) {
-        if (res.isFinal) final += res[0].transcript
-        else interim += res[0].transcript
+      rec.onstart = () => setOpname(true)
+      rec.onresult = (e) => {
+        let final = ''
+        for (const res of e.results) {
+          if (res.isFinal) final += res[0].transcript
+        }
+        if (final) setInput(prev => (prev + ' ' + final).trimStart())
       }
-      interimTekst = interim
-      if (final) setInput(prev => (prev + ' ' + final).trimStart())
+      rec.onerror = () => setOpname(false)
+      rec.onend = () => { setOpname(false); inputRef.current?.focus() }
+      rec.start()
+    } catch (err) {
+      console.error('SpeechRecognition fout:', err)
+      setOpname(false)
     }
-    rec.onerror = () => { setOpname(false) }
-    rec.onend = () => { setOpname(false); inputRef.current?.focus() }
-    rec.start()
   }
 
   useEffect(() => {
@@ -222,7 +225,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       {uploads.length > 0 && (
         <div className="upload-previews">
           {uploads.map((u, i) => (
-            <div key={i} className="upload-preview">
+            <div key={`${u.bestand.name}-${i}`} className="upload-preview">
               {u.preview
                 ? <img src={u.preview} alt={u.bestand.name} />
                 : <div className="upload-doc-icon">📄</div>

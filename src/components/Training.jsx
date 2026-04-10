@@ -40,16 +40,18 @@ export default function Training({ onNavigeer }) {
 
   async function verwijder(id) {
     if (!confirm('Training verwijderen?')) return
-    await api.delete(`/training/${id}`)
-    setTrainingen(t => t.filter(x => x.id !== id))
+    try {
+      await api.delete(`/training/${id}`)
+      setTrainingen(t => t.filter(x => x.id !== id))
+    } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
-  // Weekbelasting (laatste 7 dagen)
+  // Weekbelasting (laatste 7 dagen) — herstel-only entries tellen niet mee
   const vandaag = vandaagStr()
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = d.toISOString().split('T')[0]
-    const dagTrainingen = trainingen.filter(t => t.datum === ds)
+    const dagTrainingen = trainingen.filter(t => t.datum === ds && t.sport !== 'herstel')
     return {
       datum: ds,
       label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
@@ -84,8 +86,8 @@ export default function Training({ onNavigeer }) {
           )}
         </div>
         <div className="week-chart">
-          {week.map((d, i) => (
-            <div key={i} className="week-dag">
+          {week.map((d) => (
+            <div key={d.datum} className="week-dag">
               <div className="week-balk-wrap">
                 <div className={`week-balk ${d.datum === vandaag ? 'week-balk--vandaag' : ''} ${d.sessies > 1 ? 'week-balk--meerdere' : ''}`}
                   style={{ height: Math.max(4, (d.minuten / maxMin) * 60) + 'px' }} />
@@ -150,15 +152,12 @@ export default function Training({ onNavigeer }) {
         </div>
       )}
 
-      {laden ? <div className="center-loader"><div className="spinner" /></div> :
-        trainingen.length === 0 ? (
-          <div className="leeg-staat"><p>🏋️</p><p>Nog geen trainingen gelogd.</p></div>
-        ) : (
-          <div className="lijst">
-            {trainingen.map(t => <TrainingKaart key={t.id} t={t} onVerwijder={verwijder} />)}
-          </div>
-        )
-      }
+      {laden ? <div className="center-loader"><div className="spinner" /></div> : (() => {
+        const echte = trainingen.filter(t => t.sport !== 'herstel')
+        return echte.length === 0
+          ? <div className="leeg-staat"><p>🏋️</p><p>Nog geen trainingen gelogd.</p></div>
+          : <div className="lijst">{echte.map(t => <TrainingKaart key={t.id} t={t} onVerwijder={verwijder} />)}</div>
+      })()}
     </div>
   )
 }

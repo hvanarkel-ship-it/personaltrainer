@@ -55,7 +55,7 @@ body {
   background: var(--card);
   border-top: 1px solid var(--border);
   display: flex;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 100;
 }
 
@@ -306,7 +306,7 @@ body {
 .upload-type-btn:hover { border-color: var(--primary); background: var(--primary-light); }
 .upload-type-btn span:first-child { font-size: 1.1rem; }
 
-.chat-invoer { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--card); }
+.chat-invoer { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--card); }
 .upload-btn { background: none; border: 1.5px solid var(--border); color: var(--text-2); border-radius: var(--radius-sm); padding: 0 10px; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
 .upload-btn:hover { border-color: var(--primary); color: var(--primary); }
 .mic-btn {

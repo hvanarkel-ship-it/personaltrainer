@@ -51,12 +51,16 @@ const SPORT_ICONS_MAP = { fitness:'🏋️', hardlopen:'🏃', fietsen:'🚴', p
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [data, setData] = useState(null)
   const [laden, setLaden] = useState(true)
+  const [fout, setFout] = useState('')
   const [toonOchtendForm, setToonOchtendForm] = useState(false)
   const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
-    api.get('/dashboard').then(d => { setData(d); setLaden(false) }).catch(console.error)
+    api.get('/dashboard')
+      .then(d => setData(d))
+      .catch(e => setFout(e.message))
+      .finally(() => setLaden(false))
   }, [])
 
   const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -79,6 +83,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   }
 
   if (laden) return <div className="page page-loading"><div className="spinner" /></div>
+  if (fout) return <div className="page"><div className="alert alert-error" style={{ margin: 20 }}>Dashboard kon niet laden: {fout}</div></div>
 
   const p = data?.profiel || {}
   const v = data?.vandaag || {}
@@ -231,7 +236,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                     : d.hrv >= 45 ? '#eab308'
                     : '#ef4444'
                   return (
-                    <div key={i} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
+                    <div key={d.datum} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
                       <div className="hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
                       {d.hrv && <span className="hrv-val">{d.hrv}</span>}
                       <span className="hrv-label">{d.label}</span>
@@ -282,7 +287,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
           <div className="week-sports-strip">
             {echteTrainingen.slice(0, 7).map((t, i) => (
-              <span key={i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + t.duur_min + 'min' : ''}`}>
+              <span key={t.id || i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + t.duur_min + 'min' : ''}`}>
                 {SPORT_ICONS_MAP[t.sport] || '⚽'}
               </span>
             ))}

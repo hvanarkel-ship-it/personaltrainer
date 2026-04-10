@@ -50,7 +50,7 @@ export default function Voeding({ onNavigeer }) {
   }
 
   async function submit(e) {
-    e.preventDefault(); setOpslaan(true)
+    e.preventDefault(); setOpslaan(true); setFout('')
     try {
       const payload = { datum, ...Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')), ai_notities: aiNotities || undefined }
       const nieuw = await api.post('/maaltijd', payload)
@@ -78,8 +78,10 @@ export default function Voeding({ onNavigeer }) {
 
   async function verwijder(id) {
     if (!confirm('Maaltijd verwijderen?')) return
-    await api.delete(`/maaltijd/${id}`)
-    setMaaltijden(m => m.filter(x => x.id !== id))
+    try {
+      await api.delete(`/maaltijd/${id}`)
+      setMaaltijden(m => m.filter(x => x.id !== id))
+    } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
   const totaal = maaltijden.reduce((s, m) => ({
@@ -283,7 +285,7 @@ function MacroTag({ waarde, label, kleur }) {
   }
   return (
     <span className="macro-tag" style={stijlen[kleur] || {}}>
-      <strong>{Number.isInteger(waarde) ? waarde : waarde.toFixed(1)}</strong> {label}
+      <strong>{isNaN(waarde) ? '—' : Number.isInteger(waarde) ? waarde : waarde.toFixed(1)}</strong> {label}
     </span>
   )
 }
