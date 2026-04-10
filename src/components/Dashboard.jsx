@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api.js'
+import { api, datumStr, datumNl } from '../api.js'
 
 function berekenGereedheid(h) {
   if (!h) return null
@@ -102,7 +102,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const heeftHerstelData = !!(h.hrv_ochtend || h.slaap_uur)
 
   const herstelDagen = h?.datum
-    ? Math.floor((Date.now() - new Date(h.datum + 'T12:00:00').getTime()) / 86400000)
+    ? Math.floor((Date.now() - new Date(datumStr(h.datum) + 'T12:00:00').getTime()) / 86400000)
     : null
 
   // 7-daagse HRV trend vanuit weektrainingen
@@ -110,7 +110,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = d.toISOString().split('T')[0]
-    const record = weekTrainingen.filter(t => t.datum === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
+    const record = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
     return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: record?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
@@ -356,7 +356,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 <div key={i} className="chart-col">
                   <div className="chart-val">{m.gewicht_kg}</div>
                   <div className="chart-bar" style={{ height: barH + 'px' }} />
-                  <div className="chart-date">{new Date(m.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</div>
+                  <div className="chart-date">{datumNl(m.datum, { day: 'numeric', month: 'short' })}</div>
                 </div>
               )
             })}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { api } from '../api.js'
+import { api, datumStr, datumNl } from '../api.js'
 
 export default function Lichaam({ onNavigeer }) {
   const [metingen, setMetingen] = useState([])
@@ -7,7 +7,7 @@ export default function Lichaam({ onNavigeer }) {
   const [toonForm, setToonForm] = useState(false)
   const [analyseert, setAnalyseert] = useState(false)
   const [form, setForm] = useState({
-    datum: new Date().toISOString().split('T')[0],
+    datum: datumStr(new Date()),
     gewicht_kg: '', vetmassa_kg: '', vetpercentage: '',
     spiermassa_kg: '', visceraal_vet: '', bmr_kcal: '', vochtbalans_pct: '',
     inbody_score: '', notities: ''
@@ -54,6 +54,7 @@ export default function Lichaam({ onNavigeer }) {
 
   async function submit(e) {
     e.preventDefault()
+    setFout('')
     setOpslaan(true)
     try {
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
@@ -66,8 +67,10 @@ export default function Lichaam({ onNavigeer }) {
 
   async function verwijder(id) {
     if (!confirm('Meting verwijderen?')) return
-    await api.delete(`/inbody/${id}`)
-    setMetingen(m => m.filter(x => x.id !== id))
+    try {
+      await api.delete(`/inbody/${id}`)
+      setMetingen(m => m.filter(x => x.id !== id))
+    } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
   const laatste = metingen[0]
@@ -103,7 +106,7 @@ export default function Lichaam({ onNavigeer }) {
         <div className="card inbody-card">
           <div className="inbody-header">
             <h3>Meest recente meting</h3>
-            <span className="inbody-datum">{new Date(laatste.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            <span className="inbody-datum">{datumNl(laatste.datum)}</span>
           </div>
           <div className="inbody-grid">
             {laatste.gewicht_kg    && <InBodyStat label="Gewicht"      waarde={laatste.gewicht_kg}    eenheid="kg" delta={delta('gewicht_kg')} />}
@@ -161,7 +164,7 @@ export default function Lichaam({ onNavigeer }) {
             {metingen.map(m => (
               <div key={m.id} className="card meting-rij">
                 <div className="meting-rij-kop">
-                  <strong>{new Date(m.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+                  <strong>{datumNl(m.datum, { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
                   <button className="verwijder-btn" onClick={() => verwijder(m.id)}>×</button>
                 </div>
                 <div className="meting-mini-stats">

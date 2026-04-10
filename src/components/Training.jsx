@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api.js'
+import { api, datumNl } from '../api.js'
 
 const SPORTEN = ['fitness', 'hardlopen', 'fietsen', 'padel', 'zwemmen', 'tennis', 'wandelen', 'yoga', 'wielrennen', 'voetbal']
 const SPORT_ICONS = { fitness: '🏋️', hardlopen: '🏃', fietsen: '🚴', padel: '🎾', zwemmen: '🏊', tennis: '🎾', wandelen: '🚶', yoga: '🧘', wielrennen: '🚵', voetbal: '⚽' }
@@ -174,7 +174,7 @@ function TrainingKaart({ t, onVerwijder }) {
           <div>
             <strong>{t.sport.charAt(0).toUpperCase() + t.sport.slice(1)}</strong>
             <span className="training-datum">
-              {new Date(t.datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {datumNl(t.datum, { weekday: 'short', day: 'numeric', month: 'short' })}
             </span>
           </div>
         </div>
