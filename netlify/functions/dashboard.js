@@ -54,6 +54,25 @@ export const handler = async (event) => {
       ORDER BY datum DESC LIMIT 8
     `
 
+    // Trainingstreak: hoeveel opeenvolgende dagen was er training
+    const recentDagen = await sql`
+      SELECT DISTINCT datum::date as datum FROM trainingen
+      WHERE user_id = ${userId} AND sport != 'herstel'
+      AND datum >= CURRENT_DATE - INTERVAL '30 days'
+      ORDER BY datum DESC
+    `
+    let trainingStreak = 0
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      const ds = d.toISOString().split('T')[0]
+      const gevonden = recentDagen.some(r => {
+        const rd = r.datum instanceof Date ? r.datum.toISOString().split('T')[0] : String(r.datum).slice(0, 10)
+        return rd === ds
+      })
+      if (gevonden) trainingStreak++
+      else break
+    }
+
     const gegeten = vandaagMaaltijden.reduce((s, m) => ({
       kcal: s.kcal + (m.kcal || 0),
       eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
@@ -80,6 +99,7 @@ export const handler = async (event) => {
       week_trainingen: weektrainingen,
       doelen: actieveDoelen,
       gewicht_trend: gewichtTrend.reverse(),
+      streak: trainingStreak,
     })
   } catch (err) {
     console.error('Dashboard error:', err)

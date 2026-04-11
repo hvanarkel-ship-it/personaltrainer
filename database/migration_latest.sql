@@ -138,6 +138,10 @@ UPDATE trainingen
   WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
   AND SUBSTRING(notities FROM '\[strava:([0-9]+)\]') IS NOT NULL;
 
+-- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS stemming SMALLINT;
+
 -- ── Indexen ────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_inbody_user_datum    ON inbody_metingen(user_id, datum DESC);

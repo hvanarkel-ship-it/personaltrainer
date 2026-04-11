@@ -391,24 +391,73 @@ body {
 .week-balk-wrap { display: flex; align-items: flex-end; height: 60px; }
 .week-balk { width: 100%; background: var(--border); border-radius: 3px 3px 0 0; transition: height 0.3s; min-height: 4px; }
 .week-balk--vandaag { background: var(--primary); }
+.week-balk--meerdere { background: var(--primary-dark); }
 .week-label { font-size: 0.6rem; color: var(--text-3); font-weight: 600; }
 .week-min { font-size: 0.55rem; color: var(--primary); font-weight: 600; }
+.week-load-badge { background: #eff6ff; color: #1e40af; padding: 2px 8px; border-radius: 20px; font-size: 0.65rem; font-weight: 700; }
 
+/* Sport selector */
 .sport-keuze { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
-.sport-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font); font-size: 0.75rem; color: var(--text-2); transition: all 0.15s; }
-.sport-btn span:first-child { font-size: 1.2rem; }
+.sport-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font);
+  font-size: 0.72rem; color: var(--text-2); transition: all 0.15s;
+}
 .sport-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
 
-.training-kaart {}
+/* RPE picker */
+.rpe-keuze { display: flex; gap: 4px; flex-wrap: nowrap; margin-top: 4px; }
+.rpe-btn {
+  flex: 1; min-width: 0; height: 32px; border-radius: 6px; border: 1.5px solid transparent;
+  font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font); transition: all 0.12s;
+}
+.rpe-btn--licht { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
+.rpe-btn--matig { background: #fefce8; border-color: #fde047; color: #854d0e; }
+.rpe-btn--zwaar { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+.rpe-btn--max   { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.rpe-btn.active { box-shadow: 0 0 0 2px currentColor; opacity: 1; font-weight: 800; }
+.rpe-hint { font-size: 0.72rem; margin-top: 5px; font-weight: 500; }
+
+/* Training kaart */
+.training-kaart { border-left: 3px solid var(--border); }
 .training-kop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.training-info { display: flex; align-items: center; gap: 8px; }
-.sport-icon { font-size: 1.3rem; }
-.training-info strong { display: block; font-size: 0.9rem; }
+.training-info { display: flex; align-items: center; gap: 10px; }
+.sport-icoon-badge { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.training-info strong { display: block; font-size: 0.9rem; font-weight: 600; }
 .training-datum { font-size: 0.75rem; color: var(--text-3); }
-.training-stats { display: flex; flex-wrap: wrap; gap: 5px; }
-.stat-badge { padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; font-size: 0.72rem; color: var(--text-2); }
-.training-notities { font-size: 0.8rem; color: var(--text-3); margin-top: 7px; }
+.training-stats { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.stat-badge { padding: 3px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; font-size: 0.72rem; color: var(--text-2); }
+.stat-badge--load { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; font-weight: 700; }
+.rpe-badge { font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+.training-notities { font-size: 0.8rem; color: var(--text-3); margin-top: 7px; font-style: italic; }
 .tip-tip { font-size: 0.78rem; color: var(--text-3); padding: 8px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 10px; }
+
+/* ===== SPORTPSYCHOLOGIE / MOTIVATIE ===== */
+.stemming-keuze { display: flex; gap: 5px; }
+.stemming-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 4px; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font);
+  font-size: 0.6rem; color: var(--text-3); transition: all 0.15s; flex: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.stemming-btn span:first-child { font-size: 1.2rem; line-height: 1; }
+.stemming-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+.streak-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 10px; background: #fff7ed; border: 1px solid #fed7aa;
+  border-radius: 20px; font-size: 0.72rem; font-weight: 700; color: #c2410c;
+}
+
+/* Trainingsdag / rustdag context banner */
+.dag-context {
+  font-size: 0.78rem; font-weight: 500; padding: 7px 10px;
+  border-radius: var(--radius-sm); margin-bottom: 10px; border-left: 3px solid;
+}
+.dag-context--training { background: #fffbeb; color: #92400e; border-color: #f59e0b; }
+.dag-context--rust { background: #f0f9ff; color: #0c4a6e; border-color: #38bdf8; }
 
 /* ===== DASHBOARD VOEDING ===== */
 .dash-macro-blokken {

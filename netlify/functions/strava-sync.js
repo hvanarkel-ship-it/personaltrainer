@@ -2,11 +2,33 @@ import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
 const SPORT_MAP = {
-  Run: 'hardlopen', Ride: 'fietsen', VirtualRide: 'fietsen', Swim: 'zwemmen',
-  WeightTraining: 'fitness', Workout: 'fitness', Tennis: 'tennis', Padel: 'padel',
-  Walk: 'wandelen', Yoga: 'yoga', Soccer: 'voetbal', Football: 'voetbal',
-  Cycling: 'fietsen', Running: 'hardlopen', TrailRun: 'hardlopen',
-  MountainBikeRide: 'fietsen', GravelRide: 'fietsen', EBikeRide: 'fietsen',
+  // Hardlopen
+  Run: 'hardlopen', Running: 'hardlopen', TrailRun: 'hardlopen', VirtualRun: 'hardlopen',
+  // Fietsen
+  Ride: 'fietsen', VirtualRide: 'fietsen', GravelRide: 'fietsen', EBikeRide: 'fietsen',
+  MountainBikeRide: 'fietsen', EMountainBikeRide: 'fietsen', Cycling: 'fietsen',
+  Velomobile: 'fietsen', RollerSki: 'wielrennen',
+  // Fitness / kracht
+  WeightTraining: 'fitness', Workout: 'fitness', Crossfit: 'fitness',
+  Elliptical: 'fitness', StairStepper: 'fitness',
+  // Racket
+  Tennis: 'tennis', Padel: 'padel', Squash: 'padel', BadmintonRacquet: 'padel',
+  TableTennis: 'tennis', Pickleball: 'padel',
+  // Lopen / wandelen
+  Walk: 'wandelen', Hike: 'wandelen',
+  // Water
+  Swim: 'zwemmen', Rowing: 'zwemmen', VirtualRow: 'zwemmen',
+  Kayaking: 'zwemmen', Canoeing: 'zwemmen', StandUpPaddling: 'zwemmen',
+  Surfing: 'zwemmen', Windsurf: 'zwemmen', Kitesurf: 'zwemmen',
+  // Mind & body
+  Yoga: 'yoga', Pilates: 'yoga',
+  // Voetbal
+  Soccer: 'voetbal', Football: 'voetbal',
+  // Overig
+  AlpineSki: 'overig', BackcountrySki: 'overig', NordicSki: 'overig',
+  Snowboard: 'overig', Snowshoe: 'overig', Golf: 'overig',
+  RockClimbing: 'overig', IceSkate: 'overig', InlineSkate: 'overig',
+  Skateboard: 'overig', Sail: 'overig', Handcycle: 'overig', Wheelchair: 'overig',
 }
 
 async function haalZonesOp(activityId, accessToken) {

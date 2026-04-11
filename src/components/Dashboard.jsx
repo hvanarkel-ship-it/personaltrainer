@@ -53,7 +53,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
   const [toonOchtendForm, setToonOchtendForm] = useState(false)
-  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '' })
+  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       const nieuw = await api.get('/dashboard')
       setData(nieuw)
       setToonOchtendForm(false)
-      setOForm({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '' })
+      setOForm({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '', stemming: '' })
     } catch (err) { console.error(err) }
     finally { setOOpslaan(false) }
   }
@@ -91,6 +91,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const doelen = data?.doelen || []
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
+  const streak = data?.streak || 0
 
   const training_kcal_vandaag = v.training_kcal || 0
   const basis_kcal = p.doel_kcal || 2400
@@ -166,6 +167,19 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               <div className="form-group">
                 <label>Herstelbalans</label>
                 <input type="number" step="0.1" value={oForm.herstelbalans} onChange={e => setOForm(f => ({ ...f, herstelbalans: e.target.value }))} placeholder="+5.2" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Stemming</label>
+              <div className="stemming-keuze">
+                {[['😔','Slecht'],['😕','Matig'],['😐','Neutraal'],['🙂','Goed'],['😊','Top']].map(([emoji, lbl], i) => (
+                  <button key={i} type="button"
+                    className={`stemming-btn ${oForm.stemming == i+1 ? 'active' : ''}`}
+                    onClick={() => setOForm(f => ({ ...f, stemming: f.stemming == i+1 ? '' : String(i+1) }))}>
+                    <span>{emoji}</span>
+                    <span>{lbl}</span>
+                  </button>
+                ))}
               </div>
             </div>
             <button className="btn btn-primary btn-full" onClick={logOchtend} disabled={oOpslaan || (!oForm.hrv_ochtend && !oForm.slaap_uur)}>
@@ -267,7 +281,10 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         <div className="card">
           <div className="card-header">
             <h3>Training deze week</h3>
-            <button className="link-btn small" onClick={() => onNavigeer('training')}>Bekijk →</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {streak >= 2 && <span className="streak-badge">🔥 {streak} dagen</span>}
+              <button className="link-btn small" onClick={() => onNavigeer('training')}>Bekijk →</button>
+            </div>
           </div>
           <div className="week-stats-grid">
             <div className="week-stat">
@@ -305,6 +322,10 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           <h3>Voeding vandaag</h3>
           <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Bekijk alles →</button>
         </div>
+        {training_kcal_vandaag > 0
+          ? <div className="dag-context dag-context--training">⚡ Trainingsdag — prioriteer koolhydraten voor herstel</div>
+          : <div className="dag-context dag-context--rust">💤 Rustdag — focus op eiwit (1.6–2 g/kg lichaamsgewicht)</div>
+        }
         <div className="dash-macro-blokken">
           <div className="dash-macro-blok">
             <span className="dash-macro-val">{v.kcal || 0}</span>

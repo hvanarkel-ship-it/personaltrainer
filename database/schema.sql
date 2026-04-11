@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS trainingen (
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
   strava_id BIGINT,
+  rpe SMALLINT,
+  stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
