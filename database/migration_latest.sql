@@ -131,6 +131,13 @@ ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS bron TEXT DEFAULT 'handmatig';
 -- gesprekken: upload type (toegevoegd voor coach uploads)
 ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;
 
+-- trainingen: strava_id voor betrouwbare deduplicatie bij sync
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT;
+UPDATE trainingen
+  SET strava_id = SUBSTRING(notities FROM '\[strava:([0-9]+)\]')::BIGINT
+  WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
+  AND SUBSTRING(notities FROM '\[strava:([0-9]+)\]') IS NOT NULL;
+
 -- ── Indexen ────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_inbody_user_datum    ON inbody_metingen(user_id, datum DESC);

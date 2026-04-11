@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   zone4_min INTEGER,
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
+  strava_id BIGINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

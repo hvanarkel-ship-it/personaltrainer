@@ -61,12 +61,19 @@ export const handler = async (event) => {
       vetten: s.vetten + (parseFloat(m.vetten_g) || 0),
     }), { kcal: 0, eiwit: 0, koolhydraten: 0, vetten: 0 })
 
+    // Calorieën verbrand door training vandaag (excl. herstel-entries)
+    const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
+    const training_kcal_vandaag = weektrainingen
+      .filter(t => normalizeDate(t.datum) === vandaag && t.sport !== 'herstel' && t.kcal)
+      .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
+
     return cors({
       profiel: profiel || {},
       vandaag: {
         datum: vandaag,
         maaltijden_lijst: vandaagMaaltijden,
         ...gegeten,
+        training_kcal: training_kcal_vandaag,
       },
       herstel: recentTraining || null,
       inbody: recenteInbody || null,

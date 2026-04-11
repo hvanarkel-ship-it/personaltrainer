@@ -78,6 +78,15 @@ export const handler = async (event) => {
       accessToken = await vernieuwToken(sql, userId, profiel)
     }
 
+    // Eenmalige migratie: strava_id kolom toevoegen + bestaande records vullen
+    await sql`ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT`
+    await sql`
+      UPDATE trainingen
+      SET strava_id = SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]')::BIGINT
+      WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
+      AND SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]') IS NOT NULL
+    `
+
     // Laatste 30 activiteiten ophalen
     const res = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=30&page=1', {
       headers: { Authorization: `Bearer ${accessToken}` }
@@ -92,18 +101,29 @@ export const handler = async (event) => {
       const datum = act.start_date_local?.split('T')[0]
       if (!datum) continue
 
-      // Deduplicatie op Strava ID
+      // Deduplicatie: check op strava_id kolom (snel) + LIKE fallback voor oude records
       const [existing] = await sql`
         SELECT id FROM trainingen
-        WHERE user_id = ${userId} AND bron = 'strava'
-        AND notities LIKE ${`%[strava:${act.id}]%`}
+        WHERE user_id = ${userId}
+        AND (
+          strava_id = ${act.id}
+          OR (bron = 'strava' AND notities LIKE ${`%[strava:${act.id}]%`})
+        )
         LIMIT 1
       `
       if (existing) { overgeslagen++; continue }
 
-      const sport     = SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig'
-      const duur_min  = Math.round((act.moving_time || 0) / 60)
-      const kcal      = act.kilojoules ? Math.round(act.kilojoules / 4.184) : null
+      const sport = SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig'
+
+      // Duur: gebruik moving_time (actieve tijd), met elapsed_time als fallback
+      const bewegingsTijd = act.moving_time || act.elapsed_time || 0
+      const duur_min = bewegingsTijd > 0 ? Math.round(bewegingsTijd / 60) : null
+
+      // Calorieën: Strava's eigen schatting (metabolisch) is accurater dan kJ/4.184 (mechanisch)
+      const kcal = act.calories > 0
+        ? Math.round(act.calories)
+        : (act.kilojoules > 0 ? Math.round(act.kilojoules / 4.184) : null)
+
       const gem_hr    = act.average_heartrate ? Math.round(act.average_heartrate) : null
       const max_hr    = act.max_heartrate     ? Math.round(act.max_heartrate)     : null
       const afstand_m = act.distance          ? Math.round(act.distance)           : null
@@ -125,11 +145,11 @@ export const handler = async (event) => {
       await sql`
         INSERT INTO trainingen
           (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-           zone2_min, zone3_min, zone4_min, notities, bron)
+           zone2_min, zone3_min, zone4_min, notities, bron, strava_id)
         VALUES
           (${userId}, ${datum}, ${sport}, ${duur_min}, ${kcal}, ${gem_hr}, ${max_hr},
            ${zones?.zone2_min ?? null}, ${zones?.zone3_min ?? null}, ${zones?.zone4_min ?? null},
-           ${notities}, 'strava')
+           ${notities}, 'strava', ${act.id})
       `
       gesynchroniseerd++
     }

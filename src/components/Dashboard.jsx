@@ -92,7 +92,11 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
 
-  const kcalPct = p.doel_kcal ? Math.min(100, Math.round(((v.kcal||0) / p.doel_kcal) * 100)) : 0
+  const training_kcal_vandaag = v.training_kcal || 0
+  const basis_kcal = p.doel_kcal || 2400
+  const doel_kcal_aangepast = basis_kcal + training_kcal_vandaag
+
+  const kcalPct = Math.min(100, Math.round(((v.kcal||0) / doel_kcal_aangepast) * 100))
   const eiwitPct = p.doel_eiwit_g ? Math.min(100, Math.round(((v.eiwit||0) / p.doel_eiwit_g) * 100)) : 0
   const khPct = p.doel_koolhydraten_g ? Math.min(100, Math.round(((v.koolhydraten||0) / p.doel_koolhydraten_g) * 100)) : 0
   const vetPct = p.doel_vetten_g ? Math.min(100, Math.round(((v.vetten||0) / p.doel_vetten_g) * 100)) : 0
@@ -304,7 +308,10 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         <div className="dash-macro-blokken">
           <div className="dash-macro-blok">
             <span className="dash-macro-val">{v.kcal || 0}</span>
-            <span className="dash-macro-sub">/ {p.doel_kcal || 2400} kcal</span>
+            <span className="dash-macro-sub">
+              / {doel_kcal_aangepast} kcal
+              {training_kcal_vandaag > 0 && <span className="training-kcal-badge">+{training_kcal_vandaag} 🔥</span>}
+            </span>
           </div>
           <div className="dash-macro-blok dash-macro-groen">
             <span className="dash-macro-val">{Math.round(v.eiwit || 0)}g</span>
@@ -320,7 +327,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
         </div>
         <div style={{ marginTop: 10 }}>
-          <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={p.doel_kcal||2400} eenheid="kcal" pct={kcalPct} kleur="primary" />
+          <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={doel_kcal_aangepast} eenheid="kcal" pct={kcalPct} kleur="primary" />
           <MacroBalk label="Eiwit" huidig={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} eenheid="g" pct={eiwitPct} kleur="green" />
           <MacroBalk label="Koolhydraten" huidig={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} eenheid="g" pct={khPct} kleur="blue" />
           <MacroBalk label="Vetten" huidig={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} eenheid="g" pct={vetPct} kleur="orange" />

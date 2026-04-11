@@ -428,7 +428,8 @@ body {
 .dash-macro-groen .dash-macro-val { color: #166534; }
 .dash-macro-blauw .dash-macro-val { color: #1e40af; }
 .dash-macro-oranje .dash-macro-val { color: #9a3412; }
-.dash-macro-sub { font-size: 0.6rem; color: var(--text-3); }
+.dash-macro-sub { font-size: 0.6rem; color: var(--text-3); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.training-kcal-badge { font-size: 0.55rem; font-weight: 700; color: var(--orange); white-space: nowrap; }
 
 .dash-maaltijd-lijst {
   margin-top: 12px; border-top: 1px solid var(--border);
