@@ -468,9 +468,13 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
     return cors({ antwoord, opgeslagen })
   } catch (err) {
     console.error('Coach chat error:', err)
-    const msg = err.status === 529 || err.message?.includes('overloaded')
+    const msg = (err.status === 529 || err.message?.includes('overloaded'))
       ? 'De AI is momenteel druk bezet. Probeer het over een minuut opnieuw.'
-      : 'Coach fout: ' + err.message
-    return cors({ error: msg }, err.status === 529 ? 503 : 500)
+      : (err.status === 400 && err.message?.includes('credit balance'))
+      ? 'Het API-tegoed is op. Voeg credits toe via console.anthropic.com → Billing.'
+      : (err.status === 401 || err.message?.includes('API key'))
+      ? 'De API-sleutel is ongeldig of verlopen. Controleer de instellingen.'
+      : `Coach tijdelijk niet beschikbaar. Probeer het opnieuw. (${err.status || 500})`
+    return cors({ error: msg }, err.status || 500)
   }
 }
