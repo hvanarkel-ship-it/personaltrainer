@@ -52,35 +52,51 @@ body {
   transform: translateX(-50%);
   width: 100%; max-width: 480px;
   height: var(--nav-h);
-  background: var(--card);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.06), 0 -8px 24px rgba(0,0,0,0.04);
   display: flex;
+  align-items: stretch;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 100;
 }
 
 .nav-btn {
-  flex: 1; position: relative;
+  flex: 1;
+  min-width: 0;
+  position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; background: none; border: none; cursor: pointer;
+  gap: 2px; background: none; border: none; cursor: pointer;
   color: var(--text-3); font-family: var(--font); transition: color 0.2s;
-  padding: 8px 0 4px;
+  padding: 10px 2px 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 .nav-btn.active { color: var(--primary); }
 /* Pill indicator achter actief icoon */
 .nav-btn.active::before {
   content: '';
   position: absolute;
-  top: 7px; left: 50%;
+  top: 8px; left: 50%;
   transform: translateX(-50%);
-  width: 44px; height: 28px;
+  width: 40px; height: 28px;
   background: var(--primary-bg);
   border-radius: 14px;
 }
-.nav-icon { font-size: 1.2rem; line-height: 1; transition: transform 0.2s; position: relative; z-index: 1; }
-.nav-btn.active .nav-icon { transform: scale(1.05); }
-.nav-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.02em; position: relative; z-index: 1; }
+.nav-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  position: relative; z-index: 1;
+}
+.nav-btn.active .nav-icon { transform: scale(1.08); }
+.nav-label {
+  font-size: 0.6rem; font-weight: 600; letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  position: relative; z-index: 1; line-height: 1;
+}
 
 /* ===== PAGE ===== */
 .page {

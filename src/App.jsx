@@ -10,13 +10,36 @@ import Settings from './components/Settings.jsx'
 import DbStatus from './components/DbStatus.jsx'
 
 const NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: '⚡' },
-  { id: 'coach', label: 'Coach', icon: '💬' },
-  { id: 'training', label: 'Training', icon: '🏋️' },
-  { id: 'voeding', label: 'Voeding', icon: '🍽️' },
-  { id: 'lichaam', label: 'Lichaam', icon: '📊' },
-  { id: 'settings', label: 'Instellingen', icon: '⚙️' },
+  { id: 'dashboard', label: 'Home' },
+  { id: 'coach', label: 'Coach' },
+  { id: 'training', label: 'Training' },
+  { id: 'voeding', label: 'Voeding' },
+  { id: 'lichaam', label: 'Lichaam' },
+  { id: 'settings', label: 'Meer' },
 ]
+
+function NavIcoon({ id }) {
+  const props = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (id === 'dashboard') return (
+    <svg {...props}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+  )
+  if (id === 'coach') return (
+    <svg {...props}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+  )
+  if (id === 'training') return (
+    <svg {...props}><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+  )
+  if (id === 'voeding') return (
+    <svg {...props}><path d="M3 2v7c0 1.1.9 2 2 2s2-.9 2-2V2"/><line x1="7" y1="11" x2="7" y2="22"/><path d="M21 15V2s-5 3-5 7 5 5 5 5z"/><line x1="16" y1="22" x2="16" y2="15"/></svg>
+  )
+  if (id === 'lichaam') return (
+    <svg {...props}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  )
+  if (id === 'settings') return (
+    <svg {...props}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+  )
+  return null
+}
 
 // iOS detectie
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -173,7 +196,7 @@ export default function App() {
             className={`nav-btn ${scherm === item.id ? 'active' : ''}`}
             onClick={() => setScherm(item.id)}
           >
-            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-icon"><NavIcoon id={item.id} /></span>
             <span className="nav-label">{item.label}</span>
           </button>
         ))}
