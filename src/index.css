@@ -54,26 +54,37 @@ body {
   height: var(--nav-h);
   background: var(--card);
   border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
   display: flex;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 100;
 }
 
 .nav-btn {
-  flex: 1;
+  flex: 1; position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px; background: none; border: none; cursor: pointer;
-  color: var(--text-3); font-family: var(--font); transition: color 0.15s;
-  padding: 6px 0;
+  color: var(--text-3); font-family: var(--font); transition: color 0.2s;
+  padding: 8px 0 4px;
 }
 .nav-btn.active { color: var(--primary); }
-.nav-btn.active .nav-icon { transform: scale(1.1); }
-.nav-icon { font-size: 1.25rem; line-height: 1; transition: transform 0.15s; }
-.nav-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em; }
+/* Pill indicator achter actief icoon */
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 7px; left: 50%;
+  transform: translateX(-50%);
+  width: 44px; height: 28px;
+  background: var(--primary-bg);
+  border-radius: 14px;
+}
+.nav-icon { font-size: 1.2rem; line-height: 1; transition: transform 0.2s; position: relative; z-index: 1; }
+.nav-btn.active .nav-icon { transform: scale(1.05); }
+.nav-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.02em; position: relative; z-index: 1; }
 
 /* ===== PAGE ===== */
 .page {
-  padding: 16px 16px calc(var(--nav-h) + 16px);
+  padding: 16px 16px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 20px);
   min-height: 100dvh;
 }
 .page-loading { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
@@ -215,7 +226,7 @@ body {
 .doel-waarden { font-size: 0.75rem; color: var(--text-3); }
 
 /* ===== COACH ===== */
-.coach-pagina { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h)); }
+.coach-pagina { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom, 0px)); }
 .coach-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 14px 16px 10px; border-bottom: 1px solid var(--border); background: var(--card);
@@ -309,32 +320,51 @@ body {
 .upload-label { font-size: 0.6rem; color: var(--text-3); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-top: 2px; }
 .upload-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; background: var(--red); color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
 
-.upload-menu { position: absolute; bottom: calc(var(--nav-h) + 60px); left: 16px; right: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; z-index: 200; }
+.upload-menu { position: absolute; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 60px); left: 16px; right: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; z-index: 200; }
 .upload-type-btn { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font); font-size: 0.8rem; transition: all 0.15s; }
 .upload-type-btn:hover { border-color: var(--primary); background: var(--primary-light); }
 .upload-type-btn span:first-child { font-size: 1.1rem; }
 
-.chat-invoer { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--card); }
-.upload-btn { background: none; border: 1.5px solid var(--border); color: var(--text-2); border-radius: var(--radius-sm); padding: 0 10px; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
-.upload-btn:hover { border-color: var(--primary); color: var(--primary); }
-.mic-btn {
-  background: none; border: 1.5px solid var(--border); color: var(--text-2);
-  border-radius: var(--radius-sm); padding: 0 10px; font-size: 1.1rem;
-  cursor: pointer; flex-shrink: 0; transition: all 0.15s;
+.chat-invoer {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
 }
-.mic-btn:hover { border-color: var(--primary); color: var(--primary); }
+.upload-btn, .mic-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 50%; color: var(--text-2);
+  font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.upload-btn:hover, .mic-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
 .mic-btn--actief {
-  border-color: #ef4444; color: #ef4444;
+  border-color: #ef4444; color: #ef4444; background: #fff5f5;
   animation: mic-pulse 1.2s ease-in-out infinite;
 }
 @keyframes mic-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-  50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+  50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
 }
-.chat-input { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 20px; color: var(--text); padding: 9px 14px; font-size: 0.9rem; font-family: var(--font); }
-.chat-input:focus { outline: none; border-color: var(--primary); }
-.verstuur-btn { width: 36px; height: 36px; background: var(--primary); color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; align-self: flex-end; }
-.verstuur-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.chat-input {
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 20px; color: var(--text);
+  padding: 9px 14px; font-size: 0.9rem; font-family: var(--font);
+  height: 38px; line-height: 1.2;
+}
+.chat-input:focus { outline: none; border-color: var(--primary); background: var(--card); }
+.verstuur-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: var(--primary); color: white;
+  border: none; border-radius: 50%; cursor: pointer;
+  font-size: 1rem; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s; box-shadow: 0 2px 8px rgba(29,158,117,0.35);
+}
+.verstuur-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 .verstuur-btn:hover:not(:disabled) { background: var(--primary-dark); }
 
 .center-loader { display: flex; justify-content: center; padding: 40px; }
