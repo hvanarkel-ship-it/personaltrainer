@@ -100,13 +100,21 @@ export const handler = async (event) => {
       accessToken = await vernieuwToken(sql, userId, profiel)
     }
 
-    // Eenmalige migratie: strava_id kolom toevoegen + bestaande records vullen
+    // Eenmalige migraties
     await sql`ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT`
     await sql`
       UPDATE trainingen
       SET strava_id = SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]')::BIGINT
       WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
       AND SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]') IS NOT NULL
+    `
+    // Fix: activiteiten waarbij duur_min per abuis in seconden is opgeslagen
+    await sql`
+      UPDATE trainingen
+      SET duur_min = ROUND(duur_min::numeric / 60)::int
+      WHERE user_id = ${userId} AND bron = 'strava'
+      AND duur_min > 720
+      AND ROUND(duur_min::numeric / 60)::int <= 720
     `
 
     // Laatste 30 activiteiten ophalen

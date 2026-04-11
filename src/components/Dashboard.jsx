@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api, datumStr, datumNl } from '../api.js'
+import SportIcoon, { normMin } from '../sportIcoon.jsx'
 
 function berekenGereedheid(h) {
   if (!h) return null
@@ -46,7 +47,6 @@ function gereedheidsInfo(score) {
   }
 }
 
-const SPORT_ICONS_MAP = { fitness:'🏋️', hardlopen:'🏃', fietsen:'🚴', padel:'🎾', zwemmen:'🏊', tennis:'🎾', wandelen:'🚶', yoga:'🧘', wielrennen:'🚵', voetbal:'⚽', herstel:'🛌' }
 
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [data, setData] = useState(null)
@@ -122,7 +122,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   // Weektraining stats (excl. herstel-only records)
   const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
-  const weekMinuten = echteTrainingen.reduce((s, t) => s + (t.duur_min || 0), 0)
+  const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
   const weekKcal = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
 
   return (
@@ -308,8 +308,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
           <div className="week-sports-strip">
             {echteTrainingen.slice(0, 7).map((t, i) => (
-              <span key={t.id || i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + t.duur_min + 'min' : ''}`}>
-                {SPORT_ICONS_MAP[t.sport] || '⚽'}
+              <span key={t.id || i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + normMin(t.duur_min) + 'min' : ''}`}>
+                <SportIcoon sport={t.sport} size={16} />
               </span>
             ))}
           </div>
