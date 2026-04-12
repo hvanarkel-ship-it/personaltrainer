@@ -111,10 +111,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     : null
 
   // 7-daagse HRV trend vanuit weektrainingen
-  const vandaag = new Date().toISOString().split('T')[0]
+  const pad2 = n => String(n).padStart(2, '0')
+  const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+  const vandaag = dagStr(new Date())
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    const ds = d.toISOString().split('T')[0]
+    const ds = dagStr(d)
     const record = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
     return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: record?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })

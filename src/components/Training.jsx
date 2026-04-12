@@ -70,10 +70,10 @@ export default function Training({ onNavigeer }) {
   const vandaag = vandaagStr()
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    const ds = d.toISOString().split('T')[0]
+    const ds = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
     const dag = trainingen.filter(t => normDatum(t.datum) === ds && t.sport !== 'herstel')
-    const minuten = dag.reduce((s, t) => s + (t.duur_min || 0), 0)
-    const load = dag.reduce((s, t) => s + (t.duur_min || 0) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+    const minuten = dag.reduce((s, t) => s + normMin(t.duur_min), 0)
+    const load = dag.reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
     return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), minuten, sessies: dag.length, load: Math.round(load) }
   })
   const maxVal = Math.max(...week.map(d => d.load || d.minuten), 60)
