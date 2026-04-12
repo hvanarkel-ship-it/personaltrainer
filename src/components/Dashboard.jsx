@@ -124,6 +124,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
   const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
   const weekKcal = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
+  const heeftTrainingVandaag = echteTrainingen.some(t => datumStr(t.datum) === vandaag)
 
   return (
     <div className="page">
@@ -322,7 +323,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           <h3>Voeding vandaag</h3>
           <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Bekijk alles →</button>
         </div>
-        {training_kcal_vandaag > 0
+        {heeftTrainingVandaag
           ? <div className="dag-context dag-context--training">⚡ Trainingsdag — prioriteer koolhydraten voor herstel</div>
           : <div className="dag-context dag-context--rust">💤 Rustdag — focus op eiwit (1.6–2 g/kg lichaamsgewicht)</div>
         }
