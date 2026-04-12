@@ -9,6 +9,8 @@ import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
 import DbStatus from './components/DbStatus.jsx'
 
+const APP_VERSION = 'v2026.04-1'
+
 const NAV = [
   { id: 'dashboard', label: 'Home' },
   { id: 'coach', label: 'Coach' },
@@ -164,7 +166,7 @@ export default function App() {
       {/* SW update banner */}
       {showUpdate && (
         <div className="update-banner">
-          <span>🆕 Nieuwe versie beschikbaar</span>
+          <span>🆕 Update beschikbaar ({APP_VERSION})</span>
           <button onClick={applyUpdate}>Bijwerken</button>
           <button onClick={() => setShowUpdate(false)}>✕</button>
         </div>
@@ -188,6 +190,8 @@ export default function App() {
           stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
         />
       )}
+
+      <div className="app-versie">{APP_VERSION}</div>
 
       <nav className="bottom-nav">
         {NAV.map(item => (

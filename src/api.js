@@ -1,11 +1,12 @@
 const BASE = '/api'
 
 // Neon driver geeft DATE-kolommen terug als Date-object, niet als string.
-// Deze helper normaliseert altijd naar 'YYYY-MM-DD'.
+// Deze helper normaliseert altijd naar 'YYYY-MM-DD' (lokale tijd, niet UTC).
+const pad2 = n => String(n).padStart(2, '0')
 export function datumStr(d) {
   if (!d) return null
   if (typeof d === 'string') return d.slice(0, 10)
-  if (d instanceof Date) return d.toISOString().split('T')[0]
+  if (d instanceof Date) return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
   return null
 }
 

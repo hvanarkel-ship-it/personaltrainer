@@ -66,15 +66,8 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   }
 
   useEffect(() => {
-    api.get('/coach-chat')
-      .then(hist => setBerichten(hist.map(h => ({
-        rol: h.is_ai ? 'ai' : 'user',
-        tekst: h.bericht,
-        type: h.upload_type,
-        datum: h.created_at,
-      }))))
-      .catch(err => console.error('Geschiedenis laden mislukt:', err))
-      .finally(() => setHistLaden(false))
+    // Start elke sessie met een leeg gesprek — de AI heeft DB-context via de backend
+    setHistLaden(false)
   }, [])
 
   // Auto-trigger upload wanneer we via dashboard navigeren (bijv. 'suunto')

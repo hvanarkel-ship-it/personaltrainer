@@ -12,8 +12,13 @@ function rpeInfo(rpe) {
   return { label: 'Maximaal', omschrijving: 'Anaeroob — korte herhalingen, volle sprint', kleur: '#dc2626', bg: '#fef2f2', cat: 'max' }
 }
 
-function vandaagStr() { return new Date().toISOString().split('T')[0] }
-function normDatum(d) { return d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10) }
+const pad2 = n => String(n).padStart(2, '0')
+function vandaagStr() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` }
+function normDatum(d) {
+  if (!d) return ''
+  if (d instanceof Date) return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+  return String(d).slice(0, 10)
+}
 
 export default function Training({ onNavigeer }) {
   const [trainingen, setTrainingen] = useState([])

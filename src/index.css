@@ -45,6 +45,10 @@ body {
 
 /* ===== APP SHELL ===== */
 .app { min-height: 100dvh; display: flex; flex-direction: column; }
+.app-versie {
+  text-align: center; font-size: 0.6rem; color: var(--text-3);
+  padding: 2px 0; letter-spacing: 0.04em; opacity: 0.5;
+}
 
 .bottom-nav {
   position: fixed;
