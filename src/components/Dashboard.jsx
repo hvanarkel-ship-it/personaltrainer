@@ -7,7 +7,7 @@ function berekenGereedheid(h) {
   const scores = []
   if (h.hrv_ochtend) {
     const v = parseFloat(h.hrv_ochtend)
-    scores.push({ w: 40, v: v >= 70 ? 100 : v >= 55 ? 78 : v >= 40 ? 52 : 28 })
+    scores.push({ w: 50, v: v >= 70 ? 100 : v >= 55 ? 78 : v >= 40 ? 52 : 28 })
   }
   if (h.slaap_uur) {
     const v = parseFloat(h.slaap_uur)
@@ -15,11 +15,12 @@ function berekenGereedheid(h) {
   }
   if (h.herstelbalans != null) {
     const v = parseFloat(h.herstelbalans)
-    scores.push({ w: 20, v: v > 5 ? 100 : v >= 0 ? 75 : v >= -5 ? 50 : 25 })
-  }
-  if (h.slaapscore) {
-    const v = parseFloat(h.slaapscore)
-    scores.push({ w: 10, v: v >= 80 ? 100 : v >= 70 ? 75 : v >= 60 ? 50 : 28 })
+    // Suunto Body Resources is 0–100%; traditionele herstelbalans is -20 tot +20
+    const isPct = Math.abs(v) > 20
+    const score = isPct
+      ? (v >= 90 ? 100 : v >= 75 ? 80 : v >= 60 ? 60 : v >= 45 ? 40 : 20)
+      : (v > 5 ? 100 : v >= 0 ? 75 : v >= -5 ? 50 : 25)
+    scores.push({ w: 20, v: score })
   }
   if (!scores.length) return null
   const totW = scores.reduce((s, x) => s + x.w, 0)
@@ -31,18 +32,21 @@ function gereedheidsInfo(score) {
     kleur: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', ring: '#86efac',
     label: 'Klaar voor intensief',
     advies: 'Je lichaam is goed hersteld. Ideaal voor een zware training of nieuwe prikkel.',
+    aangeraden: 'Interval, krachttraining of hoge intensiteit',
     icon: '🟢',
   }
   if (score >= 50) return {
     kleur: '#b45309', bg: '#fffbeb', border: '#fcd34d', ring: '#fde68a',
     label: 'Matige intensiteit',
-    advies: 'Houd het bij rustige duur, techniek of mobiliteit. Vermijd maximale inspanning.',
+    advies: 'Houd het bij zone 2 duurtraining of techniekwerk. Vermijd maximale inspanning.',
+    aangeraden: 'Zone 2 duurtraining of mobiliteit (45–60 min)',
     icon: '🟡',
   }
   return {
     kleur: '#dc2626', bg: '#fef2f2', border: '#fca5a5', ring: '#fecaca',
     label: 'Herstel aanbevolen',
-    advies: 'Intensief trainen vertraagt je herstel. Kies voor rust, wandelen of yoga.',
+    advies: 'Intensief trainen vertraagt je herstel. Prioriteer slaap en voeding.',
+    aangeraden: 'Actief herstel: wandelen, yoga of volledige rust',
     icon: '🔴',
   }
 }
@@ -121,6 +125,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: record?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
+  const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
+  const hrvTrendLaag = recenteHrv.length >= 3 && recenteHrv.slice(-3).every(d => d.hrv < 45)
 
   // Weektraining stats (excl. herstel-only records)
   const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
@@ -221,11 +227,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 <div className="gereedheid-tekst">
                   <strong style={{ color: gInfo.kleur }}>{gInfo.icon} {gInfo.label}</strong>
                   <p>{gInfo.advies}</p>
+                  <p className="gereedheid-aangeraden">→ {gInfo.aangeraden}</p>
                 </div>
               </div>
             )}
 
-            <div className="metrics-grid" style={{ marginTop: 12 }}>
+            <div className="metrics-grid metrics-grid--3" style={{ marginTop: 12 }}>
               <div className="metric-card">
                 <div className="metric-icon">💓</div>
                 <div className="metric-value">{h.hrv_ochtend || '—'}</div>
@@ -237,34 +244,34 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 <div className="metric-label">Slaap (uur)</div>
               </div>
               <div className="metric-card">
-                <div className="metric-icon">📈</div>
-                <div className="metric-value">{h.herstelbalans != null ? `${h.herstelbalans > 0 ? '+' : ''}${h.herstelbalans}` : '—'}</div>
-                <div className="metric-label">Herstel</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">🏆</div>
-                <div className="metric-value">{h.slaapscore || '—'}</div>
-                <div className="metric-label">Slaapscore</div>
+                <div className="metric-icon">🔋</div>
+                <div className="metric-value">{h.herstelbalans != null ? `${Math.round(h.herstelbalans)}%` : '—'}</div>
+                <div className="metric-label">Reserves</div>
               </div>
             </div>
 
             {/* 7-daagse HRV trend */}
             {heeftHrvTrend && (
-              <div className="hrv-trend">
-                {hrv7Dagen.map((d, i) => {
-                  const kleur = !d.hrv ? '#e5e7eb'
-                    : d.hrv >= 60 ? '#22c55e'
-                    : d.hrv >= 45 ? '#eab308'
-                    : '#ef4444'
-                  return (
-                    <div key={d.datum} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
-                      <div className="hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
-                      {d.hrv && <span className="hrv-val">{d.hrv}</span>}
-                      <span className="hrv-label">{d.label}</span>
-                    </div>
-                  )
-                })}
-              </div>
+              <>
+                {hrvTrendLaag && (
+                  <p className="hrv-waarschuwing">⚠️ Je HRV is de laatste dagen laag — herstel heeft voorrang op intensiteit.</p>
+                )}
+                <div className="hrv-trend">
+                  {hrv7Dagen.map((d, i) => {
+                    const kleur = !d.hrv ? '#e5e7eb'
+                      : d.hrv >= 60 ? '#22c55e'
+                      : d.hrv >= 45 ? '#eab308'
+                      : '#ef4444'
+                    return (
+                      <div key={d.datum} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
+                        <div className="hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
+                        {d.hrv && <span className="hrv-val">{d.hrv}</span>}
+                        <span className="hrv-label">{d.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </>
         )}
@@ -420,24 +427,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
       )}
 
-      {/* Snelkoppelingen */}
-      <div className="card">
-        <h3>Snelle acties</h3>
-        <div className="snelle-acties">
-          <button className="actie-btn" onClick={() => onNavigeer('coach')}>
-            <span>💬</span><span>Vraag coach</span>
-          </button>
-          <button className="actie-btn" onClick={() => onNavigeer('voeding')}>
-            <span>📸</span><span>Log maaltijd</span>
-          </button>
-          <button className="actie-btn" onClick={() => onNavigeer('training')}>
-            <span>🏋️</span><span>Log training</span>
-          </button>
-          <button className="actie-btn" onClick={() => onNavigeer('lichaam')}>
-            <span>⚖️</span><span>Weeg in</span>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

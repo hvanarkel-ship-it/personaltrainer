@@ -204,6 +204,7 @@ body {
 
 /* ===== DASHBOARD ===== */
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.metrics-grid--3 { grid-template-columns: repeat(3, 1fr); }
 .metric-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 12px 8px; text-align: center; box-shadow: var(--shadow);
@@ -858,6 +859,8 @@ body {
 .gereedheid-tekst { flex: 1; min-width: 0; }
 .gereedheid-tekst strong { display: block; font-size: 0.88rem; margin-bottom: 3px; }
 .gereedheid-tekst p { font-size: 0.78rem; color: var(--text-2); margin: 0; line-height: 1.4; }
+.gereedheid-aangeraden { font-size: 0.75rem !important; font-weight: 600; margin-top: 5px !important; opacity: 0.85; }
+.hrv-waarschuwing { font-size: 0.75rem; color: #b45309; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 6px 10px; margin: 8px 0 4px; }
 
 /* ===== HRV TREND ===== */
 .hrv-trend {
