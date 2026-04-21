@@ -77,6 +77,8 @@ body {
   color: var(--text-3); font-family: var(--font); transition: color 0.2s;
   padding: 10px 2px 8px;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
 }
 .nav-btn.active { color: var(--primary); }
 /* Pill indicator achter actief icoon */
@@ -108,6 +110,7 @@ body {
   padding: 16px 16px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 20px);
   min-height: 100vh;
   min-height: 100dvh;
+  -webkit-overflow-scrolling: touch;
 }
 .page-loading { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
 
@@ -157,6 +160,9 @@ body {
   font-size: 0.875rem; font-weight: 600; font-family: var(--font);
   cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap;
   text-decoration: none; min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
 }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-primary { background: var(--primary); color: #fff; }
@@ -166,12 +172,12 @@ body {
 .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { border-color: var(--text-2); color: var(--text); }
 .btn-full { width: 100%; }
-.link-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-family: var(--font); font-size: inherit; padding: 0; text-decoration: underline; }
+.link-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-family: var(--font); font-size: inherit; padding: 0; text-decoration: underline; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .link-btn.small { font-size: 0.8rem; }
-.icon-btn { background: none; border: none; cursor: pointer; min-width: 44px; min-height: 44px; padding: 0; border-radius: 8px; font-size: 1rem; color: var(--text-2); transition: background 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn { background: none; border: none; cursor: pointer; min-width: 44px; min-height: 44px; padding: 0; border-radius: 8px; font-size: 1rem; color: var(--text-2); transition: background 0.15s; display: inline-flex; align-items: center; justify-content: center; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .icon-btn:hover { background: var(--border-light); }
 .icon-btn.sm { min-width: 36px; min-height: 36px; font-size: 0.85rem; }
-.verwijder-btn { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 1.1rem; min-width: 36px; min-height: 36px; padding: 0; transition: color 0.15s; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.verwijder-btn { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 1.1rem; min-width: 36px; min-height: 36px; padding: 0; transition: color 0.15s; line-height: 1; display: inline-flex; align-items: center; justify-content: center; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .verwijder-btn:hover { color: var(--red); }
 
 /* ===== FORMS ===== */
@@ -255,14 +261,14 @@ body {
   padding: 14px 16px 10px; border-bottom: 1px solid var(--border); background: var(--card);
 }
 .coach-header h1 { font-size: 1.2rem; font-weight: 700; }
-.chat-berichten { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.chat-berichten { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 
 .chat-welkom { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 16px; gap: 10px; flex: 1; justify-content: center; }
 .coach-avatar { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white; margin-bottom: 4px; }
 .chat-welkom h3 { font-size: 1.1rem; }
 .chat-welkom p { font-size: 0.875rem; color: var(--text-2); }
 .snelle-vragen { display: flex; flex-direction: column; gap: 7px; width: 100%; max-width: 300px; margin-top: 8px; }
-.snelle-vraag-btn { padding: 9px 14px; background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.8rem; cursor: pointer; text-align: left; transition: all 0.15s; font-family: var(--font); }
+.snelle-vraag-btn { padding: 9px 14px; background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.8rem; cursor: pointer; text-align: left; transition: all 0.15s; font-family: var(--font); touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .snelle-vraag-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
 .suunto-ochtend-btn {
   width: 100%; max-width: 300px; margin: 8px 0 2px;
@@ -343,7 +349,7 @@ body {
 .upload-label { font-size: 0.6rem; color: var(--text-3); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-top: 2px; }
 .upload-remove { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; background: var(--red); color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
 
-.upload-menu { position: absolute; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 60px); left: 16px; right: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; z-index: 200; }
+.upload-menu { position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 60px); left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 448px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; z-index: 200; }
 .upload-type-btn { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font); font-size: 0.8rem; transition: all 0.15s; }
 .upload-type-btn:hover { border-color: var(--primary); background: var(--primary-light); }
 .upload-type-btn span:first-child { font-size: 1.1rem; }
@@ -358,6 +364,7 @@ body {
 .upload-btn, .mic-btn {
   width: 44px; height: 44px; flex-shrink: 0;
   background: var(--bg); border: 1.5px solid var(--border);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
   border-radius: 50%; color: var(--text-2);
   font-size: 1rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -383,6 +390,7 @@ body {
 .verstuur-btn {
   width: 44px; height: 44px; flex-shrink: 0;
   background: var(--primary); color: white;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   border: none; border-radius: 50%; cursor: pointer;
   font-size: 1rem; display: flex; align-items: center; justify-content: center;
   transition: background 0.15s; box-shadow: 0 2px 8px rgba(29,158,117,0.35);
@@ -408,6 +416,7 @@ body {
 .sport-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 10px 6px; background: var(--bg); border: 1.5px solid var(--border);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
   border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font);
   font-size: 0.72rem; color: var(--text-2); transition: all 0.15s;
 }
@@ -418,6 +427,7 @@ body {
 .rpe-btn {
   flex: 1; min-width: 0; height: 32px; border-radius: 6px; border: 1.5px solid transparent;
   font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font); transition: all 0.12s;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .rpe-btn--licht { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
 .rpe-btn--matig { background: #fefce8; border-color: #fde047; color: #854d0e; }

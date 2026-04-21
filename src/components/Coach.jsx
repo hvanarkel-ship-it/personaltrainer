@@ -287,6 +287,10 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
           placeholder="Stel een vraag of beschrijf wat je at..."
           disabled={laden}
           className="chat-input"
+          inputMode="text"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
         />
         <button type="submit" className="verstuur-btn" disabled={laden || (!input.trim() && !uploads.length)}>
           ↑
