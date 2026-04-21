@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 
-const SPORTEN = ['fitness', 'padel', 'fietsen', 'hardlopen', 'zwemmen', 'tennis', 'wandelen', 'yoga', 'wielrennen', 'voetbal']
-const SPORTEN_ICONS = { fitness: '🏋️', padel: '🎾', fietsen: '🚴', hardlopen: '🏃', zwemmen: '🏊', tennis: '🎾', wandelen: '🚶', yoga: '🧘', wielrennen: '🚵', voetbal: '⚽' }
+const SPORTEN = ['hyrox', 'fitness', 'hardlopen', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal']
+const SPORTEN_ICONS = { hyrox: '⚡', fitness: '🏋️', hardlopen: '🏃', fietsen: '🚴', wielrennen: '🚵', zwemmen: '🏊', padel: '🎾', tennis: '🎾', wandelen: '🚶', yoga: '🧘', voetbal: '⚽' }
 const STIJLEN = [
   { id: 'direct', label: 'Direct & bondig' },
   { id: 'motiverend', label: 'Motiverend' },
@@ -324,8 +324,8 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             kleur="#006EBE"
             letter="G"
             naam="Garmin Connect"
-            subtitel="Training & gezondheid"
-            beschrijving="Garmin API is gesloten voor externe apps. Upload exports of schermafbeeldingen via de Coach."
+            subtitel="Forerunner, Fenix, Epix & andere Garmin horloges"
+            beschrijving="Koppel Garmin Connect aan Strava (gratis, via Garmin Connect app → Instellingen → Partners). Zodra de koppeling actief is, synchroniseert APEX Coach je Garmin trainingen automatisch via Strava."
             onNavigeer={onNavigeer}
           />
 

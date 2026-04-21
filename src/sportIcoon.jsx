@@ -11,6 +11,7 @@ export const SPORT_KLEUR = {
   wandelen:   { kleur: '#059669', bg: '#ecfdf5' },
   yoga:       { kleur: '#db2777', bg: '#fdf2f8' },
   voetbal:    { kleur: '#1d4ed8', bg: '#eff6ff' },
+  hyrox:      { kleur: '#e11d48', bg: '#fff1f2' },
   overig:     { kleur: '#6b7280', bg: '#f9fafb' },
   herstel:    { kleur: '#9ca3af', bg: '#f9fafb' },
 }
@@ -19,7 +20,7 @@ export const SPORT_LABEL = {
   fitness: 'Fitness', hardlopen: 'Hardlopen', fietsen: 'Fietsen',
   wielrennen: 'Wielrennen', zwemmen: 'Zwemmen', padel: 'Padel',
   tennis: 'Tennis', wandelen: 'Wandelen', yoga: 'Yoga',
-  voetbal: 'Voetbal', overig: 'Overig', herstel: 'Herstel',
+  voetbal: 'Voetbal', hyrox: 'Hyrox', overig: 'Overig', herstel: 'Herstel',
 }
 
 // Corrigeert duur_min die per abuis in seconden is opgeslagen (Strava sync bug).
@@ -60,6 +61,16 @@ export default function SportIcoon({ sport, size = 24 }) {
       return <svg {...p}><circle cx="12" cy="4" r="2"/><path d="M12 6v5"/><path d="M6 11c0 0 2-2 6-2s6 2 6 2"/><path d="M6 11l-2 7M18 11l2 7"/><line x1="8" y1="20" x2="16" y2="20"/></svg>
     case 'voetbal':
       return <svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3l2 6h5l-4 4 2 6-5-4-5 4 2-6-4-4h5z"/></svg>
+    case 'hyrox':
+      // Athlete in power stance: head + H-shape body (nod to HYROX brand) = speed + strength
+      return <svg {...p}>
+        <circle cx="12" cy="4" r="2"/>
+        <path d="M12 6 L9 10 L9 20"/>
+        <path d="M12 6 L15 10 L15 20"/>
+        <line x1="9" y1="14" x2="15" y2="14"/>
+        <path d="M9 10 L6 8"/>
+        <path d="M15 10 L18 8"/>
+      </svg>
     case 'herstel':
       return <svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     default: // overig + onbekend

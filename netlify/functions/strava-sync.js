@@ -143,7 +143,10 @@ export const handler = async (event) => {
       `
       if (existing) { overgeslagen++; continue }
 
-      const sport = SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig'
+      const naamLower = (act.name || '').toLowerCase()
+      const sport = /hyrox|hyro x/.test(naamLower)
+        ? 'hyrox'
+        : (SPORT_MAP[act.sport_type] || act.sport_type?.toLowerCase() || 'overig')
 
       // Duur: gebruik moving_time (actieve tijd), met elapsed_time als fallback
       const bewegingsTijd = act.moving_time || act.elapsed_time || 0

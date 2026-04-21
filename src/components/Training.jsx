@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, datumNl } from '../api.js'
 import SportIcoon, { SPORT_KLEUR, SPORT_LABEL, normMin } from '../sportIcoon.jsx'
 
-const SPORTEN = ['fitness', 'hardlopen', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal', 'overig']
+const SPORTEN = ['hyrox', 'hardlopen', 'fitness', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal', 'overig']
 
 function rpeInfo(rpe) {
   if (!rpe) return null

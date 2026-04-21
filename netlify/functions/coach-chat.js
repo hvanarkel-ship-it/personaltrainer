@@ -367,6 +367,39 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     const recentHrv = hrvTrend[0]?.hrv_ochtend || null
     const recentSlaap = hrvTrend[0]?.slaap_uur || null
 
+    const heeftHyrox = profiel?.sporten?.includes('hyrox')
+    const hyroxKennis = heeftHyrox ? `
+═══ HYROX COACHING KENNIS ═══
+HYROX race formaat: 8 rondes van 1km hardlopen, telkens gevolgd door één functioneel station:
+  Ronde 1 → SkiErg 1000m
+  Ronde 2 → Sled Push 50m
+  Ronde 3 → Sled Pull 50m
+  Ronde 4 → Burpee Broad Jump 80m
+  Ronde 5 → RowErg 1000m
+  Ronde 6 → Farmer's Carry 200m (2× 24kg men / 2× 16kg women)
+  Ronde 7 → Sandbag Lunges 100m (20kg men / 10kg women)
+  Ronde 8 → Wall Balls 100 reps (6kg men / 4kg women)
+
+Sled gewichten Open Men: Push +102kg, Pull +78kg | Pro Men: Push +152kg, Pull +103kg
+Streeftijden Open Men: Elite <60min | Sterk 60–75min | Amateur 75–95min | Beginner 95–120min
+Streeftijden Open Women: Elite <70min | Sterk 70–85min | Amateur 85–105min
+
+HYROX trainingspeilers (in volgorde van impact op eindtijd):
+1. AEROBE BASIS — Zone2 hardlopen is de #1 tijdsbepaler. Meer Z2 volume = snellere runs + sneller herstel tussen stations. Minimum 80% van trainingsvolume rustig.
+2. RUNNING ECONOMY — Lopen op vermoeide benen (na zware stations). Train dit expliciet met "brick workouts": kracht direct gevolgd door 1–2km run.
+3. FUNCTIONELE KRACHT — Focus op: posterior chain (sled/carries), grip strength (farmer's carry), single-leg kracht (lunges), schouder/core (wall balls, ski erg). 2–3 krachtdagen/week.
+4. RACE-SPECIFIEKE INTENSITEIT — "Double work" training: 2 stations aaneengesloten + 2km run. Bouw racespecificiteit in de laatste 6 weken op.
+5. HERSTEL & PERIODICERING — Hyrox-training is hoog volume + hoog intensiteit tegelijk. Herstelmanagement is kritiek.
+
+Proactieve HYROX coaching regels (gebruik ALTIJD als data aanleiding geeft):
+• Zone2 < 60min/week → TOPPRIORITEIT: "Je aerobe basis bepaalt 60% van je HYROX-tijd. Voeg Z2 hardloopsessies toe."
+• Hardlopen < 2x/week → "Je runt 8km in de race (8× 1km), dit vraagt om meer loopvolume."
+• Kracht < 1x/week → "Zonder gerichte krachttraining verlies je op de sled, carry en lunges."
+• Race deadline nadert (≤6 weken) → adviseer taper: volume −30%, intensiteit behouden, race-simulaties toevoegen.
+• Als HYROX in actieve doelen met deadline → bereken weken tot race en geef periodiseringsplan.
+• Bij hoge RPE op hardloopsessies → check of running economy voldoende is voor HYROX-tempo.
+` : ''
+
     const systemPrompt = `Je bent ${coachNaam}, een persoonlijke AI-coachingassistent voor ${naam}.
 
 ROL: Combineer trainer, diëtist, fysioloog en coach. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief.
@@ -412,7 +445,7 @@ ${inbodyRegels}
 
 ═══ ACTIEVE DOELEN ═══
 ${doelenRegels}
-
+${hyroxKennis}
 Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), begin dan daarmee voordat je de vraag van de gebruiker beantwoordt.`
 
     // ── Bouw user bericht op (afbeeldingen + tekst + geëxtraheerde context) ──
