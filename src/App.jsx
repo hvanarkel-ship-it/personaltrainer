@@ -18,6 +18,7 @@ class ErrorBoundary extends Component {
   }
 }
 import Login from './components/Login.jsx'
+import Onboarding from './components/Onboarding.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Coach from './components/Coach.jsx'
 import Training from './components/Training.jsx'
@@ -78,6 +79,7 @@ export default function App() {
   const [showIosHint, setShowIosHint] = useState(false)      // iOS
   const [showUpdate, setShowUpdate] = useState(false)
   const [updateReg, setUpdateReg] = useState(null)
+  const [toonOnboarding, setToonOnboarding] = useState(false)
 
   useEffect(() => {
     // Auth
@@ -126,11 +128,20 @@ export default function App() {
     }
   }, [])
 
-  function inloggen(token, userData) {
+  async function inloggen(token, userData) {
     localStorage.setItem('apex_token', token)
     localStorage.setItem('apex_user', JSON.stringify(userData))
     setUser(userData)
     setScherm('dashboard')
+    // Check onboarding: only if not already completed for this user
+    const vlagKey = `apex_onboarding_${userData.id}`
+    if (!localStorage.getItem(vlagKey)) {
+      try {
+        const profiel = await fetch('/api/profiel', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        if (!profiel.gewicht_kg) setToonOnboarding(true)
+        else localStorage.setItem(vlagKey, '1')
+      } catch { /* stil falen — toon gewoon de app */ }
+    }
   }
 
   function uitloggen() {
@@ -158,6 +169,12 @@ export default function App() {
 
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (!user) return <Login onInloggen={inloggen} />
+  if (toonOnboarding) return (
+    <Onboarding user={user} onKlaar={() => {
+      localStorage.setItem(`apex_onboarding_${user.id}`, '1')
+      setToonOnboarding(false)
+    }} />
+  )
 
   const schermen = {
     dashboard: Dashboard, training: Training,

@@ -153,6 +153,57 @@ body {
 .login-card form h2 { margin-bottom: 18px; font-size: 1.05rem; }
 .login-switch { text-align: center; margin-top: 14px; font-size: 0.85rem; color: var(--text-2); }
 
+/* ===== ONBOARDING ===== */
+.onboarding-overlay {
+  position: fixed; inset: 0; background: linear-gradient(160deg, var(--primary-light) 0%, var(--bg) 60%);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 500; padding: 24px 16px 40px;
+}
+.onboarding-card {
+  width: 100%; max-width: 420px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-md);
+  margin-top: auto; margin-bottom: auto;
+}
+.onboarding-card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+.onboarding-sub { font-size: 0.85rem; color: var(--text-2); margin-bottom: 16px; line-height: 1.4; }
+.onboarding-stappen { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
+.onboarding-stap-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border); transition: background 0.2s, width 0.2s;
+}
+.onboarding-stap-dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+.onboarding-stap-dot.done { background: var(--primary); opacity: 0.4; }
+.onboarding-doelen { display: flex; flex-direction: column; gap: 8px; }
+.onboarding-doel-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 12px 14px; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font);
+  text-align: left; transition: all 0.15s;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.onboarding-doel-btn strong { font-size: 0.9rem; color: var(--text); }
+.onboarding-doel-btn span { font-size: 0.78rem; color: var(--text-2); }
+.onboarding-doel-btn.active { border-color: var(--primary); background: var(--primary-light); }
+.onboarding-doel-btn.active strong { color: var(--primary); }
+.onboarding-dagen { display: flex; gap: 6px; margin-top: 8px; }
+.onboarding-dag-btn {
+  flex: 1; height: 44px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--bg); font-family: var(--font); font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; color: var(--text-2);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.onboarding-dag-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.onboarding-tdee {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 4px;
+}
+.onboarding-tdee-label { font-size: 0.8rem; color: var(--text-2); }
+.onboarding-tdee-waarde { font-size: 1rem; font-weight: 700; color: var(--primary); }
+.onboarding-uitleg { background: var(--primary-bg); border-radius: var(--radius-sm); padding: 10px 14px; }
+.onboarding-uitleg p { font-size: 0.8rem; color: var(--text-2); margin-bottom: 4px; line-height: 1.4; }
+.onboarding-uitleg p:last-child { margin-bottom: 0; }
+
 /* ===== BUTTONS ===== */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
