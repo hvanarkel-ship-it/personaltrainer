@@ -1,4 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { fout: null } }
+  static getDerivedStateFromError(err) { return { fout: err?.message || 'Onbekende fout' } }
+  render() {
+    if (this.state.fout) return (
+      <div style={{ padding: 24, textAlign: 'center', fontFamily: '-apple-system, sans-serif' }}>
+        <p style={{ fontSize: '2rem', marginBottom: 8 }}>⚠️</p>
+        <h2 style={{ marginBottom: 8 }}>Er is iets misgegaan</h2>
+        <p style={{ color: '#6b7280', marginBottom: 20, fontSize: '0.875rem' }}>{this.state.fout}</p>
+        <button onClick={() => window.location.reload()} style={{ background: '#1D9E75', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 20px', fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
+          App herladen
+        </button>
+      </div>
+    )
+    return this.props.children
+  }
+}
 import Login from './components/Login.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Coach from './components/Coach.jsx'
@@ -9,7 +27,7 @@ import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
 import DbStatus from './components/DbStatus.jsx'
 
-const APP_VERSION = 'v2026.04-1'
+const APP_VERSION = 'v2026.04-2'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },
@@ -153,6 +171,7 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
     <div className="app">
       <DbStatus />
 
@@ -244,5 +263,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   )
 }
