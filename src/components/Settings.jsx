@@ -299,6 +299,30 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
       {tab === 'integraties' && (
         <div className="lijst">
 
+          {/* Garmin — Junction */}
+          <JunctionConnectCard
+            kleur="#006EBE"
+            letter="G"
+            naam="Garmin Connect"
+            subtitel="Trainingen, slaap, HRV & herstel"
+            provider="garmin"
+            verbonden={junctionProviders.includes('garmin')}
+            laden={junctionVerbinden === 'garmin'}
+            onVerbinden={() => koppelJunction('garmin')}
+          />
+
+          {/* Suunto — Junction */}
+          <JunctionConnectCard
+            kleur="#003882"
+            letter="S"
+            naam="Suunto"
+            subtitel="Trainingen, slaap, HRV & herstel"
+            provider="suunto"
+            verbonden={junctionProviders.includes('suunto')}
+            laden={junctionVerbinden === 'suunto'}
+            onVerbinden={() => koppelJunction('suunto')}
+          />
+
           {/* Strava */}
           <div className="card integratie-card">
             <div className="integratie-header">
@@ -326,7 +350,9 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
             ) : (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Importeer automatisch trainingen, hartslag en prestaties vanuit Strava.
+                  {(junctionProviders.includes('garmin') || junctionProviders.includes('suunto'))
+                    ? 'Je Garmin of Suunto synchroniseert al automatisch via Junction — inclusief slaap en HRV. Strava is optioneel, handig als je ook een Polar, Wahoo of ander toestel gebruikt.'
+                    : 'Importeer automatisch trainingen, hartslag en prestaties vanuit Strava. Handig voor Polar, Wahoo en andere toestellen. Garmin en Suunto? Die sync je beter direct hierboven via Junction.'}
                 </p>
                 <button className="btn btn-full" onClick={koppelStrava} style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}>
                   Verbinden met Strava
@@ -343,30 +369,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
             subtitel="Stappen, HRV, slaap"
             beschrijving="Apple Health is alleen toegankelijk via de iOS-app. Upload schermafbeeldingen via de Coach voor automatische analyse."
             onNavigeer={onNavigeer}
-          />
-
-          {/* Suunto — Junction */}
-          <JunctionConnectCard
-            kleur="#003882"
-            letter="S"
-            naam="Suunto"
-            subtitel="Trainingen, slaap, HRV & herstel"
-            provider="suunto"
-            verbonden={junctionProviders.includes('suunto')}
-            laden={junctionVerbinden === 'suunto'}
-            onVerbinden={() => koppelJunction('suunto')}
-          />
-
-          {/* Garmin — Junction */}
-          <JunctionConnectCard
-            kleur="#006EBE"
-            letter="G"
-            naam="Garmin Connect"
-            subtitel="Trainingen, slaap, HRV & herstel"
-            provider="garmin"
-            verbonden={junctionProviders.includes('garmin')}
-            laden={junctionVerbinden === 'garmin'}
-            onVerbinden={() => koppelJunction('garmin')}
           />
 
           {/* MyFitnessPal */}

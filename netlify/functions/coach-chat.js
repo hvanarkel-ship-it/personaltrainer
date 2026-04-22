@@ -456,8 +456,21 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
     }
     if (berichtTekst.trim()) userContent.push({ type: 'text', text: berichtTekst.trim() })
 
+    const filteredHistory = history.reverse().filter(h => h.bericht && h.bericht.trim())
+    const dedupedHistory = []
+    for (const h of filteredHistory) {
+      const role = h.is_ai ? 'assistant' : 'user'
+      const content = h.bericht.trim()
+      if (dedupedHistory.length > 0 && dedupedHistory[dedupedHistory.length - 1].role === role) {
+        dedupedHistory[dedupedHistory.length - 1].content += '\n\n' + content
+      } else {
+        dedupedHistory.push({ role, content })
+      }
+    }
+    while (dedupedHistory.length > 0 && dedupedHistory[0].role === 'assistant') dedupedHistory.shift()
+
     const messages = [
-      ...history.reverse().map(h => ({ role: h.is_ai ? 'assistant' : 'user', content: h.bericht })),
+      ...dedupedHistory,
       { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : userContent }
     ]
 
