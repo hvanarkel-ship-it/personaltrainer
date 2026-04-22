@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 
 const SPORTEN = ['hyrox', 'fitness', 'hardlopen', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal']
@@ -10,15 +10,26 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }) {
+export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, owStatus }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [owSyncing, setOwSyncing] = useState(false)
   const [melding, setMelding] = useState(null)
+  const [owProviders, setOwProviders] = useState(null)   // null = not yet loaded
 
-  useEffect(() => { laadProfiel() }, [])
+  const laadOwStatus = useCallback(async () => {
+    try {
+      const data = await api.get('/openwearables-status')
+      setOwProviders(data.configured ? data.providers : false)
+    } catch {
+      setOwProviders(false)
+    }
+  }, [])
+
+  useEffect(() => { laadProfiel(); laadOwStatus() }, [])
 
   useEffect(() => {
     if (stravaStatus === 'verbonden') {
@@ -33,6 +44,21 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
       setTab('integraties')
     }
   }, [stravaStatus])
+
+  useEffect(() => {
+    if (!owStatus) return
+    const { provider, status } = owStatus
+    const naam = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Wearable'
+    if (status === 'verbonden') {
+      setMelding({ type: 'success', tekst: `✓ ${naam} succesvol gekoppeld!` })
+      laadOwStatus()
+    } else if (status === 'geweigerd') {
+      setMelding({ type: 'error', tekst: `${naam} koppeling geweigerd.` })
+    } else {
+      setMelding({ type: 'error', tekst: `Fout bij koppelen ${naam}. Probeer opnieuw.` })
+    }
+    setTab('integraties')
+  }, [owStatus])
 
   async function laadProfiel() {
     try {
@@ -105,6 +131,38 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
       setMelding({ type: 'error', tekst: 'Sync mislukt: ' + err.message })
     } finally {
       setSyncing(false)
+    }
+  }
+
+  function koppelOwProvider(provider) {
+    const token = localStorage.getItem('apex_token')
+    window.location.href = `/api/openwearables-connect?token=${encodeURIComponent(token)}&provider=${provider}`
+  }
+
+  async function ontkoppelOwProvider(provider) {
+    try {
+      await api.delete(`/openwearables-status?provider=${provider}`)
+      setOwProviders(prev => prev
+        ? prev.map(p => p.id === provider ? { ...p, verbonden: false } : p)
+        : prev
+      )
+      setMelding({ type: 'success', tekst: `${provider.charAt(0).toUpperCase() + provider.slice(1)} ontkoppeld.` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Ontkoppelen mislukt: ' + err.message })
+    }
+  }
+
+  async function syncOwData() {
+    setOwSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/openwearables-sync', {})
+      const totaal = (res.activiteit_gesynchroniseerd || 0) + (res.slaap_gesynchroniseerd || 0)
+      setMelding({ type: 'success', tekst: `↻ ${totaal} nieuwe items gesynchroniseerd (${res.activiteit_gesynchroniseerd || 0} activiteiten, ${res.slaap_gesynchroniseerd || 0} slaap)` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Sync mislukt: ' + err.message })
+    } finally {
+      setOwSyncing(false)
     }
   }
 
@@ -278,7 +336,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             {profiel.strava_verbonden ? (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Trainingen worden automatisch gesynchroniseerd zodra ze op Strava verschijnen. Garmin en Suunto synchroniseren via de Strava-brug — geen handmatige actie nodig.
+                  Trainingen worden automatisch gesynchroniseerd zodra ze op Strava verschijnen.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={syncing}>
@@ -290,7 +348,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             ) : (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Importeer automatisch trainingen, hartslag en prestaties. Garmin Connect en Suunto synchroniseren automatisch met Strava — koppel Strava eenmalig en je trainingen verschijnen vanzelf.
+                  Importeer automatisch trainingen, hartslag en prestaties via Strava.
                 </p>
                 <button className="btn btn-full" onClick={koppelStrava} style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}>
                   Verbinden met Strava
@@ -299,27 +357,47 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             )}
           </div>
 
-          {/* Garmin */}
-          <IntegratieUploadCard
-            kleur="#006EBE"
-            letter="G"
-            naam="Garmin Connect"
-            subtitel="Slaap, HRV & ochtendherstel"
-            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Garmin Connect ochtendherstel of slaapoverzicht via de Coach voor automatische HRV- en slaapanalyse."
-            uploadType="garmin"
-            onNavigeer={onNavigeer}
-          />
+          {/* Open Wearables — Garmin, Suunto, Polar, Whoop, Oura */}
+          {owProviders === null && (
+            <div className="card" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)', fontSize: '0.85rem' }}>
+              Wearables laden...
+            </div>
+          )}
 
-          {/* Suunto */}
-          <IntegratieUploadCard
-            kleur="#003882"
-            letter="S"
-            naam="Suunto"
-            subtitel="Slaap, HRV & ochtendherstel"
-            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Suunto-app ochtendherstel of trainingsoverzicht via de Coach voor automatische analyse."
-            uploadType="suunto"
-            onNavigeer={onNavigeer}
-          />
+          {owProviders === false && (
+            <>
+              <IntegratieUploadCard
+                kleur="#006EBE" letter="G" naam="Garmin Connect" subtitel="Slaap, HRV & activiteiten"
+                beschrijving="Upload een screenshot van je Garmin Connect ochtendherstel of slaapoverzicht via de Coach voor automatische HRV- en slaapanalyse. Of koppel Open Wearables voor directe synchronisatie."
+                uploadType="garmin" onNavigeer={onNavigeer}
+              />
+              <IntegratieUploadCard
+                kleur="#003882" letter="S" naam="Suunto" subtitel="Slaap, HRV & activiteiten"
+                beschrijving="Upload een screenshot van je Suunto-app via de Coach voor automatische analyse. Of koppel Open Wearables voor directe synchronisatie."
+                uploadType="suunto" onNavigeer={onNavigeer}
+              />
+            </>
+          )}
+
+          {Array.isArray(owProviders) && (
+            <>
+              {owProviders.some(p => p.verbonden) && (
+                <div style={{ marginBottom: '4px' }}>
+                  <button className="btn btn-secondary btn-full" onClick={syncOwData} disabled={owSyncing}>
+                    {owSyncing ? '...' : '↻ Alle wearables synchroniseren'}
+                  </button>
+                </div>
+              )}
+              {owProviders.map(p => (
+                <OwProviderCard
+                  key={p.id}
+                  provider={p}
+                  onKoppel={() => koppelOwProvider(p.id)}
+                  onOntkoppel={() => ontkoppelOwProvider(p.id)}
+                />
+              ))}
+            </>
+          )}
 
           {/* Apple Health */}
           <IntegratieUploadCard
@@ -340,6 +418,39 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             beschrijving="MyFitnessPal heeft geen openbare API meer. Export je dagoverzicht als screenshot en upload via de Coach."
             onNavigeer={onNavigeer}
           />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OwProviderCard({ provider, onKoppel, onOntkoppel }) {
+  const { label, kleur, letter, verbonden } = provider
+  return (
+    <div className="card integratie-card">
+      <div className="integratie-header">
+        <div className="integratie-logo" style={{ background: kleur }}>{letter}</div>
+        <div className="integratie-info">
+          <strong>{label}</strong>
+          <span>Activiteiten, slaap & HRV</span>
+        </div>
+        <span className={`integratie-badge ${verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+          {verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+        </span>
+      </div>
+      {verbonden ? (
+        <div style={{ marginTop: '12px' }}>
+          <button className="btn btn-ghost btn-full" onClick={onOntkoppel}>Ontkoppelen</button>
+        </div>
+      ) : (
+        <div style={{ marginTop: '12px' }}>
+          <button
+            className="btn btn-full"
+            onClick={onKoppel}
+            style={{ background: kleur, color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+          >
+            Verbinden met {label}
+          </button>
         </div>
       )}
     </div>

@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
   strava_refresh_token TEXT,
   strava_token_expires_at BIGINT,
   strava_athlete_id BIGINT,
+  openwearables_user_id TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

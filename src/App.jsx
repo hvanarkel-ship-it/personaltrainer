@@ -75,6 +75,7 @@ export default function App() {
   const [scherm, setScherm] = useState('dashboard')
   const [coachTrigger, setCoachTrigger] = useState(null)
   const [stravaStatus, setStravaStatus] = useState(null)
+  const [owStatus, setOwStatus] = useState(null)   // { provider, status }
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [installPrompt, setInstallPrompt] = useState(null)   // Android
   const [showIosHint, setShowIosHint] = useState(false)      // iOS
@@ -97,6 +98,11 @@ export default function App() {
     const status = params.get('status')
     if (integratie === 'strava' && status) {
       setStravaStatus(status)
+      setScherm('settings')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    if (integratie === 'openwearables' && status) {
+      setOwStatus({ provider: params.get('provider'), status })
       setScherm('settings')
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -233,6 +239,7 @@ export default function App() {
           user={user}
           {...navProps}
           stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
+          owStatus={scherm === 'settings' ? owStatus : undefined}
         />
       )}
 

@@ -16,7 +16,7 @@ export const handler = async (event) => {
           p.geboortejaar, p.lengte_cm, p.gewicht_kg,
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
-          p.strava_athlete_id, p.updated_at
+          p.strava_athlete_id, p.openwearables_user_id, p.updated_at
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
