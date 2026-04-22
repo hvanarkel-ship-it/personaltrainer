@@ -75,6 +75,7 @@ export default function App() {
   const [scherm, setScherm] = useState('dashboard')
   const [coachTrigger, setCoachTrigger] = useState(null)
   const [stravaStatus, setStravaStatus] = useState(null)
+  const [junctionStatus, setJunctionStatus] = useState(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [installPrompt, setInstallPrompt] = useState(null)   // Android
   const [showIosHint, setShowIosHint] = useState(false)      // iOS
@@ -97,6 +98,15 @@ export default function App() {
     const status = params.get('status')
     if (integratie === 'strava' && status) {
       setStravaStatus(status)
+      setScherm('settings')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
+    // Junction (Garmin/Suunto) callback
+    const jProvider = params.get('junction_provider')
+    const jState = params.get('junction_state')
+    if (jProvider && jState) {
+      setJunctionStatus({ provider: jProvider, state: jState })
       setScherm('settings')
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -233,6 +243,7 @@ export default function App() {
           user={user}
           {...navProps}
           stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
+          junctionStatus={scherm === 'settings' ? junctionStatus : undefined}
         />
       )}
 
