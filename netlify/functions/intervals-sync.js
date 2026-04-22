@@ -45,7 +45,7 @@ export const handler = async (event) => {
 
     const { intervals_athlete_id: athleteId, intervals_api_key: apiKey } = profiel
     const authHeader = 'Basic ' + Buffer.from(`API_KEY:${apiKey}`).toString('base64')
-    const oldest = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0]
+    const oldest = '2015-01-01'  // volledige historie ophalen
     const newest = new Date().toISOString().split('T')[0]
     const headers = { Authorization: authHeader, Accept: 'application/json' }
 
@@ -59,24 +59,25 @@ export const handler = async (event) => {
     let wellness_synced = 0
     let debug = {}
 
+    // Pre-fetch alle bestaande intervals_ids in één query (efficiënt voor grote historiek)
+    const bestaand = await sql`
+      SELECT intervals_id FROM trainingen WHERE user_id = ${userId} AND intervals_id IS NOT NULL
+    `
+    const bestaandeIds = new Set(bestaand.map(r => String(r.intervals_id)))
+
     // ── Activiteiten ─────────────────────────────────────────────────────────
     if (activitiesRes.ok) {
       const raw = await activitiesRes.json()
       const activities = toArray(raw)
       debug.activities_received = activities.length
-      // Log first item shape so we can verify field names
       if (activities.length > 0) console.log('Intervals activity sample:', JSON.stringify(activities[0]).slice(0, 300))
 
       for (const act of activities) {
-        // Support both start_date_local and start_date
         const datum = (act.start_date_local ?? act.start_date ?? '')?.split('T')[0]
         if (!datum || !act.id) continue
 
         const intervalsId = String(act.id)
-        const [existing] = await sql`
-          SELECT id FROM trainingen WHERE user_id = ${userId} AND intervals_id = ${intervalsId} LIMIT 1
-        `
-        if (existing) { overgeslagen++; continue }
+        if (bestaandeIds.has(intervalsId)) { overgeslagen++; continue }
 
         const naamLower = (act.name || '').toLowerCase()
         const sport = /hyrox|hyro x/.test(naamLower)
@@ -119,6 +120,13 @@ export const handler = async (event) => {
       debug.wellness_received = wellness.length
       if (wellness.length > 0) console.log('Intervals wellness sample:', JSON.stringify(wellness[0]).slice(0, 300))
 
+      // Pre-fetch bestaande wellness-datums in één query
+      const bestaandeWellness = await sql`
+        SELECT datum::text FROM trainingen
+        WHERE user_id = ${userId} AND sport = 'herstel' AND bron = 'intervals'
+      `
+      const bestaandeWellnessDagen = new Set(bestaandeWellness.map(r => String(r.datum).slice(0, 10)))
+
       for (const w of wellness) {
         if (!w.id) continue
 
@@ -129,13 +137,7 @@ export const handler = async (event) => {
         const rusthartsslag = w.restingHR ?? null
 
         if (!hrv && !slaap_uur) continue
-
-        const [existing] = await sql`
-          SELECT id FROM trainingen
-          WHERE user_id = ${userId} AND datum = ${w.id} AND sport = 'herstel' AND bron = 'intervals'
-          LIMIT 1
-        `
-        if (existing) continue
+        if (bestaandeWellnessDagen.has(String(w.id).slice(0, 10))) continue
 
         await sql`
           INSERT INTO trainingen

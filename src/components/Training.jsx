@@ -138,7 +138,7 @@ export default function Training({ onNavigeer, user }) {
   const [fout, setFout] = useState('')
 
   useEffect(() => {
-    api.get('/training').then(setTrainingen).catch(e => setFout(e.message)).finally(() => setLaden(false))
+    api.get('/training?limit=2000').then(setTrainingen).catch(e => setFout(e.message)).finally(() => setLaden(false))
   }, [])
 
   const upd = k => e => setForm(f => ({ ...f, [k]: e.target.value }))

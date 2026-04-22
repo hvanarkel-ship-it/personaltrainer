@@ -13,7 +13,7 @@ export const handler = async (event) => {
   try {
     if (event.httpMethod === 'GET') {
       const params = event.queryStringParameters || {}
-      const limit = Math.min(parseInt(params.limit) || 30, 100)
+      const limit = Math.min(parseInt(params.limit) || 500, 2000)
       const sport = params.sport
       let rows
       if (sport) {
