@@ -16,6 +16,16 @@ const SPORT_MAP = {
   RockClimbing: 'overig', IceSkate: 'overig', InlineSkate: 'overig',
 }
 
+function toArray(data) {
+  if (Array.isArray(data)) return data
+  // Unwrap common envelope shapes: { activities: [] } or { data: [] } etc.
+  if (data && typeof data === 'object') {
+    const val = data.activities ?? data.wellness ?? data.data ?? data.items ?? null
+    if (Array.isArray(val)) return val
+  }
+  return []
+}
+
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
   const auth = requireAuth(event)
@@ -47,12 +57,19 @@ export const handler = async (event) => {
     let gesynchroniseerd = 0
     let overgeslagen = 0
     let wellness_synced = 0
+    let debug = {}
 
     // ── Activiteiten ─────────────────────────────────────────────────────────
     if (activitiesRes.ok) {
-      const activities = await activitiesRes.json()
+      const raw = await activitiesRes.json()
+      const activities = toArray(raw)
+      debug.activities_received = activities.length
+      // Log first item shape so we can verify field names
+      if (activities.length > 0) console.log('Intervals activity sample:', JSON.stringify(activities[0]).slice(0, 300))
+
       for (const act of activities) {
-        const datum = act.start_date_local?.split('T')[0]
+        // Support both start_date_local and start_date
+        const datum = (act.start_date_local ?? act.start_date ?? '')?.split('T')[0]
         if (!datum || !act.id) continue
 
         const intervalsId = String(act.id)
@@ -68,8 +85,9 @@ export const handler = async (event) => {
 
         const duur_min = act.moving_time ? Math.round(act.moving_time / 60) : null
         const kcal = act.calories > 0 ? Math.round(act.calories) : null
-        const gem_hr = act.average_hr ? Math.round(act.average_hr) : null
-        const max_hr = act.max_hr ? Math.round(act.max_hr) : null
+        // Support both average_hr (intervals) and average_heartrate (strava-style)
+        const gem_hr = (act.average_hr ?? act.average_heartrate) ? Math.round(act.average_hr ?? act.average_heartrate) : null
+        const max_hr = (act.max_hr ?? act.max_heartrate) ? Math.round(act.max_hr ?? act.max_heartrate) : null
         const afstand_m = act.distance ? Math.round(act.distance) : null
         const hoogte_m = act.total_elevation_gain ? Math.round(act.total_elevation_gain) : null
 
@@ -88,18 +106,26 @@ export const handler = async (event) => {
         `
         gesynchroniseerd++
       }
+    } else {
+      const errText = await activitiesRes.text()
+      console.error('Intervals activities error:', activitiesRes.status, errText)
+      debug.activities_error = `${activitiesRes.status}: ${errText.slice(0, 200)}`
     }
 
     // ── Wellness (HRV, slaap, form) ──────────────────────────────────────────
     if (wellnessRes.ok) {
-      const wellness = await wellnessRes.json()
+      const raw = await wellnessRes.json()
+      const wellness = toArray(raw)
+      debug.wellness_received = wellness.length
+      if (wellness.length > 0) console.log('Intervals wellness sample:', JSON.stringify(wellness[0]).slice(0, 300))
+
       for (const w of wellness) {
         if (!w.id) continue
 
         const hrv = w.hrv ?? w.hrvSdnn ?? null
         const slaap_uur = w.sleepSecs > 0 ? Math.round(w.sleepSecs / 360) / 10 : null
         const slaapscore = w.sleepScore ?? null
-        const herstelbalans = w.form ?? null  // TSB: positief = fris, negatief = vermoeid
+        const herstelbalans = w.form ?? null
         const rusthartsslag = w.restingHR ?? null
 
         if (!hrv && !slaap_uur) continue
@@ -123,9 +149,13 @@ export const handler = async (event) => {
         `
         wellness_synced++
       }
+    } else {
+      const errText = await wellnessRes.text()
+      console.error('Intervals wellness error:', wellnessRes.status, errText)
+      debug.wellness_error = `${wellnessRes.status}: ${errText.slice(0, 200)}`
     }
 
-    return cors({ success: true, gesynchroniseerd, overgeslagen, wellness: wellness_synced })
+    return cors({ success: true, gesynchroniseerd, overgeslagen, wellness: wellness_synced, debug })
   } catch (err) {
     console.error('Intervals sync error:', err)
     return cors({ error: 'Sync fout: ' + err.message }, 500)

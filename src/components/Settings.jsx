@@ -133,7 +133,9 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
     setMelding(null)
     try {
       const res = await api.post('/intervals-sync', {})
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} + ${res.wellness} wellness-dagen gesynchroniseerd` })
+      const debugInfo = res.debug ? ` (ontvangen: ${res.debug.activities_received ?? 0} activiteiten, ${res.debug.wellness_received ?? 0} wellness)` : ''
+      const errorInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
+      setMelding({ type: res.gesynchroniseerd > 0 || res.wellness > 0 ? 'success' : 'error', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} + ${res.wellness} wellness-dagen gesynchroniseerd${debugInfo}${errorInfo}` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Intervals sync mislukt: ' + err.message })
     } finally {
