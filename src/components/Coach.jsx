@@ -28,7 +28,10 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   const [uploads, setUploads] = useState([])
   const [uploadType, setUploadType] = useState(null)
   const [opname, setOpname] = useState(false)
+  const [nieuweMsg, setNieuweMsg] = useState(false)
+  const [toonScrollBtn, setToonScrollBtn] = useState(false)
   const bottomRef = useRef(null)
+  const chatRef = useRef(null)
   const inputRef = useRef(null)
   const fileRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -67,8 +70,19 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   }
 
   useEffect(() => {
-    // Start elke sessie met een leeg gesprek — de AI heeft DB-context via de backend
-    setHistLaden(false)
+    api.get('/coach-chat')
+      .then(rows => {
+        if (!rows?.length) { setHistLaden(false); return }
+        const geladen = rows.map(r => ({
+          rol: r.is_ai ? 'ai' : 'user',
+          tekst: r.bericht,
+          datum: r.created_at,
+          upload_type: r.upload_type,
+        }))
+        setBerichten(geladen)
+      })
+      .catch(() => {})
+      .finally(() => setHistLaden(false))
   }, [])
 
   // Auto-trigger upload wanneer we via dashboard navigeren (bijv. 'suunto')
@@ -80,7 +94,9 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     }
   }, [coachTrigger, histLaden])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [berichten])
+  useEffect(() => {
+    if (nieuweMsg) { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); setNieuweMsg(false) }
+  }, [berichten, nieuweMsg])
 
   function selectUploadType(type) {
     setUploadType(type)
@@ -123,6 +139,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
 
     const nu = new Date().toISOString()
     setBerichten(b => [...b, { rol: 'user', tekst: previewTekst, datum: nu }])
+    setNieuweMsg(true)
     setInput('')
     setUploads([])
     setLaden(true)
@@ -135,6 +152,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       }
       nieuweB.push({ rol: 'ai', tekst: res.antwoord, datum: nu })
       setBerichten(b => [...b, ...nieuweB])
+      setNieuweMsg(true)
     } catch (err) {
       setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
     } finally {
@@ -161,7 +179,16 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
         )}
       </header>
 
-      <div className="chat-berichten">
+      {toonScrollBtn && (
+        <button className="scroll-naar-onderen" onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+          ↓ Naar onderen
+        </button>
+      )}
+      <div className="chat-berichten" id="chat-berichten-scroll" ref={chatRef}
+        onScroll={e => {
+          const el = e.currentTarget
+          setToonScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 200)
+        }}>
         {histLaden ? (
           <div className="center-loader"><div className="spinner" /></div>
         ) : berichten.length === 0 ? (
@@ -186,7 +213,9 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
         ) : (() => {
           // Groepeer berichten op datum met datum-scheidingslijn
           let vorigeDatum = null
-          return berichten.map((b, i) => {
+          return [
+            <div key="hist-top" className="chat-hist-top">↑ Begin van gesprekgeschiedenis</div>,
+            ...berichten.map((b, i) => {
             const datumLabel = b.datum
               ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
               : null
@@ -218,8 +247,8 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
                 </div>
               </div>
             )
-          })
-        })()}
+          }))
+        ])()}
 
         {laden && (
           <div className="bericht bericht--ai">
