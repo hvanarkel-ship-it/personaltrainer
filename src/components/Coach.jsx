@@ -132,7 +132,6 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     const bestanden = uploads.map(u => ({ base64: u.base64, naam: u.bestand.name }))
     const type = uploads[0]?.type || null
 
-    // Toon in chat
     const previewTekst = uploads.length
       ? `${tekst ? tekst + '\n' : ''}📎 ${uploads.length} bestand(en): ${uploads.map(u => u.bestand.name).join(', ')}`
       : tekst
@@ -211,44 +210,44 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
             </div>
           </div>
         ) : (() => {
-          // Groepeer berichten op datum met datum-scheidingslijn
           let vorigeDatum = null
           return [
             <div key="hist-top" className="chat-hist-top">↑ Begin van gesprekgeschiedenis</div>,
             ...berichten.map((b, i) => {
-            const datumLabel = b.datum
-              ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-              : null
-            const toonDatum = datumLabel && datumLabel !== vorigeDatum
-            if (toonDatum) vorigeDatum = datumLabel
+              const datumLabel = b.datum
+                ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+                : null
+              const toonDatum = datumLabel && datumLabel !== vorigeDatum
+              if (toonDatum) vorigeDatum = datumLabel
 
-            if (b.rol === 'systeem' && b.opgeslagen) {
-              const cfg = {
-                inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
-                suunto:   { icoon: '⌚', bg: '#eff6ff', border: '#bfdbfe', kleur: '#1e40af' },
-                maaltijd: { icoon: '🍽️', bg: '#fff7ed', border: '#fed7aa', kleur: '#9a3412' },
-              }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }
+              if (b.rol === 'systeem' && b.opgeslagen) {
+                const cfg = {
+                  inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
+                  suunto:   { icoon: '⌚', bg: '#eff6ff', border: '#bfdbfe', kleur: '#1e40af' },
+                  maaltijd: { icoon: '🍽️', bg: '#fff7ed', border: '#fed7aa', kleur: '#9a3412' },
+                }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }
+                return (
+                  <div key={i} className="opgeslagen-pill" style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.kleur }}>
+                    {cfg.icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.type === 'maaltijd' ? b.opgeslagen.samenvatting : b.opgeslagen.label}
+                  </div>
+                )
+              }
               return (
-                <div key={i} className="opgeslagen-pill" style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.kleur }}>
-                  {cfg.icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.type === 'maaltijd' ? b.opgeslagen.samenvatting : b.opgeslagen.label}
-                </div>
-              )
-            }
-            return (
-              <div key={i}>
-                {toonDatum && <div className="chat-datum-lijn"><span>{datumLabel}</span></div>}
-                <div className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
-                  {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
-                  <div className="bericht-bubble">
-                    <div className="bericht-tekst" dangerouslySetInnerHTML={{
-                      __html: formatBericht(b.tekst)
-                    }} />
+                <div key={i}>
+                  {toonDatum && <div className="chat-datum-lijn"><span>{datumLabel}</span></div>}
+                  <div className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
+                    {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
+                    <div className="bericht-bubble">
+                      <div className="bericht-tekst" dangerouslySetInnerHTML={{
+                        __html: formatBericht(b.tekst)
+                      }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          }))
-        ])()}
+              )
+            }),
+          ]
+        })()}
 
         {laden && (
           <div className="bericht bericht--ai">
@@ -366,7 +365,6 @@ function markdownTabelNaarHtml(tabelTekst) {
 }
 
 function formatBericht(tekst) {
-  // Splits tekst in tabel-blokken en gewone tekst-blokken
   const blokken = []
   const tabelRe = /^(\|.+\|[ \t]*\n?){2,}/gm
   let lastIdx = 0, m
