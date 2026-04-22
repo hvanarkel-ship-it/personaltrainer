@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 
+const PROVIDER_LABELS = {
+  garmin: '⌚ Garmin Connect',
+  polar: '⌚ Polar Flow',
+  suunto: '⌚ Suunto',
+  oura: '💍 Oura Ring',
+  strava: '🏃 Strava',
+  fitbit: '⌚ Fitbit',
+}
+
 const SPORTEN = ['hyrox', 'fitness', 'hardlopen', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal']
 const SPORTEN_ICONS = { hyrox: '⚡', fitness: '🏋️', hardlopen: '🏃', fietsen: '🚴', wielrennen: '🚵', zwemmen: '🏊', padel: '🎾', tennis: '🎾', wandelen: '🚶', yoga: '🧘', voetbal: '⚽' }
 const STIJLEN = [
@@ -10,7 +19,7 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen, wearablesStatus }) {
+export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
@@ -19,20 +28,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, wearablesStatu
   const [melding, setMelding] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
-
-  useEffect(() => {
-    if (wearablesStatus === 'verbonden') {
-      setMelding({ type: 'success', tekst: '✓ Wearable succesvol gekoppeld!' })
-      setTab('integraties')
-      laadProfiel()
-    } else if (wearablesStatus === 'geweigerd') {
-      setMelding({ type: 'error', tekst: 'Wearable koppeling geweigerd.' })
-      setTab('integraties')
-    } else if (wearablesStatus === 'fout') {
-      setMelding({ type: 'error', tekst: 'Fout bij koppelen wearable. Probeer opnieuw.' })
-      setTab('integraties')
-    }
-  }, [wearablesStatus])
 
   async function laadProfiel() {
     try {
@@ -80,9 +75,20 @@ export default function Settings({ user, onNavigeer, onUitloggen, wearablesStatu
     setProfiel(p => ({ ...p, sporten: cur.includes(sport) ? cur.filter(s => s !== sport) : [...cur, sport] }))
   }
 
-  function koppelWearables() {
-    const token = localStorage.getItem('apex_token')
-    window.location.href = `/api/wearables-auth?token=${encodeURIComponent(token)}`
+  const [wearablesConnecting, setWearablesConnecting] = useState(false)
+  const [providerLinks, setProviderLinks] = useState(null)
+
+  async function laadProviderLinks() {
+    setWearablesConnecting(true)
+    try {
+      const res = await api.post('/wearables-connect', {})
+      setProviderLinks(res.connections)
+      setProfiel(p => ({ ...p, wearables_verbonden: true }))
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
+    } finally {
+      setWearablesConnecting(false)
+    }
   }
 
   async function ontkoppelWearables() {
@@ -290,17 +296,41 @@ export default function Settings({ user, onNavigeer, onUitloggen, wearablesStatu
                   <button className="btn btn-ghost" onClick={ontkoppelWearables}>Ontkoppelen</button>
                 </div>
               </>
+            ) : providerLinks ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Kies je apparaat om te koppelen. Je wordt doorgestuurd naar de inlogpagina van de provider.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  {providerLinks.map(({ provider, url }) => (
+                    <a
+                      key={provider}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary btn-full"
+                      style={{ textAlign: 'center', textDecoration: 'none' }}
+                    >
+                      {PROVIDER_LABELS[provider] || provider}
+                    </a>
+                  ))}
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginTop: 10 }}>
+                  Na het koppelen: kom terug en tik "↻ Nu synchroniseren" om data op te halen.
+                </p>
+              </>
             ) : (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Koppel je wearable via Open Wearables voor automatische HRV, slaap- en hersteldata. Ondersteunt Garmin, Polar, Suunto, Apple Watch en andere apparaten.
+                  Koppel je wearable voor automatische HRV, slaap- en hersteldata. Ondersteunt Garmin, Polar, Suunto, Oura, Fitbit en meer.
                 </p>
                 <button
                   className="btn btn-full"
-                  onClick={koppelWearables}
+                  onClick={laadProviderLinks}
+                  disabled={wearablesConnecting}
                   style={{ marginTop: '12px', background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
                 >
-                  Verbinden met Open Wearables
+                  {wearablesConnecting ? 'Laden...' : 'Verbinden met Open Wearables'}
                 </button>
               </>
             )}

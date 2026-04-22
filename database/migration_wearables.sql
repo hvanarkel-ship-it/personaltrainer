@@ -1,10 +1,7 @@
 -- APEX Coach — Wearables (Open Wearables) migratie
 -- Uitvoeren in Neon SQL Editor: https://console.neon.tech
 
--- Kolommen voor Open Wearables koppeling in user_profile
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_token TEXT;
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_refresh_token TEXT;
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_token_expires_at BIGINT;
+-- Open Wearables user ID opslaan in user_profile
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_user_id TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_device TEXT;
 

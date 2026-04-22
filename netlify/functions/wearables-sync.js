@@ -12,17 +12,43 @@ export const handler = async (event) => {
 
   try {
     const [profiel] = await sql`
-      SELECT wearables_token, wearables_refresh_token, wearables_token_expires_at, wearables_device
-      FROM user_profile WHERE user_id = ${userId}
+      SELECT wearables_user_id, wearables_device FROM user_profile WHERE user_id = ${userId}
     `
-    if (!profiel?.wearables_token) return cors({ error: 'Open Wearables niet gekoppeld' }, 400)
+    if (!profiel?.wearables_user_id) return cors({ error: 'Open Wearables niet gekoppeld' }, 400)
 
     const wearablesUrl = process.env.WEARABLES_URL
-    if (!wearablesUrl) return cors({ error: 'Open Wearables niet geconfigureerd' }, 500)
+    const apiKey = process.env.WEARABLES_API_KEY
+    if (!wearablesUrl || !apiKey) return cors({ error: 'Open Wearables niet geconfigureerd' }, 500)
 
-    let accessToken = profiel.wearables_token
-    if (profiel.wearables_token_expires_at && profiel.wearables_token_expires_at < Math.floor(Date.now() / 1000)) {
-      accessToken = await vernieuwToken(sql, userId, profiel, wearablesUrl)
+    const owUserId = profiel.wearables_user_id
+    const headers = { 'X-Open-Wearables-API-Key': apiKey }
+
+    // Fetch last 7 days
+    const endDate = new Date().toISOString().split('T')[0]
+    const startDate = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
+
+    const [sleepRes, activityRes, bodyRes, connectionsRes] = await Promise.all([
+      fetch(`${wearablesUrl}/api/v1/users/${owUserId}/summaries/sleep?start_date=${startDate}&end_date=${endDate}&limit=7&sort_order=desc`, { headers }),
+      fetch(`${wearablesUrl}/api/v1/users/${owUserId}/summaries/activity?start_date=${startDate}&end_date=${endDate}&limit=7&sort_order=desc`, { headers }),
+      fetch(`${wearablesUrl}/api/v1/users/${owUserId}/summaries/body`, { headers }),
+      fetch(`${wearablesUrl}/api/v1/users/${owUserId}/connections`, { headers }),
+    ])
+
+    const [sleepData, activityData, bodyData] = await Promise.all([
+      sleepRes.ok ? sleepRes.json() : null,
+      activityRes.ok ? activityRes.json() : null,
+      bodyRes.ok ? bodyRes.json() : null,
+    ])
+
+    // Update device name from first active connection
+    if (connectionsRes.ok) {
+      const connections = await connectionsRes.json()
+      if (Array.isArray(connections) && connections.length > 0) {
+        const device = connections[0].provider || connections[0].provider_name || null
+        if (device) {
+          await sql`UPDATE user_profile SET wearables_device = ${device}, updated_at = NOW() WHERE user_id = ${userId}`
+        }
+      }
     }
 
     await sql`
@@ -43,37 +69,49 @@ export const handler = async (event) => {
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_dagelijkse_stats_user_datum ON dagelijkse_stats(user_id, datum DESC)`
 
-    const res = await fetch(`${wearablesUrl}/api/metrics/recent?days=7`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      console.error('Wearables API error:', text)
-      return cors({ error: 'Open Wearables API fout' }, 500)
+    // Build lookup maps keyed by date
+    const sleepByDate = {}
+    for (const entry of sleepData?.items ?? sleepData?.data ?? []) {
+      const date = entry.date || entry.day || entry.summary_date
+      if (date) sleepByDate[date] = entry
     }
 
-    const metrics = await res.json()
-    if (!Array.isArray(metrics)) return cors({ error: 'Onverwacht API formaat' }, 500)
+    const activityByDate = {}
+    for (const entry of activityData?.items ?? activityData?.data ?? []) {
+      const date = entry.date || entry.day || entry.summary_date
+      if (date) activityByDate[date] = entry
+    }
 
+    // Body summary gives averaged HRV + resting HR (not per-day)
+    const avgHrv = bodyData?.averaged?.hrv ?? bodyData?.hrv_rmssd_average ?? null
+    const avgRhr = bodyData?.averaged?.resting_heart_rate ?? bodyData?.resting_heart_rate ?? null
+
+    // Merge into dagelijkse_stats for each day
+    const dates = new Set([...Object.keys(sleepByDate), ...Object.keys(activityByDate)])
     let gesynchroniseerd = 0
-    for (const m of metrics) {
-      if (!m.date) continue
+
+    for (const date of dates) {
+      const sleep = sleepByDate[date] || {}
+      const activity = activityByDate[date] || {}
+
+      const slaap_uur = sleep.total_sleep_time_seconds
+        ? Math.round((sleep.total_sleep_time_seconds / 3600) * 10) / 10
+        : (sleep.sleep_duration_hours ?? sleep.total_sleep_hours ?? null)
+
+      const slaapscore = sleep.sleep_score ?? sleep.score ?? null
+      const stappen = activity.steps ?? activity.total_steps ?? null
+      const hrv = sleep.average_hrv ?? sleep.hrv_rmssd ?? avgHrv ?? null
+      const rhr = activity.resting_heart_rate ?? sleep.resting_heart_rate ?? avgRhr ?? null
+
       await sql`
-        INSERT INTO dagelijkse_stats (user_id, datum, hrv_ms, slaap_uur, slaapscore, herstel_score, rusthartsslag, stappen, bron)
-        VALUES (
-          ${userId}, ${m.date},
-          ${m.hrv_ms || null}, ${m.sleep_hours || null}, ${m.sleep_score || null},
-          ${m.recovery_score || null}, ${m.resting_hr || null}, ${m.steps || null},
-          'wearables'
-        )
+        INSERT INTO dagelijkse_stats (user_id, datum, hrv_ms, slaap_uur, slaapscore, rusthartsslag, stappen, bron)
+        VALUES (${userId}, ${date}, ${hrv}, ${slaap_uur}, ${slaapscore}, ${rhr}, ${stappen}, 'wearables')
         ON CONFLICT (user_id, datum) DO UPDATE SET
-          hrv_ms = COALESCE(EXCLUDED.hrv_ms, dagelijkse_stats.hrv_ms),
-          slaap_uur = COALESCE(EXCLUDED.slaap_uur, dagelijkse_stats.slaap_uur),
-          slaapscore = COALESCE(EXCLUDED.slaapscore, dagelijkse_stats.slaapscore),
-          herstel_score = COALESCE(EXCLUDED.herstel_score, dagelijkse_stats.herstel_score),
-          rusthartsslag = COALESCE(EXCLUDED.rusthartsslag, dagelijkse_stats.rusthartsslag),
-          stappen = COALESCE(EXCLUDED.stappen, dagelijkse_stats.stappen)
+          hrv_ms       = COALESCE(EXCLUDED.hrv_ms,       dagelijkse_stats.hrv_ms),
+          slaap_uur    = COALESCE(EXCLUDED.slaap_uur,    dagelijkse_stats.slaap_uur),
+          slaapscore   = COALESCE(EXCLUDED.slaapscore,   dagelijkse_stats.slaapscore),
+          rusthartsslag= COALESCE(EXCLUDED.rusthartsslag,dagelijkse_stats.rusthartsslag),
+          stappen      = COALESCE(EXCLUDED.stappen,      dagelijkse_stats.stappen)
       `
       gesynchroniseerd++
     }
@@ -83,28 +121,4 @@ export const handler = async (event) => {
     console.error('Wearables sync error:', err)
     return cors({ error: 'Sync fout: ' + err.message }, 500)
   }
-}
-
-async function vernieuwToken(sql, userId, profiel, wearablesUrl) {
-  const res = await fetch(`${wearablesUrl}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.WEARABLES_CLIENT_ID,
-      client_secret: process.env.WEARABLES_CLIENT_SECRET,
-      refresh_token: profiel.wearables_refresh_token,
-      grant_type: 'refresh_token',
-    })
-  })
-  const tokens = await res.json()
-  if (!tokens.access_token) throw new Error('Token vernieuwen mislukt')
-  await sql`
-    UPDATE user_profile SET
-      wearables_token = ${tokens.access_token},
-      wearables_refresh_token = ${tokens.refresh_token || profiel.wearables_refresh_token},
-      wearables_token_expires_at = ${tokens.expires_at || null},
-      updated_at = NOW()
-    WHERE user_id = ${userId}
-  `
-  return tokens.access_token
 }
