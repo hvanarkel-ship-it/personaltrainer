@@ -26,10 +26,11 @@ CREATE TABLE IF NOT EXISTS user_profile (
   coach_context TEXT,
   coach_naam TEXT DEFAULT 'APEX Coach',
   coach_stijl TEXT DEFAULT 'direct',
-  strava_access_token TEXT,
-  strava_refresh_token TEXT,
-  strava_token_expires_at BIGINT,
-  strava_athlete_id BIGINT,
+  wearables_token TEXT,
+  wearables_refresh_token TEXT,
+  wearables_token_expires_at BIGINT,
+  wearables_user_id TEXT,
+  wearables_device TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -68,6 +69,8 @@ CREATE TABLE IF NOT EXISTS trainingen (
   zone4_min INTEGER,
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
+  rpe SMALLINT,
+  stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -110,33 +113,44 @@ CREATE TABLE IF NOT EXISTS gesprekken (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS dagelijkse_stats (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  datum DATE NOT NULL,
+  hrv_ms INTEGER,
+  slaap_uur NUMERIC(4,1),
+  slaapscore INTEGER,
+  herstel_score INTEGER,
+  rusthartsslag INTEGER,
+  stappen INTEGER,
+  bron TEXT DEFAULT 'wearables',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, datum)
+);
+
 -- ── Kolommen toevoegen die mogelijk ontbreken (bestaande DB's) ─────────────
 
--- user_profile: instellingen & Strava (toegevoegd na initiële setup)
+-- user_profile: coach-instellingen
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS geslacht TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_context TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_naam TEXT DEFAULT 'APEX Coach';
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_stijl TEXT DEFAULT 'direct';
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_access_token TEXT;
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_refresh_token TEXT;
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_token_expires_at BIGINT;
-ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_athlete_id BIGINT;
 
--- trainingen: hartslagzones (toegevoegd voor Strava sync)
+-- user_profile: Open Wearables koppeling
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_token TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_refresh_token TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_token_expires_at BIGINT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_user_id TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS wearables_device TEXT;
+
+-- trainingen: hartslagzones
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone2_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone3_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone4_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS bron TEXT DEFAULT 'handmatig';
 
--- gesprekken: upload type (toegevoegd voor coach uploads)
+-- gesprekken: upload type
 ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;
-
--- trainingen: strava_id voor betrouwbare deduplicatie bij sync
-ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT;
-UPDATE trainingen
-  SET strava_id = SUBSTRING(notities FROM '\[strava:([0-9]+)\]')::BIGINT
-  WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
-  AND SUBSTRING(notities FROM '\[strava:([0-9]+)\]') IS NOT NULL;
 
 -- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
@@ -144,11 +158,12 @@ ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS stemming SMALLINT;
 
 -- ── Indexen ────────────────────────────────────────────────────────────────
 
-CREATE INDEX IF NOT EXISTS idx_inbody_user_datum    ON inbody_metingen(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
-CREATE INDEX IF NOT EXISTS idx_gesprekken_user       ON gesprekken(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_doelen_user           ON doelen(user_id, actief);
+CREATE INDEX IF NOT EXISTS idx_inbody_user_datum         ON inbody_metingen(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum      ON trainingen(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum      ON maaltijden(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_gesprekken_user            ON gesprekken(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_doelen_user                ON doelen(user_id, actief);
+CREATE INDEX IF NOT EXISTS idx_dagelijkse_stats_user_datum ON dagelijkse_stats(user_id, datum DESC);
 
 -- ── Trigger: auto-update user_profile.updated_at ──────────────────────────
 

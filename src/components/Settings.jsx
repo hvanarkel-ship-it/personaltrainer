@@ -10,7 +10,7 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }) {
+export default function Settings({ user, onNavigeer, onUitloggen, wearablesStatus }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
@@ -21,18 +21,18 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
   useEffect(() => { laadProfiel() }, [])
 
   useEffect(() => {
-    if (stravaStatus === 'verbonden') {
-      setMelding({ type: 'success', tekst: '✓ Strava succesvol gekoppeld!' })
+    if (wearablesStatus === 'verbonden') {
+      setMelding({ type: 'success', tekst: '✓ Wearable succesvol gekoppeld!' })
       setTab('integraties')
       laadProfiel()
-    } else if (stravaStatus === 'geweigerd') {
-      setMelding({ type: 'error', tekst: 'Strava koppeling geweigerd.' })
+    } else if (wearablesStatus === 'geweigerd') {
+      setMelding({ type: 'error', tekst: 'Wearable koppeling geweigerd.' })
       setTab('integraties')
-    } else if (stravaStatus === 'fout') {
-      setMelding({ type: 'error', tekst: 'Fout bij koppelen Strava. Probeer opnieuw.' })
+    } else if (wearablesStatus === 'fout') {
+      setMelding({ type: 'error', tekst: 'Fout bij koppelen wearable. Probeer opnieuw.' })
       setTab('integraties')
     }
-  }, [stravaStatus])
+  }, [wearablesStatus])
 
   async function laadProfiel() {
     try {
@@ -51,8 +51,8 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
         coach_context: data.coach_context || '',
         coach_naam: data.coach_naam || 'APEX Coach',
         coach_stijl: data.coach_stijl || 'direct',
-        strava_verbonden: !!data.strava_athlete_id,
-        strava_athlete_id: data.strava_athlete_id || null,
+        wearables_verbonden: !!data.wearables_device,
+        wearables_device: data.wearables_device || null,
       })
     } catch {
       setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
@@ -80,27 +80,27 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
     setProfiel(p => ({ ...p, sporten: cur.includes(sport) ? cur.filter(s => s !== sport) : [...cur, sport] }))
   }
 
-  function koppelStrava() {
+  function koppelWearables() {
     const token = localStorage.getItem('apex_token')
-    window.location.href = `/api/strava-auth?token=${encodeURIComponent(token)}`
+    window.location.href = `/api/wearables-auth?token=${encodeURIComponent(token)}`
   }
 
-  async function ontkoppelStrava() {
+  async function ontkoppelWearables() {
     try {
-      await api.put('/profiel', { ontkoppel_strava: true })
-      setProfiel(p => ({ ...p, strava_verbonden: false, strava_athlete_id: null }))
-      setMelding({ type: 'success', tekst: 'Strava ontkoppeld.' })
+      await api.put('/profiel', { ontkoppel_wearables: true })
+      setProfiel(p => ({ ...p, wearables_verbonden: false, wearables_device: null }))
+      setMelding({ type: 'success', tekst: 'Wearable ontkoppeld.' })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
   }
 
-  async function syncStrava() {
+  async function syncWearables() {
     setSyncing(true)
     setMelding(null)
     try {
-      const res = await api.post('/strava-sync', {})
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuwe trainingen gesynchroniseerd` })
+      const res = await api.post('/wearables-sync', {})
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} dag${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Sync mislukt: ' + err.message })
     } finally {
@@ -263,63 +263,48 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
       {tab === 'integraties' && (
         <div className="lijst">
 
-          {/* Strava */}
+          {/* Open Wearables */}
           <div className="card integratie-card">
             <div className="integratie-header">
-              <div className="integratie-logo" style={{ background: '#FC4C02' }}>S</div>
+              <div className="integratie-logo" style={{ background: '#7C3AED' }}>⌚</div>
               <div className="integratie-info">
-                <strong>Strava</strong>
-                <span>Activiteiten & trainingen</span>
+                <strong>Open Wearables</strong>
+                <span>HRV, slaap & dagelijks herstel</span>
               </div>
-              <span className={`integratie-badge ${profiel.strava_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-                {profiel.strava_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              <span className={`integratie-badge ${profiel.wearables_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.wearables_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
               </span>
             </div>
-            {profiel.strava_verbonden ? (
+            {profiel.wearables_verbonden ? (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Trainingen worden automatisch gesynchroniseerd zodra ze op Strava verschijnen. Garmin en Suunto synchroniseren via de Strava-brug — geen handmatige actie nodig.
+                  {profiel.wearables_device
+                    ? <><strong>{profiel.wearables_device}</strong> is gekoppeld. </>
+                    : ''}
+                  HRV, slaap en herstelscore worden automatisch gesynchroniseerd en zichtbaar op het dashboard.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={syncing}>
-                    {syncing ? '...' : '↻ Handmatig synchroniseren'}
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncWearables} disabled={syncing}>
+                    {syncing ? '...' : '↻ Nu synchroniseren'}
                   </button>
-                  <button className="btn btn-ghost" onClick={ontkoppelStrava}>Ontkoppelen</button>
+                  <button className="btn btn-ghost" onClick={ontkoppelWearables}>Ontkoppelen</button>
                 </div>
               </>
             ) : (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Importeer automatisch trainingen, hartslag en prestaties. Garmin Connect en Suunto synchroniseren automatisch met Strava — koppel Strava eenmalig en je trainingen verschijnen vanzelf.
+                  Koppel je wearable via Open Wearables voor automatische HRV, slaap- en hersteldata. Ondersteunt Garmin, Polar, Suunto, Apple Watch en andere apparaten.
                 </p>
-                <button className="btn btn-full" onClick={koppelStrava} style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}>
-                  Verbinden met Strava
+                <button
+                  className="btn btn-full"
+                  onClick={koppelWearables}
+                  style={{ marginTop: '12px', background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+                >
+                  Verbinden met Open Wearables
                 </button>
               </>
             )}
           </div>
-
-          {/* Garmin */}
-          <IntegratieUploadCard
-            kleur="#006EBE"
-            letter="G"
-            naam="Garmin Connect"
-            subtitel="Slaap, HRV & ochtendherstel"
-            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Garmin Connect ochtendherstel of slaapoverzicht via de Coach voor automatische HRV- en slaapanalyse."
-            uploadType="garmin"
-            onNavigeer={onNavigeer}
-          />
-
-          {/* Suunto */}
-          <IntegratieUploadCard
-            kleur="#003882"
-            letter="S"
-            naam="Suunto"
-            subtitel="Slaap, HRV & ochtendherstel"
-            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Suunto-app ochtendherstel of trainingsoverzicht via de Coach voor automatische analyse."
-            uploadType="suunto"
-            onNavigeer={onNavigeer}
-          />
 
           {/* Apple Health */}
           <IntegratieUploadCard
@@ -327,7 +312,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             letter="♥"
             naam="Apple Health"
             subtitel="Stappen, HRV, slaap"
-            beschrijving="Apple Health is alleen toegankelijk via de iOS-app. Upload schermafbeeldingen via de Coach voor automatische analyse."
+            beschrijving="Upload schermafbeeldingen van Apple Health via de Coach voor automatische analyse."
             onNavigeer={onNavigeer}
           />
 

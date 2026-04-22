@@ -23,10 +23,11 @@ CREATE TABLE IF NOT EXISTS user_profile (
   coach_context TEXT,
   coach_naam TEXT DEFAULT 'APEX Coach',
   coach_stijl TEXT DEFAULT 'direct',
-  strava_access_token TEXT,
-  strava_refresh_token TEXT,
-  strava_token_expires_at BIGINT,
-  strava_athlete_id BIGINT,
+  wearables_token TEXT,
+  wearables_refresh_token TEXT,
+  wearables_token_expires_at BIGINT,
+  wearables_user_id TEXT,
+  wearables_device TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -100,6 +101,21 @@ CREATE TABLE IF NOT EXISTS doelen (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS dagelijkse_stats (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  datum DATE NOT NULL,
+  hrv_ms INTEGER,
+  slaap_uur NUMERIC(4,1),
+  slaapscore INTEGER,
+  herstel_score INTEGER,
+  rusthartsslag INTEGER,
+  stappen INTEGER,
+  bron TEXT DEFAULT 'wearables',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, datum)
+);
+
 CREATE TABLE IF NOT EXISTS gesprekken (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -112,6 +128,7 @@ CREATE TABLE IF NOT EXISTS gesprekken (
 
 -- Indexen
 CREATE INDEX IF NOT EXISTS idx_inbody_user_datum ON inbody_metingen(user_id, datum DESC);
+CREATE INDEX IF NOT EXISTS idx_dagelijkse_stats_user_datum ON dagelijkse_stats(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user ON gesprekken(user_id, created_at DESC);

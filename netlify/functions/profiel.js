@@ -16,11 +16,22 @@ export const handler = async (event) => {
           p.geboortejaar, p.lengte_cm, p.gewicht_kg,
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
-          p.strava_athlete_id, p.updated_at
+          p.wearables_device, p.wearables_user_id, p.updated_at
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
       `
+
+      // Graceful fallback if wearables columns don't exist yet (pre-migration)
+      if (row && row.wearables_device === undefined) {
+        let wearablesInfo = {}
+        try {
+          const [wi] = await sql`SELECT wearables_device, wearables_user_id FROM user_profile WHERE user_id = ${userId}`
+          wearablesInfo = { wearables_device: wi?.wearables_device || null, wearables_user_id: wi?.wearables_user_id || null }
+        } catch { /* columns not yet migrated */ }
+        return cors({ ...(row || {}), ...wearablesInfo })
+      }
+
       return cors(row || {})
     }
 
@@ -31,14 +42,14 @@ export const handler = async (event) => {
         await sql`UPDATE users SET name = ${d.name} WHERE id = ${userId}`
       }
 
-      // Strava ontkoppelen
-      if (d.ontkoppel_strava) {
+      if (d.ontkoppel_wearables) {
         await sql`
           UPDATE user_profile SET
-            strava_access_token = NULL,
-            strava_refresh_token = NULL,
-            strava_token_expires_at = NULL,
-            strava_athlete_id = NULL,
+            wearables_token = NULL,
+            wearables_refresh_token = NULL,
+            wearables_token_expires_at = NULL,
+            wearables_user_id = NULL,
+            wearables_device = NULL,
             updated_at = NOW()
           WHERE user_id = ${userId}
         `
