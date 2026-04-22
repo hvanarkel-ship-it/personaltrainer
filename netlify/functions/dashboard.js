@@ -43,44 +43,7 @@ export const handler = async (event) => {
       ORDER BY datum DESC LIMIT 1
     `
 
-    // Wearables dagelijkse stats (als tabel bestaat)
-    let recenteWearables = null
-    let weekWearables = []
-    try {
-      const [rw] = await sql`
-        SELECT datum, hrv_ms, slaap_uur, slaapscore, herstel_score, rusthartsslag, stappen
-        FROM dagelijkse_stats WHERE user_id = ${userId}
-        ORDER BY datum DESC LIMIT 1
-      `
-      recenteWearables = rw || null
-
-      weekWearables = await sql`
-        SELECT datum, hrv_ms, slaap_uur, slaapscore, herstel_score, rusthartsslag, stappen
-        FROM dagelijkse_stats WHERE user_id = ${userId}
-        AND datum >= (CURRENT_DATE - INTERVAL '7 days')
-        ORDER BY datum DESC
-      `
-    } catch { /* dagelijkse_stats table not yet created */ }
-
-    // Gebruik wearables data als die recenter is
-    const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
-    let herstelData = recentTraining || null
-    if (recenteWearables) {
-      const wDate = normalizeDate(recenteWearables.datum)
-      const tDate = recentTraining ? normalizeDate(recentTraining.datum) : null
-      if (!tDate || wDate >= tDate) {
-        herstelData = {
-          hrv_ochtend: recenteWearables.hrv_ms,
-          slaap_uur: recenteWearables.slaap_uur,
-          slaapscore: recenteWearables.slaapscore,
-          herstelbalans: recenteWearables.herstel_score,
-          rusthartsslag: recenteWearables.rusthartsslag,
-          stappen: recenteWearables.stappen,
-          datum: recenteWearables.datum,
-          bron: 'wearables',
-        }
-      }
-    }
+    const herstelData = recentTraining || null
 
     const actieveDoelen = await sql`
       SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE
@@ -119,6 +82,7 @@ export const handler = async (event) => {
       vetten: s.vetten + (parseFloat(m.vetten_g) || 0),
     }), { kcal: 0, eiwit: 0, koolhydraten: 0, vetten: 0 })
 
+    const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
     const training_kcal_vandaag = weektrainingen
       .filter(t => normalizeDate(t.datum) === vandaag && t.sport !== 'herstel' && t.kcal)
       .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
@@ -134,7 +98,6 @@ export const handler = async (event) => {
       herstel: herstelData,
       inbody: recenteInbody || null,
       week_trainingen: weektrainingen,
-      week_dagelijks_stats: weekWearables,
       doelen: actieveDoelen,
       gewicht_trend: gewichtTrend.reverse(),
       streak: trainingStreak,

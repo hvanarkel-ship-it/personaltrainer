@@ -59,7 +59,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [toonOchtendForm, setToonOchtendForm] = useState(false)
   const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
-  const [wearablesSyncing, setWearablesSyncing] = useState(false)
 
   useEffect(() => {
     api.get('/dashboard')
@@ -69,16 +68,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   }, [])
 
   const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-
-  async function syncWearables() {
-    setWearablesSyncing(true)
-    try {
-      await api.post('/wearables-sync', {})
-      const nieuw = await api.get('/dashboard')
-      setData(nieuw)
-    } catch { /* silent fail */ }
-    finally { setWearablesSyncing(false) }
-  }
 
   async function logOchtend() {
     if (!oForm.hrv_ochtend && !oForm.slaap_uur) return
@@ -106,10 +95,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const doelen = data?.doelen || []
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
-  const weekDagelijks = data?.week_dagelijks_stats || []
   const streak = data?.streak || 0
-  const wearablesVerbonden = !!p.wearables_device
-  const wearablesDataVandaag = h?.bron === 'wearables'
 
   const training_kcal_vandaag = v.training_kcal || 0
   const basis_kcal = p.doel_kcal || 2400
@@ -135,13 +121,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = dagStr(d)
-    const wearablesRecord = weekDagelijks.find(t => {
-      const td = t.datum instanceof Date ? t.datum.toISOString().split('T')[0] : String(t.datum).slice(0, 10)
-      return td === ds && t.hrv_ms
-    })
     const trainingRecord = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
-    const hrv = wearablesRecord?.hrv_ms || trainingRecord?.hrv_ochtend || null
-    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv, isVandaag: ds === vandaag }
+    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: trainingRecord?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
   const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
@@ -168,16 +149,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         <div className="card-header">
           <h3>Herstel & Gereedheid</h3>
           <div style={{ display: 'flex', gap: 6 }}>
-            {wearablesVerbonden && !toonOchtendForm && (
-              <button
-                className="btn btn-sm btn-ghost"
-                onClick={syncWearables}
-                disabled={wearablesSyncing}
-                title="Synchroniseer wearable data"
-              >
-                {wearablesSyncing ? '...' : '⌚ Sync'}
-              </button>
-            )}
             <button
               className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
               onClick={() => setToonOchtendForm(f => !f)}
@@ -311,14 +282,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           <button className="link-btn small" onClick={() => onNavigeer('coach')}>
             💬 Vraag coach om analyse →
           </button>
-          {wearablesVerbonden
-            ? <button className="link-btn small" onClick={syncWearables} disabled={wearablesSyncing}>
-                {wearablesSyncing ? '...' : '⌚ Wearables synchroniseren →'}
-              </button>
-            : <button className="link-btn small" onClick={() => onNavigeer('settings')}>
-                ⌚ Koppel wearable →
-              </button>
-          }
         </div>
       </div>
 
