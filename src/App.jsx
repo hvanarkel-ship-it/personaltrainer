@@ -81,7 +81,6 @@ export default function App() {
   const [updateReg, setUpdateReg] = useState(null)
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
-  const [stravaStatus, setStravaStatus] = useState(null)
 
   useEffect(() => {
     // Auth
@@ -89,16 +88,6 @@ export default function App() {
     const saved = localStorage.getItem('apex_user')
     if (token && saved) {
       try { setUser(JSON.parse(saved)) } catch { localStorage.clear() }
-    }
-
-    // Handle OAuth callback params (e.g. Strava redirect)
-    const params = new URLSearchParams(window.location.search)
-    const integratie = params.get('integratie')
-    const status = params.get('status')
-    if (integratie === 'strava' && status) {
-      setStravaStatus(status)
-      setScherm('settings')
-      window.history.replaceState({}, '', window.location.pathname)
     }
 
     // Online / offline
@@ -232,7 +221,6 @@ export default function App() {
         <Scherm
           user={user}
           {...navProps}
-          {...(scherm === 'settings' ? { stravaStatus, onStravaStatusClear: () => setStravaStatus(null) } : {})}
         />
       )}
 
