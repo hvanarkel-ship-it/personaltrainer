@@ -40,7 +40,7 @@ export const handler = async (event) => {
       VALUES (${user.id}, ${token}, ${expiresAt})
     `
 
-    const appUrl = process.env.APP_URL || 'https://apex-coach.netlify.app'
+    const appUrl = process.env.APP_URL || 'https://personaltrainerandcoach.netlify.app'
     const resetLink = `${appUrl}?reset=${token}`
 
     const resendKey = process.env.RESEND_API_KEY

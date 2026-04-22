@@ -10,7 +10,7 @@ export const handler = async (event) => {
     return { statusCode: 403, body: 'Forbidden' }
   }
 
-  const appUrl = (process.env.APP_URL || 'https://apex-coach.netlify.app').replace(/\/$/, '')
+  const appUrl = (process.env.APP_URL || 'https://personaltrainerandcoach.netlify.app').replace(/\/$/, '')
   const callbackUrl = `${appUrl}/.netlify/functions/strava-webhook`
 
   try {
