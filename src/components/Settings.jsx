@@ -278,11 +278,11 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }
             {profiel.strava_verbonden ? (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Trainingen worden automatisch geïmporteerd. Garmin en Suunto synchroniseren via de Strava-brug.
+                  Trainingen worden automatisch gesynchroniseerd zodra ze op Strava verschijnen. Garmin en Suunto synchroniseren via de Strava-brug — geen handmatige actie nodig.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={syncing}>
-                    {syncing ? '...' : '↻ Synchroniseren'}
+                    {syncing ? '...' : '↻ Handmatig synchroniseren'}
                   </button>
                   <button className="btn btn-ghost" onClick={ontkoppelStrava}>Ontkoppelen</button>
                 </div>
