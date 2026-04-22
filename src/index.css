@@ -462,6 +462,32 @@ body {
 .week-min { font-size: 0.55rem; color: var(--primary); font-weight: 600; }
 .week-load-badge { background: #eff6ff; color: #1e40af; padding: 2px 8px; border-radius: 20px; font-size: 0.65rem; font-weight: 700; }
 
+/* Maandoverzicht */
+.maand-nav { display: flex; align-items: center; gap: 6px; }
+.maand-titel { font-size: 0.8rem; font-weight: 600; color: var(--text); min-width: 110px; text-align: center; }
+.maand-nav-btn { background: none; border: 1px solid var(--border); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 1rem; color: var(--text-2); display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
+.maand-nav-btn:disabled { opacity: 0.35; cursor: default; }
+.maand-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
+.maand-dag-kop { text-align: center; font-size: 0.6rem; font-weight: 600; color: var(--text-3); padding: 2px 0; }
+.maand-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.maand-cel {
+  aspect-ratio: 1; border-radius: 6px; border: 1px solid transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; background: var(--bg); transition: background 0.15s;
+}
+.maand-cel--leeg { background: transparent; border-color: transparent; }
+.maand-cel--vandaag { box-shadow: 0 0 0 2px var(--primary); }
+.maand-cel--actief { border-color: currentColor; }
+.maand-dag-nr { font-size: 0.65rem; font-weight: 600; color: var(--text-3); line-height: 1; }
+.maand-cel--actief .maand-dag-nr { font-weight: 700; }
+.maand-dots { display: flex; gap: 2px; align-items: center; }
+.maand-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+.maand-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-light); }
+.maand-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.maand-stat-val { font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.1; }
+.maand-stat-label { font-size: 0.6rem; color: var(--text-3); text-align: center; }
+.maand-leeg { font-size: 0.8rem; color: var(--text-3); text-align: center; margin-top: 8px; }
+
 /* Sport selector */
 .sport-keuze { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
 .sport-btn {

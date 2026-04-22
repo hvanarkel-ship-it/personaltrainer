@@ -2,6 +2,110 @@ import { useState, useEffect } from 'react'
 import { api, datumNl } from '../api.js'
 import SportIcoon, { SPORT_KLEUR, SPORT_LABEL, normMin } from '../sportIcoon.jsx'
 
+const MAANDEN_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
+const DAG_NL = ['Ma','Di','Wo','Do','Vr','Za','Zo']
+
+function MaandOverzicht({ trainingen }) {
+  const vandaag = new Date()
+  const [jaar, setJaar] = useState(vandaag.getFullYear())
+  const [maand, setMaand] = useState(vandaag.getMonth()) // 0-indexed
+
+  function vorige() {
+    if (maand === 0) { setJaar(j => j - 1); setMaand(11) } else setMaand(m => m - 1)
+  }
+  function volgende() {
+    const nu = new Date()
+    if (jaar > nu.getFullYear() || (jaar === nu.getFullYear() && maand >= nu.getMonth())) return
+    if (maand === 11) { setJaar(j => j + 1); setMaand(0) } else setMaand(m => m + 1)
+  }
+
+  const isHuidig = jaar === vandaag.getFullYear() && maand === vandaag.getMonth()
+  const pad = n => String(n).padStart(2, '0')
+
+  // All training days for this month (excluding herstel)
+  const prefix = `${jaar}-${pad(maand + 1)}`
+  const maandTrainingen = trainingen.filter(t => t.sport !== 'herstel' && normDatum(t.datum).startsWith(prefix))
+
+  // Build calendar grid — start on Monday
+  const eersteVdMaand = new Date(jaar, maand, 1)
+  const dagVdWeek = (eersteVdMaand.getDay() + 6) % 7 // 0=Ma
+  const aantalDagen = new Date(jaar, maand + 1, 0).getDate()
+
+  const cellen = []
+  for (let i = 0; i < dagVdWeek; i++) cellen.push(null)
+  for (let d = 1; d <= aantalDagen; d++) cellen.push(d)
+
+  // Group trainingen by day number
+  const perDag = {}
+  for (const t of maandTrainingen) {
+    const d = parseInt(normDatum(t.datum).slice(8, 10))
+    if (!perDag[d]) perDag[d] = []
+    perDag[d].push(t)
+  }
+
+  // Monthly stats
+  const sessies = maandTrainingen.length
+  const totaalMin = maandTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
+  const totaalLoad = maandTrainingen.reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+  // Most common sport
+  const sportTelling = {}
+  for (const t of maandTrainingen) sportTelling[t.sport] = (sportTelling[t.sport] || 0) + 1
+  const topSport = Object.entries(sportTelling).sort((a, b) => b[1] - a[1])[0]?.[0]
+
+  const vandaagDag = isHuidig ? vandaag.getDate() : null
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3>Maandoverzicht</h3>
+        <div className="maand-nav">
+          <button className="maand-nav-btn" onClick={vorige}>‹</button>
+          <span className="maand-titel">{MAANDEN_NL[maand]} {jaar}</span>
+          <button className="maand-nav-btn" onClick={volgende} disabled={isHuidig}>›</button>
+        </div>
+      </div>
+
+      <div className="maand-grid-header">
+        {DAG_NL.map(d => <div key={d} className="maand-dag-kop">{d}</div>)}
+      </div>
+      <div className="maand-grid">
+        {cellen.map((dag, i) => {
+          if (!dag) return <div key={`leeg-${i}`} className="maand-cel maand-cel--leeg" />
+          const dagsessies = perDag[dag] || []
+          const isVandaag = dag === vandaagDag
+          const hoofdSport = dagsessies[0]?.sport
+          const kleur = hoofdSport ? SPORT_KLEUR[hoofdSport] || SPORT_KLEUR.overig : null
+          return (
+            <div key={dag} className={`maand-cel ${isVandaag ? 'maand-cel--vandaag' : ''} ${dagsessies.length > 0 ? 'maand-cel--actief' : ''}`}
+              style={kleur && dagsessies.length > 0 ? { background: kleur.bg, borderColor: kleur.kleur + '55' } : {}}>
+              <span className="maand-dag-nr" style={kleur && dagsessies.length > 0 ? { color: kleur.kleur } : {}}>{dag}</span>
+              {dagsessies.length > 0 && (
+                <div className="maand-dots">
+                  {dagsessies.slice(0, 3).map((t, j) => {
+                    const k = SPORT_KLEUR[t.sport] || SPORT_KLEUR.overig
+                    return <span key={j} className="maand-dot" style={{ background: k.kleur }} />
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {sessies > 0 ? (
+        <div className="maand-stats">
+          <div className="maand-stat"><span className="maand-stat-val">{sessies}</span><span className="maand-stat-label">sessies</span></div>
+          <div className="maand-stat"><span className="maand-stat-val">{totaalMin >= 60 ? `${Math.floor(totaalMin/60)}u${totaalMin%60?totaalMin%60+'m':''}` : `${totaalMin}m`}</span><span className="maand-stat-label">totaal</span></div>
+          {Math.round(totaalLoad) > 0 && <div className="maand-stat"><span className="maand-stat-val">{Math.round(totaalLoad)}</span><span className="maand-stat-label">load</span></div>}
+          {topSport && <div className="maand-stat"><span className="maand-stat-val" style={{ fontSize: '0.8rem' }}>{SPORT_LABEL[topSport] || topSport}</span><span className="maand-stat-label">meest gedaan</span></div>}
+        </div>
+      ) : (
+        <p className="maand-leeg">Geen trainingen in {MAANDEN_NL[maand].toLowerCase()}</p>
+      )}
+    </div>
+  )
+}
+
 const SPORTEN = ['hyrox', 'hardlopen', 'fitness', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal', 'overig']
 
 function rpeInfo(rpe) {
@@ -121,6 +225,9 @@ export default function Training({ onNavigeer }) {
           ))}
         </div>
       </div>
+
+      {/* Maandoverzicht */}
+      {!laden && <MaandOverzicht trainingen={trainingen} />}
 
       {/* Nieuw training formulier */}
       {toonForm && (
