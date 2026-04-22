@@ -1,7 +1,7 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
-const PROVIDERS = ['garmin', 'polar', 'suunto', 'oura', 'strava', 'fitbit']
+const PROVIDERS = ['garmin', 'polar', 'suunto', 'oura', 'fitbit']
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -57,7 +57,6 @@ export const handler = async (event) => {
     }
 
     // Build provider connection URLs (user goes to these to connect their device)
-    const appUrl = process.env.URL || 'http://localhost:8888'
     const connections = PROVIDERS.map(provider => ({
       provider,
       url: `${wearablesUrl}/api/v1/oauth/${provider}/authorize?user_id=${owUserId}`,

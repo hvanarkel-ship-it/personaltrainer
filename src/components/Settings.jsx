@@ -6,7 +6,6 @@ const PROVIDER_LABELS = {
   polar: '⌚ Polar Flow',
   suunto: '⌚ Suunto',
   oura: '💍 Oura Ring',
-  strava: '🏃 Strava',
   fitbit: '⌚ Fitbit',
 }
 
@@ -19,15 +18,33 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen }) {
+export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, onStravaStatusClear }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [stravaSyncing, setStravaSyncing] = useState(false)
   const [melding, setMelding] = useState(null)
+  const [wearablesConnecting, setWearablesConnecting] = useState(false)
+  const [providerLinks, setProviderLinks] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
+
+  useEffect(() => {
+    if (!stravaStatus) return
+    if (stravaStatus === 'verbonden') {
+      setMelding({ type: 'success', tekst: '✓ Strava gekoppeld! Je trainingen worden nu gesynchroniseerd.' })
+      setProfiel(p => p ? { ...p, strava_verbonden: true } : p)
+    } else if (stravaStatus === 'geweigerd') {
+      setMelding({ type: 'error', tekst: 'Strava koppeling geweigerd.' })
+    } else {
+      setMelding({ type: 'error', tekst: 'Strava koppeling mislukt. Probeer opnieuw.' })
+    }
+    setTab('integraties')
+    onStravaStatusClear?.()
+    setTimeout(() => setMelding(null), 6000)
+  }, [stravaStatus])
 
   async function laadProfiel() {
     try {
@@ -46,6 +63,7 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
         coach_context: data.coach_context || '',
         coach_naam: data.coach_naam || 'APEX Coach',
         coach_stijl: data.coach_stijl || 'direct',
+        strava_verbonden: !!data.strava_athlete_id,
         wearables_verbonden: !!data.wearables_device,
         wearables_device: data.wearables_device || null,
       })
@@ -75,8 +93,33 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
     setProfiel(p => ({ ...p, sporten: cur.includes(sport) ? cur.filter(s => s !== sport) : [...cur, sport] }))
   }
 
-  const [wearablesConnecting, setWearablesConnecting] = useState(false)
-  const [providerLinks, setProviderLinks] = useState(null)
+  function verbindStrava() {
+    const token = localStorage.getItem('apex_token')
+    window.location.href = `/api/strava-auth?token=${encodeURIComponent(token)}`
+  }
+
+  async function syncStrava() {
+    setStravaSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/strava-sync', {})
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} al aanwezig)` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Strava sync mislukt: ' + err.message })
+    } finally {
+      setStravaSyncing(false)
+    }
+  }
+
+  async function ontkoppelStrava() {
+    try {
+      await api.put('/profiel', { ontkoppel_strava: true })
+      setProfiel(p => ({ ...p, strava_verbonden: false }))
+      setMelding({ type: 'success', tekst: 'Strava ontkoppeld.' })
+    } catch {
+      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
+    }
+  }
 
   async function laadProviderLinks() {
     setWearablesConnecting(true)
@@ -96,7 +139,7 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       await api.put('/profiel', { ontkoppel_wearables: true })
       setProfiel(p => ({ ...p, wearables_verbonden: false, wearables_device: null }))
       setMelding({ type: 'success', tekst: 'Wearable ontkoppeld.' })
-    } catch (err) {
+    } catch {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
   }
@@ -268,6 +311,46 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       {/* ── INTEGRATIES ── */}
       {tab === 'integraties' && (
         <div className="lijst">
+
+          {/* Strava */}
+          <div className="card integratie-card">
+            <div className="integratie-header">
+              <div className="integratie-logo" style={{ background: '#FC4C02' }}>🏃</div>
+              <div className="integratie-info">
+                <strong>Strava</strong>
+                <span>Trainingen & hartslagzones</span>
+              </div>
+              <span className={`integratie-badge ${profiel.strava_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.strava_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              </span>
+            </div>
+            {profiel.strava_verbonden ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Trainingen worden automatisch binnengehaald via de Strava webhook. Gebruik de knop voor een handmatige sync van de laatste 30 activiteiten.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={stravaSyncing}>
+                    {stravaSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={ontkoppelStrava}>Ontkoppelen</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Koppel Strava voor automatische import van trainingen inclusief hartslagzones. Suunto Race, Garmin en andere apparaten die naar Strava synchroniseren worden automatisch meegenomen.
+                </p>
+                <button
+                  className="btn btn-full"
+                  onClick={verbindStrava}
+                  style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+                >
+                  Verbinden met Strava
+                </button>
+              </>
+            )}
+          </div>
 
           {/* Open Wearables */}
           <div className="card integratie-card">
