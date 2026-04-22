@@ -61,6 +61,6 @@ export const handler = async (event) => {
     return cors({ link_url: linkData.link_web_url })
   } catch (err) {
     console.error('Junction link token error:', err)
-    return cors({ error: 'Verbinding mislukt: ' + err.message }, 500)
+    return cors({ error: err.message }, 500)
   }
 }
