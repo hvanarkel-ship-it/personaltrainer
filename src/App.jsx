@@ -19,6 +19,7 @@ class ErrorBoundary extends Component {
 }
 import Login from './components/Login.jsx'
 import Onboarding from './components/Onboarding.jsx'
+import WachtwoordReset from './components/WachtwoordReset.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Coach from './components/Coach.jsx'
 import Training from './components/Training.jsx'
@@ -80,6 +81,7 @@ export default function App() {
   const [showUpdate, setShowUpdate] = useState(false)
   const [updateReg, setUpdateReg] = useState(null)
   const [toonOnboarding, setToonOnboarding] = useState(false)
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
 
   useEffect(() => {
     // Auth
@@ -168,6 +170,13 @@ export default function App() {
   }
 
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
+  if (resetToken) return (
+    <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {
+      window.history.replaceState({}, '', window.location.pathname)
+      setResetToken(null)
+      inloggen(token, userData)
+    }} />
+  )
   if (!user) return <Login onInloggen={inloggen} />
   if (toonOnboarding) return (
     <Onboarding user={user} onKlaar={() => {
