@@ -30,18 +30,20 @@ export const handler = async (event) => {
       ORDER BY created_at ASC`
 
     const weektrainingen = await sql`
-      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
+      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaapscore, herstelbalans, rpe
       FROM trainingen WHERE user_id = ${userId}
       AND datum >= (CURRENT_DATE - INTERVAL '7 days')
       ORDER BY datum DESC
     `
 
-    // Meest recente HRV/slaap
+    // Meest recente HRV/slaap uit handmatige logs
     const [recentTraining] = await sql`
       SELECT hrv_ochtend, slaap_uur, slaapscore, herstelbalans, datum
       FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
       ORDER BY datum DESC LIMIT 1
     `
+
+    const herstelData = recentTraining || null
 
     const actieveDoelen = await sql`
       SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE
@@ -54,7 +56,7 @@ export const handler = async (event) => {
       ORDER BY datum DESC LIMIT 8
     `
 
-    // Trainingstreak: hoeveel opeenvolgende dagen was er training
+    // Trainingstreak
     const recentDagen = await sql`
       SELECT DISTINCT datum::date as datum FROM trainingen
       WHERE user_id = ${userId} AND sport != 'herstel'
@@ -80,7 +82,6 @@ export const handler = async (event) => {
       vetten: s.vetten + (parseFloat(m.vetten_g) || 0),
     }), { kcal: 0, eiwit: 0, koolhydraten: 0, vetten: 0 })
 
-    // Calorieën verbrand door training vandaag (excl. herstel-entries)
     const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
     const training_kcal_vandaag = weektrainingen
       .filter(t => normalizeDate(t.datum) === vandaag && t.sport !== 'herstel' && t.kcal)
@@ -94,7 +95,7 @@ export const handler = async (event) => {
         ...gegeten,
         training_kcal: training_kcal_vandaag,
       },
-      herstel: recentTraining || null,
+      herstel: herstelData,
       inbody: recenteInbody || null,
       week_trainingen: weektrainingen,
       doelen: actieveDoelen,

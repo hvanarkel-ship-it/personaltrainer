@@ -121,8 +121,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = dagStr(d)
-    const record = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
-    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: record?.hrv_ochtend || null, isVandaag: ds === vandaag }
+    const trainingRecord = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
+    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: trainingRecord?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
   const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
@@ -148,12 +148,14 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       <div className="card herstel-hero-card">
         <div className="card-header">
           <h3>Herstel & Gereedheid</h3>
-          <button
-            className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
-            onClick={() => setToonOchtendForm(f => !f)}
-          >
-            {toonOchtendForm ? 'Annuleer' : '+ Log ochtend'}
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
+              onClick={() => setToonOchtendForm(f => !f)}
+            >
+              {toonOchtendForm ? 'Annuleer' : '+ Log ochtend'}
+            </button>
+          </div>
         </div>
 
         {/* Inline ochtend log form */}
@@ -279,9 +281,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button className="link-btn small" onClick={() => onNavigeer('coach')}>
             💬 Vraag coach om analyse →
-          </button>
-          <button className="link-btn small" onClick={() => onNavigeer('coach', 'suunto')}>
-            ⌚ Deel Suunto ochtend →
           </button>
         </div>
       </div>

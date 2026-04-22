@@ -88,9 +88,9 @@ export async function slaActiviteitOp(sql, userId, act, accessToken, haalZones =
   const kcal = act.calories > 0
     ? Math.round(act.calories)
     : (act.kilojoules > 0 ? Math.round(act.kilojoules / 4.184) : null)
-  const gem_hr   = act.average_heartrate ? Math.round(act.average_heartrate) : null
-  const max_hr   = act.max_heartrate     ? Math.round(act.max_heartrate)     : null
-  const afstand_m = act.distance         ? Math.round(act.distance)          : null
+  const gem_hr    = act.average_heartrate ? Math.round(act.average_heartrate) : null
+  const max_hr    = act.max_heartrate     ? Math.round(act.max_heartrate)     : null
+  const afstand_m = act.distance          ? Math.round(act.distance)          : null
   const hoogte_m  = act.total_elevation_gain ? Math.round(act.total_elevation_gain) : null
 
   const notitiesDelen = [act.name || sport]

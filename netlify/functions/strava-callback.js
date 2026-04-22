@@ -49,8 +49,5 @@ export const handler = async (event) => {
 }
 
 function redirect(url) {
-  return {
-    statusCode: 302,
-    headers: { Location: url }
-  }
+  return { statusCode: 302, headers: { Location: url } }
 }

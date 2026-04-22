@@ -23,22 +23,6 @@ export const handler = async (event) => {
       accessToken = await vernieuwToken(sql, userId, profiel)
     }
 
-    // Eenmalige migraties
-    await sql`ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT`
-    await sql`
-      UPDATE trainingen
-      SET strava_id = SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]')::BIGINT
-      WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
-      AND SUBSTRING(notities FROM '\\[strava:([0-9]+)\\]') IS NOT NULL
-    `
-    await sql`
-      UPDATE trainingen
-      SET duur_min = ROUND(duur_min::numeric / 60)::int
-      WHERE user_id = ${userId} AND bron = 'strava'
-      AND duur_min > 720
-      AND ROUND(duur_min::numeric / 60)::int <= 720
-    `
-
     const res = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=30&page=1', {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
@@ -47,9 +31,7 @@ export const handler = async (event) => {
 
     let gesynchroniseerd = 0
     let overgeslagen = 0
-
     for (const act of activities) {
-      // Limit zone fetches to first 10 new activities
       const ingevoegd = await slaActiviteitOp(sql, userId, act, accessToken, gesynchroniseerd < 10)
       if (ingevoegd) gesynchroniseerd++
       else overgeslagen++

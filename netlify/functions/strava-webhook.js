@@ -28,31 +28,23 @@ export const handler = async (event) => {
   const sql = getDb()
 
   try {
-    await sql`ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT`
-
-    // Look up the user by their Strava athlete ID
     const [profiel] = await sql`
       SELECT user_id, strava_access_token, strava_refresh_token, strava_token_expires_at
       FROM user_profile WHERE strava_athlete_id = ${owner_id} LIMIT 1
     `
     if (!profiel) return { statusCode: 200, body: 'ok' }
 
-    // Refresh token if expired
     let accessToken = profiel.strava_access_token
     if (profiel.strava_token_expires_at < Math.floor(Date.now() / 1000)) {
       accessToken = await vernieuwToken(sql, profiel.user_id, profiel)
     }
 
-    // Fetch full activity details from Strava
     const res = await fetch(`https://www.strava.com/api/v3/activities/${object_id}`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
-    if (!res.ok) {
-      console.error(`Strava activity fetch mislukt: ${res.status}`)
-      return { statusCode: 200, body: 'ok' }
-    }
-    const act = await res.json()
+    if (!res.ok) return { statusCode: 200, body: 'ok' }
 
+    const act = await res.json()
     await slaActiviteitOp(sql, profiel.user_id, act, accessToken)
 
     return { statusCode: 200, body: 'ok' }

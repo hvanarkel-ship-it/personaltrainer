@@ -74,7 +74,6 @@ export default function App() {
   const [laden, setLaden] = useState(true)
   const [scherm, setScherm] = useState('dashboard')
   const [coachTrigger, setCoachTrigger] = useState(null)
-  const [stravaStatus, setStravaStatus] = useState(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [installPrompt, setInstallPrompt] = useState(null)   // Android
   const [showIosHint, setShowIosHint] = useState(false)      // iOS
@@ -82,6 +81,7 @@ export default function App() {
   const [updateReg, setUpdateReg] = useState(null)
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
+  const [stravaStatus, setStravaStatus] = useState(null)
 
   useEffect(() => {
     // Auth
@@ -91,7 +91,7 @@ export default function App() {
       try { setUser(JSON.parse(saved)) } catch { localStorage.clear() }
     }
 
-    // Strava callback
+    // Handle OAuth callback params (e.g. Strava redirect)
     const params = new URLSearchParams(window.location.search)
     const integratie = params.get('integratie')
     const status = params.get('status')
@@ -232,7 +232,7 @@ export default function App() {
         <Scherm
           user={user}
           {...navProps}
-          stravaStatus={scherm === 'settings' ? stravaStatus : undefined}
+          {...(scherm === 'settings' ? { stravaStatus, onStravaStatusClear: () => setStravaStatus(null) } : {})}
         />
       )}
 

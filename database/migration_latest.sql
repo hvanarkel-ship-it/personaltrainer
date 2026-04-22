@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS user_profile (
   strava_refresh_token TEXT,
   strava_token_expires_at BIGINT,
   strava_athlete_id BIGINT,
+  intervals_athlete_id TEXT,
+  intervals_api_key TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -68,6 +70,10 @@ CREATE TABLE IF NOT EXISTS trainingen (
   zone4_min INTEGER,
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
+  strava_id BIGINT,
+  intervals_id TEXT,
+  rpe SMALLINT,
+  stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -112,35 +118,36 @@ CREATE TABLE IF NOT EXISTS gesprekken (
 
 -- ── Kolommen toevoegen die mogelijk ontbreken (bestaande DB's) ─────────────
 
--- user_profile: instellingen & Strava (toegevoegd na initiële setup)
+-- user_profile: coach-instellingen
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS geslacht TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_context TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_naam TEXT DEFAULT 'APEX Coach';
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS coach_stijl TEXT DEFAULT 'direct';
+
+-- user_profile: Strava koppeling
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_access_token TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_refresh_token TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_token_expires_at BIGINT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_athlete_id BIGINT;
 
--- trainingen: hartslagzones (toegevoegd voor Strava sync)
+-- user_profile: Intervals.icu koppeling
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS intervals_athlete_id TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS intervals_api_key TEXT;
+
+-- trainingen: hartslagzones, bron en Strava ID
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone2_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone3_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone4_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS bron TEXT DEFAULT 'handmatig';
-
--- gesprekken: upload type (toegevoegd voor coach uploads)
-ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;
-
--- trainingen: strava_id voor betrouwbare deduplicatie bij sync
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT;
-UPDATE trainingen
-  SET strava_id = SUBSTRING(notities FROM '\[strava:([0-9]+)\]')::BIGINT
-  WHERE bron = 'strava' AND strava_id IS NULL AND notities LIKE '%[strava:%'
-  AND SUBSTRING(notities FROM '\[strava:([0-9]+)\]') IS NOT NULL;
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS intervals_id TEXT;
 
 -- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS stemming SMALLINT;
+
+-- gesprekken: upload type
+ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;
 
 -- ── Indexen ────────────────────────────────────────────────────────────────
 
@@ -149,6 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datu
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user       ON gesprekken(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doelen_user           ON doelen(user_id, actief);
+CREATE INDEX IF NOT EXISTS idx_trainingen_strava_id    ON trainingen(strava_id) WHERE strava_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_trainingen_intervals_id ON trainingen(intervals_id) WHERE intervals_id IS NOT NULL;
 
 -- ── Trigger: auto-update user_profile.updated_at ──────────────────────────
 
