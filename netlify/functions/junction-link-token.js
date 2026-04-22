@@ -26,6 +26,10 @@ export const handler = async (event) => {
   const sql = getDb()
   const userId = auth.user.userId
 
+  if (!process.env.JUNCTION_API_KEY) {
+    return cors({ error: 'JUNCTION_API_KEY is niet ingesteld in Netlify omgevingsvariabelen.' }, 500)
+  }
+
   try {
     await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS junction_user_id TEXT`
 
