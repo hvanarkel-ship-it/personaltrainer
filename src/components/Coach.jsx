@@ -3,6 +3,7 @@ import { api } from '../api.js'
 
 const UPLOAD_TYPES = [
   { id: 'maaltijd', label: 'Maaltijdfoto', icon: '🍽️' },
+  { id: 'garmin', label: 'Garmin screenshot', icon: '⌚' },
   { id: 'suunto', label: 'Suunto screenshot', icon: '⌚' },
   { id: 'inbody', label: 'InBody scan', icon: '📊' },
   { id: 'apple_health', label: 'Apple Health', icon: '❤️' },

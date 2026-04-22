@@ -10,17 +10,15 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, junctionStatus }) {
+export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [melding, setMelding] = useState(null)
-  const [junctionProviders, setJunctionProviders] = useState([])
-  const [junctionVerbinden, setJunctionVerbinden] = useState(null) // 'garmin' | 'suunto' | null
 
-  useEffect(() => { laadProfiel(); laadJunctionStatus() }, [])
+  useEffect(() => { laadProfiel() }, [])
 
   useEffect(() => {
     if (stravaStatus === 'verbonden') {
@@ -35,40 +33,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
       setTab('integraties')
     }
   }, [stravaStatus])
-
-  useEffect(() => {
-    if (junctionStatus) {
-      const { provider, state } = junctionStatus
-      const naam = provider === 'garmin' ? 'Garmin' : 'Suunto'
-      if (state === 'success') {
-        setMelding({ type: 'success', tekst: `✓ ${naam} succesvol gekoppeld! Historische data wordt geladen.` })
-        setJunctionProviders(p => [...new Set([...p, provider])])
-      } else {
-        setMelding({ type: 'error', tekst: `Koppeling ${naam} mislukt. Probeer opnieuw.` })
-      }
-      setTab('integraties')
-    }
-  }, [junctionStatus])
-
-  async function laadJunctionStatus() {
-    try {
-      const data = await api.get('/junction-status')
-      setJunctionProviders(data.providers || [])
-    } catch { /* stil falen */ }
-  }
-
-  async function koppelJunction(provider) {
-    setJunctionVerbinden(provider)
-    try {
-      const data = await api.post('/junction-link-token', { provider })
-      if (data.link_url) window.location.href = data.link_url
-      else setMelding({ type: 'error', tekst: 'Kon verbindingslink niet ophalen.' })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
-    } finally {
-      setJunctionVerbinden(null)
-    }
-  }
 
   async function laadProfiel() {
     try {
@@ -299,30 +263,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
       {tab === 'integraties' && (
         <div className="lijst">
 
-          {/* Garmin — Junction */}
-          <JunctionConnectCard
-            kleur="#006EBE"
-            letter="G"
-            naam="Garmin Connect"
-            subtitel="Trainingen, slaap, HRV & herstel"
-            provider="garmin"
-            verbonden={junctionProviders.includes('garmin')}
-            laden={junctionVerbinden === 'garmin'}
-            onVerbinden={() => koppelJunction('garmin')}
-          />
-
-          {/* Suunto — Junction */}
-          <JunctionConnectCard
-            kleur="#003882"
-            letter="S"
-            naam="Suunto"
-            subtitel="Trainingen, slaap, HRV & herstel"
-            provider="suunto"
-            verbonden={junctionProviders.includes('suunto')}
-            laden={junctionVerbinden === 'suunto'}
-            onVerbinden={() => koppelJunction('suunto')}
-          />
-
           {/* Strava */}
           <div className="card integratie-card">
             <div className="integratie-header">
@@ -338,7 +278,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
             {profiel.strava_verbonden ? (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Trainingen worden automatisch geïmporteerd vanuit Strava.
+                  Trainingen worden automatisch geïmporteerd. Garmin en Suunto synchroniseren via de Strava-brug.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={syncing}>
@@ -350,9 +290,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
             ) : (
               <>
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  {(junctionProviders.includes('garmin') || junctionProviders.includes('suunto'))
-                    ? 'Je Garmin of Suunto synchroniseert al automatisch via Junction — inclusief slaap en HRV. Strava is optioneel, handig als je ook een Polar, Wahoo of ander toestel gebruikt.'
-                    : 'Importeer automatisch trainingen, hartslag en prestaties vanuit Strava. Handig voor Polar, Wahoo en andere toestellen. Garmin en Suunto? Die sync je beter direct hierboven via Junction.'}
+                  Importeer automatisch trainingen, hartslag en prestaties. Garmin Connect en Suunto synchroniseren automatisch met Strava — koppel Strava eenmalig en je trainingen verschijnen vanzelf.
                 </p>
                 <button className="btn btn-full" onClick={koppelStrava} style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}>
                   Verbinden met Strava
@@ -360,6 +298,28 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
               </>
             )}
           </div>
+
+          {/* Garmin */}
+          <IntegratieUploadCard
+            kleur="#006EBE"
+            letter="G"
+            naam="Garmin Connect"
+            subtitel="Slaap, HRV & ochtendherstel"
+            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Garmin Connect ochtendherstel of slaapoverzicht via de Coach voor automatische HRV- en slaapanalyse."
+            uploadType="garmin"
+            onNavigeer={onNavigeer}
+          />
+
+          {/* Suunto */}
+          <IntegratieUploadCard
+            kleur="#003882"
+            letter="S"
+            naam="Suunto"
+            subtitel="Slaap, HRV & ochtendherstel"
+            beschrijving="Trainingen komen automatisch binnen via Strava. Upload een screenshot van je Suunto-app ochtendherstel of trainingsoverzicht via de Coach voor automatische analyse."
+            uploadType="suunto"
+            onNavigeer={onNavigeer}
+          />
 
           {/* Apple Health */}
           <IntegratieUploadCard
@@ -386,41 +346,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
   )
 }
 
-function JunctionConnectCard({ kleur, letter, naam, subtitel, provider, verbonden, laden, onVerbinden }) {
-  return (
-    <div className="card integratie-card">
-      <div className="integratie-header">
-        <div className="integratie-logo" style={{ background: kleur }}>{letter}</div>
-        <div className="integratie-info">
-          <strong>{naam}</strong>
-          <span>{subtitel}</span>
-        </div>
-        <span className={`integratie-badge ${verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-          {verbonden ? '✓ Verbonden' : 'Niet verbonden'}
-        </span>
-      </div>
-      <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-        {verbonden
-          ? `${naam} is gekoppeld. Trainingen, slaap en HRV worden automatisch gesynchroniseerd zodra je toestel synchroniseert.`
-          : `Koppel ${naam} voor automatische synchronisatie van trainingen, slaapdata en HRV. Werkt direct — geen Strava nodig.`}
-      </p>
-      {!verbonden && (
-        <button
-          className="btn btn-full"
-          onClick={onVerbinden}
-          disabled={laden}
-          style={{ marginTop: '12px', background: kleur, color: '#fff', border: 'none',
-            padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'inherit', fontSize: '0.875rem', opacity: laden ? 0.7 : 1 }}
-        >
-          {laden ? 'Verbinden...' : `Verbinden met ${naam}`}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function IntegratieUploadCard({ kleur, letter, naam, subtitel, beschrijving, onNavigeer }) {
+function IntegratieUploadCard({ kleur, letter, naam, subtitel, beschrijving, uploadType, onNavigeer }) {
   return (
     <div className="card integratie-card">
       <div className="integratie-header">
@@ -432,7 +358,7 @@ function IntegratieUploadCard({ kleur, letter, naam, subtitel, beschrijving, onN
         <span className="integratie-badge badge-upload">📷 Upload</span>
       </div>
       <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>{beschrijving}</p>
-      <button className="btn btn-secondary btn-full" style={{ marginTop: '12px' }} onClick={() => onNavigeer('coach')}>
+      <button className="btn btn-secondary btn-full" style={{ marginTop: '12px' }} onClick={() => onNavigeer('coach', uploadType ? { uploadType } : undefined)}>
         Uploaden via Coach →
       </button>
     </div>

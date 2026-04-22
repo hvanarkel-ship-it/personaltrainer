@@ -190,9 +190,9 @@ export const handler = async (event) => {
     // ── Bepaal welke extractie te doen (parallel met context-queries) ──
     let extractiePromise = null
     if (bestanden?.length) {
-      if (upload_type === 'inbody')   extractiePromise = extractInbody(sql, userId, bestanden)
-      if (upload_type === 'suunto')   extractiePromise = extractSuunto(sql, userId, bestanden)
-      if (upload_type === 'maaltijd') extractiePromise = extractMaaltijdFoto(sql, userId, bestanden)
+      if (upload_type === 'inbody')              extractiePromise = extractInbody(sql, userId, bestanden)
+      if (upload_type === 'suunto' || upload_type === 'garmin') extractiePromise = extractSuunto(sql, userId, bestanden)
+      if (upload_type === 'maaltijd')            extractiePromise = extractMaaltijdFoto(sql, userId, bestanden)
     } else if (bericht && !upload_type) {
       extractiePromise = detecteerMaaltijdTekst(sql, userId, bericht)
     }
