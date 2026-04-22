@@ -9,7 +9,7 @@ export const handler = async (event) => {
 
   const sql = getDb()
   const userId = auth.user.userId
-  const dagen = Math.min(365, Math.max(28, parseInt(event.queryStringParameters?.dagen || '84')))
+  const dagen = Math.min(1825, Math.max(28, parseInt(event.queryStringParameters?.dagen || '84')))
   const vanafDatum = new Date(Date.now() - dagen * 86400000).toISOString().split('T')[0]
 
   try {
