@@ -247,8 +247,8 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
                 </div>
               </div>
             )
-          }))
-        ])()}
+          })
+        ]})()}
 
         {laden && (
           <div className="bericht bericht--ai">
