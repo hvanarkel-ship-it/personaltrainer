@@ -27,6 +27,7 @@ import Voeding from './components/Voeding.jsx'
 import Lichaam from './components/Lichaam.jsx'
 import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
+import Statistieken from './components/Statistieken.jsx'
 import DbStatus from './components/DbStatus.jsx'
 
 const APP_VERSION = 'v2026.04-2'
@@ -177,6 +178,7 @@ export default function App() {
   const schermen = {
     dashboard: Dashboard, training: Training,
     voeding: Voeding, lichaam: Lichaam, doelen: Doelen, settings: Settings,
+    statistieken: Statistieken,
   }
   const Scherm = schermen[scherm]
 

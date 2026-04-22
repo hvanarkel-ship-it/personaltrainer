@@ -974,6 +974,78 @@ body {
 .hrv-val { font-size: 0.6rem; font-weight: 600; color: var(--text-2); }
 .hrv-label { font-size: 0.62rem; color: var(--text-3); }
 
+/* ===== STATISTIEKEN ===== */
+.stat-periode-tabs { display: flex; gap: 6px; padding: 0 16px 12px; }
+.stat-periode-btn { flex: 1; padding: 8px; background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600; color: var(--text-2); cursor: pointer; font-family: var(--font); transition: all 0.15s; }
+.stat-periode-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.stat-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 16px 12px; }
+.stat-summ { background: var(--card); border-radius: var(--radius-sm); padding: 12px 6px; text-align: center; box-shadow: var(--shadow); }
+.stat-summ-val { display: block; font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.2; }
+.stat-summ-label { display: block; font-size: 0.6rem; color: var(--text-3); margin-top: 1px; }
+
+/* Volume chart */
+.vol-chart { display: flex; align-items: flex-end; gap: 3px; height: 96px; }
+.vol-week { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vol-balk-wrap { position: relative; display: flex; align-items: flex-end; width: 100%; justify-content: center; height: 72px; }
+.vol-balk { width: 100%; max-width: 30px; border-radius: 3px 3px 0 0; transition: height 0.35s, opacity 0.2s; min-height: 4px; }
+.vol-week--actief .vol-balk { outline: 2px solid var(--primary); outline-offset: 1px; border-radius: 3px 3px 0 0; }
+.vol-sessie-dot { position: absolute; top: 0; right: 0; background: var(--primary); color: #fff; font-size: 0.48rem; font-weight: 700; width: 12px; height: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.vol-min { font-size: 0.52rem; color: var(--primary); font-weight: 700; line-height: 1; }
+.vol-label { font-size: 0.5rem; color: var(--text-3); font-weight: 600; white-space: nowrap; }
+.vol-week-info { font-size: 0.78rem; color: var(--text-2); text-align: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light); }
+
+/* Sport verdeling */
+.sport-verd-lijst { display: flex; flex-direction: column; gap: 10px; }
+.sport-verd-rij { display: flex; flex-direction: column; gap: 5px; }
+.sport-verd-kop { display: flex; align-items: center; gap: 7px; }
+.sport-verd-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sport-verd-naam { font-size: 0.82rem; font-weight: 600; flex: 1; }
+.sport-verd-meta { font-size: 0.7rem; color: var(--text-3); }
+.sport-verd-pct { font-size: 0.75rem; font-weight: 700; color: var(--text-2); min-width: 30px; text-align: right; }
+.sport-verd-bg { background: var(--bg); border-radius: 3px; height: 5px; overflow: hidden; }
+.sport-verd-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+/* Zone chart */
+.zone-stacked { display: flex; height: 34px; border-radius: var(--radius-sm); overflow: hidden; gap: 2px; margin: 10px 0 8px; }
+.zone-seg { display: flex; align-items: center; justify-content: center; min-width: 20px; transition: flex 0.4s; }
+.zone-seg span { font-size: 0.6rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.zone-z2 { background: #3b82f6; }
+.zone-z3 { background: #f59e0b; }
+.zone-z4 { background: #ef4444; }
+.zone-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-2); }
+.zone-leg { display: flex; align-items: center; gap: 5px; }
+.zone-leg-z2::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #3b82f6; border-radius: 2px; }
+.zone-leg-z3::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #f59e0b; border-radius: 2px; }
+.zone-leg-z4::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 2px; }
+.zone-ratio-badge { font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+.zone-ratio--goed { background: #f0fdf4; color: #166534; }
+.zone-ratio--matig { background: #fffbeb; color: #92400e; }
+.zone-ratio--laag { background: #fef2f2; color: #dc2626; }
+.zone-tip { font-size: 0.78rem; color: #1e40af; margin-top: 10px; padding: 8px 10px; background: #eff6ff; border-radius: var(--radius-sm); }
+
+/* HRV sparkline */
+.hrv-sparkline { display: flex; align-items: flex-end; gap: 2px; height: 64px; }
+.hrv-spark-col { flex: 1; display: flex; align-items: flex-end; cursor: default; }
+.hrv-spark-bar { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.3s; min-height: 3px; }
+.hrv-spark-leg { display: flex; gap: 12px; font-size: 0.68rem; margin-top: 8px; flex-wrap: wrap; }
+.hrv-leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+.hrv-leg-groen::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; }
+.hrv-leg-geel::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #eab308; border-radius: 50%; }
+.hrv-leg-rood::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
+
+/* Activity feed */
+.act-rij { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+.act-rij:last-child { border-bottom: none; padding-bottom: 0; }
+.act-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.act-info { flex: 1; min-width: 0; }
+.act-kop { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+.act-kop strong { font-size: 0.85rem; }
+.act-datum { font-size: 0.72rem; color: var(--text-3); }
+.act-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-2); }
+.act-icu-badge { font-size: 0.58rem; font-weight: 700; background: #eff6ff; color: #1e40af; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; letter-spacing: 0.03em; }
+.stat-leeg { font-size: 0.85rem; color: var(--text-3); text-align: center; padding: 16px 0; }
+
 /* ===== BUTTON VARIANTS ===== */
 .btn-sm { padding: 4px 10px !important; font-size: 0.75rem !important; }
 .btn-full { width: 100%; }
