@@ -10,33 +10,17 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, onStravaStatusClear }) {
+export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
-  const [stravaSyncing, setStravaSyncing] = useState(false)
   const [intervalsSyncing, setIntervalsSyncing] = useState(false)
   const [intervalsConnecting, setIntervalsConnecting] = useState(false)
   const [intervalsForm, setIntervalsForm] = useState({ athlete_id: '', api_key: '' })
   const [melding, setMelding] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
-
-  useEffect(() => {
-    if (!stravaStatus) return
-    if (stravaStatus === 'verbonden') {
-      setMelding({ type: 'success', tekst: '✓ Strava gekoppeld! Je trainingen worden nu gesynchroniseerd.' })
-      setProfiel(p => p ? { ...p, strava_verbonden: true } : p)
-    } else if (stravaStatus === 'geweigerd') {
-      setMelding({ type: 'error', tekst: 'Strava koppeling geweigerd.' })
-    } else {
-      setMelding({ type: 'error', tekst: 'Strava koppeling mislukt. Probeer opnieuw.' })
-    }
-    setTab('integraties')
-    onStravaStatusClear?.()
-    setTimeout(() => setMelding(null), 6000)
-  }, [stravaStatus])
 
   async function laadProfiel() {
     try {
@@ -55,7 +39,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
         coach_context: data.coach_context || '',
         coach_naam: data.coach_naam || 'APEX Coach',
         coach_stijl: data.coach_stijl || 'direct',
-        strava_verbonden: !!data.strava_athlete_id,
         intervals_verbonden: !!data.intervals_athlete_id,
         intervals_athlete_id: data.intervals_athlete_id || null,
       })
@@ -83,34 +66,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
   function toggleSport(sport) {
     const cur = profiel.sporten || []
     setProfiel(p => ({ ...p, sporten: cur.includes(sport) ? cur.filter(s => s !== sport) : [...cur, sport] }))
-  }
-
-  function verbindStrava() {
-    const token = localStorage.getItem('apex_token')
-    window.location.href = `/api/strava-auth?token=${encodeURIComponent(token)}`
-  }
-
-  async function syncStrava() {
-    setStravaSyncing(true)
-    setMelding(null)
-    try {
-      const res = await api.post('/strava-sync', {})
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} al aanwezig)` })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Strava sync mislukt: ' + err.message })
-    } finally {
-      setStravaSyncing(false)
-    }
-  }
-
-  async function ontkoppelStrava() {
-    try {
-      await api.put('/profiel', { ontkoppel_strava: true })
-      setProfiel(p => ({ ...p, strava_verbonden: false }))
-      setMelding({ type: 'success', tekst: 'Strava ontkoppeld.' })
-    } catch {
-      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
-    }
   }
 
   async function verbindIntervals() {
@@ -307,46 +262,6 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
       {/* ── INTEGRATIES ── */}
       {tab === 'integraties' && (
         <div className="lijst">
-
-          {/* Strava */}
-          <div className="card integratie-card">
-            <div className="integratie-header">
-              <div className="integratie-logo" style={{ background: '#FC4C02' }}>🏃</div>
-              <div className="integratie-info">
-                <strong>Strava</strong>
-                <span>Trainingen & hartslagzones</span>
-              </div>
-              <span className={`integratie-badge ${profiel.strava_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-                {profiel.strava_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
-              </span>
-            </div>
-            {profiel.strava_verbonden ? (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Trainingen worden automatisch binnengehaald via de Strava webhook. Gebruik de knop voor een handmatige sync van de laatste 30 activiteiten.
-                </p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncStrava} disabled={stravaSyncing}>
-                    {stravaSyncing ? '...' : '↻ Nu synchroniseren'}
-                  </button>
-                  <button className="btn btn-ghost" onClick={ontkoppelStrava}>Ontkoppelen</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Koppel Strava voor automatische import van trainingen inclusief hartslagzones. Suunto Race, Garmin en andere apparaten die naar Strava synchroniseren worden automatisch meegenomen.
-                </p>
-                <button
-                  className="btn btn-full"
-                  onClick={verbindStrava}
-                  style={{ marginTop: '12px', background: '#FC4C02', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
-                >
-                  Verbinden met Strava
-                </button>
-              </>
-            )}
-          </div>
 
           {/* Intervals.icu */}
           <div className="card integratie-card">

@@ -23,10 +23,6 @@ CREATE TABLE IF NOT EXISTS user_profile (
   coach_context TEXT,
   coach_naam TEXT DEFAULT 'APEX Coach',
   coach_stijl TEXT DEFAULT 'direct',
-  strava_access_token TEXT,
-  strava_refresh_token TEXT,
-  strava_token_expires_at BIGINT,
-  strava_athlete_id BIGINT,
   intervals_athlete_id TEXT,
   intervals_api_key TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -67,7 +63,6 @@ CREATE TABLE IF NOT EXISTS trainingen (
   zone4_min INTEGER,
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
-  strava_id BIGINT,
   intervals_id TEXT,
   rpe SMALLINT,
   stemming SMALLINT,
@@ -119,7 +114,6 @@ CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datu
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user ON gesprekken(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doelen_user ON doelen(user_id, actief);
-CREATE INDEX IF NOT EXISTS idx_trainingen_strava_id    ON trainingen(strava_id) WHERE strava_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_trainingen_intervals_id ON trainingen(intervals_id) WHERE intervals_id IS NOT NULL;
 
 -- Auto-update user_profile timestamp
