@@ -23,7 +23,7 @@ export const SPORT_LABEL = {
   voetbal: 'Voetbal', hyrox: 'Hyrox', overig: 'Overig', herstel: 'Herstel',
 }
 
-// Corrigeert duur_min die per abuis in seconden is opgeslagen (Strava sync bug).
+// Corrigeert duur_min die per abuis in seconden is opgeslagen.
 // Heuristiek: als waarde > 720 (>12 uur) én na /60 realistisch is (<= 720 min),
 // dan behandelen we het als seconden.
 export function normMin(d) {

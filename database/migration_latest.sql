@@ -26,10 +26,6 @@ CREATE TABLE IF NOT EXISTS user_profile (
   coach_context TEXT,
   coach_naam TEXT DEFAULT 'APEX Coach',
   coach_stijl TEXT DEFAULT 'direct',
-  strava_access_token TEXT,
-  strava_refresh_token TEXT,
-  strava_token_expires_at BIGINT,
-  strava_athlete_id BIGINT,
   intervals_athlete_id TEXT,
   intervals_api_key TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -70,7 +66,6 @@ CREATE TABLE IF NOT EXISTS trainingen (
   zone4_min INTEGER,
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
-  strava_id BIGINT,
   intervals_id TEXT,
   rpe SMALLINT,
   stemming SMALLINT,
