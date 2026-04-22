@@ -124,7 +124,7 @@ function normDatum(d) {
   return String(d).slice(0, 10)
 }
 
-export default function Training({ onNavigeer }) {
+export default function Training({ onNavigeer, user }) {
   const [trainingen, setTrainingen] = useState([])
   const [laden, setLaden] = useState(true)
   const [toonForm, setToonForm] = useState(false)
@@ -191,9 +191,12 @@ export default function Training({ onNavigeer }) {
     <div className="page">
       <div className="page-header">
         <div><h1>Training</h1><p className="subtitle">Log en volg je workouts</p></div>
-        <button className="btn btn-primary" onClick={() => setToonForm(!toonForm)}>
-          {toonForm ? 'Annuleer' : '+ Training'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('statistieken')}>📊</button>
+          <button className="btn btn-primary" onClick={() => setToonForm(!toonForm)}>
+            {toonForm ? 'Annuleer' : '+ Training'}
+          </button>
+        </div>
       </div>
 
       {fout && <div className="alert alert-error">{fout}</div>}
