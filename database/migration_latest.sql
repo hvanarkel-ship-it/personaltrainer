@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS user_profile (
   strava_refresh_token TEXT,
   strava_token_expires_at BIGINT,
   strava_athlete_id BIGINT,
+  intervals_athlete_id TEXT,
+  intervals_api_key TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -69,6 +71,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
   strava_id BIGINT,
+  intervals_id TEXT,
   rpe SMALLINT,
   stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -127,12 +130,17 @@ ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_refresh_token TEXT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_token_expires_at BIGINT;
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS strava_athlete_id BIGINT;
 
+-- user_profile: Intervals.icu koppeling
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS intervals_athlete_id TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS intervals_api_key TEXT;
+
 -- trainingen: hartslagzones, bron en Strava ID
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone2_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone3_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone4_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS bron TEXT DEFAULT 'handmatig';
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS strava_id BIGINT;
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS intervals_id TEXT;
 
 -- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
@@ -148,7 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datu
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user       ON gesprekken(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doelen_user           ON doelen(user_id, actief);
-CREATE INDEX IF NOT EXISTS idx_trainingen_strava_id  ON trainingen(strava_id) WHERE strava_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_trainingen_strava_id    ON trainingen(strava_id) WHERE strava_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_trainingen_intervals_id ON trainingen(intervals_id) WHERE intervals_id IS NOT NULL;
 
 -- ── Trigger: auto-update user_profile.updated_at ──────────────────────────
 

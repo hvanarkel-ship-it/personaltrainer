@@ -16,6 +16,9 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
   const [stravaSyncing, setStravaSyncing] = useState(false)
+  const [intervalsSyncing, setIntervalsSyncing] = useState(false)
+  const [intervalsConnecting, setIntervalsConnecting] = useState(false)
+  const [intervalsForm, setIntervalsForm] = useState({ athlete_id: '', api_key: '' })
   const [melding, setMelding] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
@@ -53,6 +56,8 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
         coach_naam: data.coach_naam || 'APEX Coach',
         coach_stijl: data.coach_stijl || 'direct',
         strava_verbonden: !!data.strava_athlete_id,
+        intervals_verbonden: !!data.intervals_athlete_id,
+        intervals_athlete_id: data.intervals_athlete_id || null,
       })
     } catch {
       setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
@@ -103,6 +108,44 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
       await api.put('/profiel', { ontkoppel_strava: true })
       setProfiel(p => ({ ...p, strava_verbonden: false }))
       setMelding({ type: 'success', tekst: 'Strava ontkoppeld.' })
+    } catch {
+      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
+    }
+  }
+
+  async function verbindIntervals() {
+    setIntervalsConnecting(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/intervals-connect', intervalsForm)
+      setProfiel(p => ({ ...p, intervals_verbonden: true, intervals_athlete_id: intervalsForm.athlete_id }))
+      setIntervalsForm({ athlete_id: '', api_key: '' })
+      setMelding({ type: 'success', tekst: `✓ Intervals.icu gekoppeld${res.athlete_name ? ` als ${res.athlete_name}` : ''}` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
+    } finally {
+      setIntervalsConnecting(false)
+    }
+  }
+
+  async function syncIntervals() {
+    setIntervalsSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/intervals-sync', {})
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} + ${res.wellness} wellness-dagen gesynchroniseerd` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Intervals sync mislukt: ' + err.message })
+    } finally {
+      setIntervalsSyncing(false)
+    }
+  }
+
+  async function ontkoppelIntervals() {
+    try {
+      await api.put('/profiel', { ontkoppel_intervals: true })
+      setProfiel(p => ({ ...p, intervals_verbonden: false, intervals_athlete_id: null }))
+      setMelding({ type: 'success', tekst: 'Intervals.icu ontkoppeld.' })
     } catch {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
@@ -299,6 +342,67 @@ export default function Settings({ user, onNavigeer, onUitloggen, stravaStatus, 
                 >
                   Verbinden met Strava
                 </button>
+              </>
+            )}
+          </div>
+
+          {/* Intervals.icu */}
+          <div className="card integratie-card">
+            <div className="integratie-header">
+              <div className="integratie-logo" style={{ background: '#1a1a2e', fontSize: '0.75rem', fontWeight: 700, color: '#e94560' }}>ICU</div>
+              <div className="integratie-info">
+                <strong>Intervals.icu</strong>
+                <span>Trainingen, HRV & slaap</span>
+              </div>
+              <span className={`integratie-badge ${profiel.intervals_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.intervals_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              </span>
+            </div>
+            {profiel.intervals_verbonden ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Athlete <strong>{profiel.intervals_athlete_id}</strong> — trainingen, HRV en slaapdata worden gesynchroniseerd. Alle gekoppelde apparaten (Suunto, Garmin, enz.) worden automatisch meegenomen.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncIntervals} disabled={intervalsSyncing}>
+                    {intervalsSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={ontkoppelIntervals}>Ontkoppelen</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Koppel Intervals.icu voor automatische import van trainingen én wellness data (HRV, slaap, TSB). Werkt met alle apparaten die naar Intervals.icu synchroniseren: Suunto, Garmin, Wahoo en meer.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Athlete ID <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(bijv. i12345 — zie URL op intervals.icu)</span></label>
+                    <input
+                      value={intervalsForm.athlete_id}
+                      onChange={e => setIntervalsForm(f => ({ ...f, athlete_id: e.target.value }))}
+                      placeholder="i12345"
+                      autoCapitalize="none"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>API Key <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(Intervals.icu → Instellingen → API Key)</span></label>
+                    <input
+                      type="password"
+                      value={intervalsForm.api_key}
+                      onChange={e => setIntervalsForm(f => ({ ...f, api_key: e.target.value }))}
+                      placeholder="••••••••••••••••"
+                    />
+                  </div>
+                  <button
+                    className="btn btn-full"
+                    onClick={verbindIntervals}
+                    disabled={intervalsConnecting || !intervalsForm.athlete_id || !intervalsForm.api_key}
+                    style={{ background: '#1a1a2e', color: '#e94560', border: '1px solid #e94560', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+                  >
+                    {intervalsConnecting ? 'Verbinden...' : 'Verbinden met Intervals.icu'}
+                  </button>
+                </div>
               </>
             )}
           </div>
