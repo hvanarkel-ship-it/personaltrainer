@@ -18,12 +18,21 @@ const SPORT_MAP = {
 
 function toArray(data) {
   if (Array.isArray(data)) return data
-  // Unwrap common envelope shapes: { activities: [] } or { data: [] } etc.
   if (data && typeof data === 'object') {
     const val = data.activities ?? data.wellness ?? data.data ?? data.items ?? null
     if (Array.isArray(val)) return val
   }
   return []
+}
+
+async function fetchWithTimeout(url, options, timeoutMs = 20000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export const handler = async (event) => {
@@ -45,21 +54,28 @@ export const handler = async (event) => {
 
     const { intervals_athlete_id: athleteId, intervals_api_key: apiKey } = profiel
     const authHeader = 'Basic ' + Buffer.from(`API_KEY:${apiKey}`).toString('base64')
-    const oldest = '2015-01-01'  // volledige historie ophalen
+    const oldest = '2015-01-01'
     const newest = new Date().toISOString().split('T')[0]
     const headers = { Authorization: authHeader, Accept: 'application/json' }
-
-    const [activitiesRes, wellnessRes] = await Promise.all([
-      fetch(`https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${oldest}&newest=${newest}`, { headers }),
-      fetch(`https://intervals.icu/api/v1/athlete/${athleteId}/wellness?oldest=${oldest}&newest=${newest}`, { headers }),
-    ])
 
     let gesynchroniseerd = 0
     let overgeslagen = 0
     let wellness_synced = 0
-    let debug = {}
+    const debug = {}
 
-    // Pre-fetch alle bestaande intervals_ids in één query (efficiënt voor grote historiek)
+    // Fetch activities and wellness in parallel, each with a 20s timeout
+    const [activitiesRes, wellnessRes] = await Promise.all([
+      fetchWithTimeout(
+        `https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${oldest}&newest=${newest}`,
+        { headers }
+      ),
+      fetchWithTimeout(
+        `https://intervals.icu/api/v1/athlete/${athleteId}/wellness?oldest=${oldest}&newest=${newest}`,
+        { headers }
+      ),
+    ])
+
+    // Pre-fetch all existing intervals_ids in one query
     const bestaand = await sql`
       SELECT intervals_id FROM trainingen WHERE user_id = ${userId} AND intervals_id IS NOT NULL
     `
@@ -72,6 +88,7 @@ export const handler = async (event) => {
       debug.activities_received = activities.length
       if (activities.length > 0) console.log('Intervals activity sample:', JSON.stringify(activities[0]).slice(0, 300))
 
+      const nieuweRijen = []
       for (const act of activities) {
         const datum = (act.start_date_local ?? act.start_date ?? '')?.split('T')[0]
         if (!datum || !act.id) continue
@@ -86,7 +103,6 @@ export const handler = async (event) => {
 
         const duur_min = act.moving_time ? Math.round(act.moving_time / 60) : null
         const kcal = act.calories > 0 ? Math.round(act.calories) : null
-        // Support both average_hr (intervals) and average_heartrate (strava-style)
         const gem_hr = (act.average_hr ?? act.average_heartrate) ? Math.round(act.average_hr ?? act.average_heartrate) : null
         const max_hr = (act.max_hr ?? act.max_heartrate) ? Math.round(act.max_hr ?? act.max_heartrate) : null
         const afstand_m = act.distance ? Math.round(act.distance) : null
@@ -97,15 +113,25 @@ export const handler = async (event) => {
         if (hoogte_m > 0) notitiesDelen.push(`↑${hoogte_m}m`)
         notitiesDelen.push(`[intervals:${act.id}]`)
 
+        nieuweRijen.push({
+          user_id: userId, datum, sport, duur_min, kcal,
+          gem_hartslag: gem_hr, max_hartslag: max_hr,
+          notities: notitiesDelen.join(' — '),
+          bron: 'intervals',
+          intervals_id: intervalsId,
+        })
+      }
+
+      // Bulk insert in batches of 200
+      const BATCH = 200
+      for (let i = 0; i < nieuweRijen.length; i += BATCH) {
+        const batch = nieuweRijen.slice(i, i + BATCH)
         await sql`
           INSERT INTO trainingen
-            (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-             notities, bron, intervals_id)
-          VALUES
-            (${userId}, ${datum}, ${sport}, ${duur_min}, ${kcal}, ${gem_hr}, ${max_hr},
-             ${notitiesDelen.join(' — ')}, 'intervals', ${intervalsId})
+            (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, notities, bron, intervals_id)
+          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'notities', 'bron', 'intervals_id')}
         `
-        gesynchroniseerd++
+        gesynchroniseerd += batch.length
       }
     } else {
       const errText = await activitiesRes.text()
@@ -120,13 +146,13 @@ export const handler = async (event) => {
       debug.wellness_received = wellness.length
       if (wellness.length > 0) console.log('Intervals wellness sample:', JSON.stringify(wellness[0]).slice(0, 300))
 
-      // Pre-fetch bestaande wellness-datums in één query
       const bestaandeWellness = await sql`
         SELECT datum::text FROM trainingen
         WHERE user_id = ${userId} AND sport = 'herstel' AND bron = 'intervals'
       `
       const bestaandeWellnessDagen = new Set(bestaandeWellness.map(r => String(r.datum).slice(0, 10)))
 
+      const nieuweWellness = []
       for (const w of wellness) {
         if (!w.id) continue
 
@@ -139,17 +165,29 @@ export const handler = async (event) => {
         if (!hrv && !slaap_uur) continue
         if (bestaandeWellnessDagen.has(String(w.id).slice(0, 10))) continue
 
+        nieuweWellness.push({
+          user_id: userId,
+          datum: String(w.id).slice(0, 10),
+          sport: 'herstel',
+          hrv_ochtend: hrv,
+          slaap_uur,
+          slaapscore,
+          herstelbalans,
+          gem_hartslag: rusthartsslag,
+          notities: `Intervals.icu wellness — TSB: ${herstelbalans ?? '–'}`,
+          bron: 'intervals',
+        })
+      }
+
+      const BATCH = 200
+      for (let i = 0; i < nieuweWellness.length; i += BATCH) {
+        const batch = nieuweWellness.slice(i, i + BATCH)
         await sql`
           INSERT INTO trainingen
-            (user_id, datum, sport, hrv_ochtend, slaap_uur, slaapscore,
-             herstelbalans, gem_hartslag, notities, bron)
-          VALUES
-            (${userId}, ${w.id}, 'herstel', ${hrv}, ${slaap_uur}, ${slaapscore},
-             ${herstelbalans}, ${rusthartsslag},
-             ${`Intervals.icu wellness — TSB: ${herstelbalans ?? '–'}`},
-             'intervals')
+            (user_id, datum, sport, hrv_ochtend, slaap_uur, slaapscore, herstelbalans, gem_hartslag, notities, bron)
+          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'hrv_ochtend', 'slaap_uur', 'slaapscore', 'herstelbalans', 'gem_hartslag', 'notities', 'bron')}
         `
-        wellness_synced++
+        wellness_synced += batch.length
       }
     } else {
       const errText = await wellnessRes.text()
@@ -159,7 +197,8 @@ export const handler = async (event) => {
 
     return cors({ success: true, gesynchroniseerd, overgeslagen, wellness: wellness_synced, debug })
   } catch (err) {
+    const cause = err.cause?.message ?? err.cause ?? ''
     console.error('Intervals sync error:', err)
-    return cors({ error: 'Sync fout: ' + err.message }, 500)
+    return cors({ error: `Sync fout: ${err.message}${cause ? ' (' + cause + ')' : ''}` }, 500)
   }
 }
