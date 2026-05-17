@@ -5,12 +5,20 @@ import { requireAuth, cors } from './_auth.js'
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
 function getMaaltijdType() {
-  const h = new Date().getHours()
+  const h = parseInt(new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: '2-digit', hour12: false }), 10)
   if (h >= 5 && h < 11) return 'ontbijt'
   if (h >= 11 && h < 15) return 'lunch'
   if (h >= 15 && h < 18) return 'snack'
   if (h >= 18) return 'diner'
   return 'snack'
+}
+
+function vandaagAms() {
+  const parts = new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const g = t => parts.find(p => p.type === t).value
+  return `${g('year')}-${g('month')}-${g('day')}`
 }
 
 function bestandenNaarContent(bestanden) {
@@ -35,7 +43,7 @@ async function extractInbody(sql, userId, bestanden) {
   ]
   const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content }] })
   const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
-  const vandaag = new Date().toISOString().split('T')[0]
+  const vandaag = vandaagAms()
   const datum = d.datum && d.datum !== 'null' ? d.datum : vandaag
 
   const [row] = await sql`
@@ -68,7 +76,7 @@ Let op:
   ]
   const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content }] })
   const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
-  const vandaag = new Date().toISOString().split('T')[0]
+  const vandaag = vandaagAms()
   const datum = d.datum && d.datum !== 'null' ? d.datum : vandaag
 
   // Ochtend/herstel schermen altijd opslaan als sport='herstel'
@@ -100,7 +108,7 @@ Geef UITSLUITEND geldig JSON:
   ]
   const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content }] })
   const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
-  const vandaag = new Date().toISOString().split('T')[0]
+  const vandaag = vandaagAms()
   const maaltijdType = getMaaltijdType()
 
   const [row] = await sql`
@@ -144,7 +152,7 @@ Bericht: "${bericht.slice(0, 800)}"`
   const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
   if (!d.is_voeding) return null
 
-  const vandaag = new Date().toISOString().split('T')[0]
+  const vandaag = vandaagAms()
   const maaltijdType = d.maaltijd_type || getMaaltijdType()
 
   const [row] = await sql`
@@ -202,7 +210,11 @@ export const handler = async (event) => {
     }
 
     // ── Alle data parallel ophalen ──
-    const vandaag = new Date().toISOString().split('T')[0]
+    const vandaag = vandaagAms()
+    const nu = new Date()
+    const tijdStr = nu.toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit' })
+    const dagNaamNL = nu.toLocaleDateString('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long' })
+
     let opgeslagen
     const [
       _opgeslagen,
@@ -213,6 +225,7 @@ export const handler = async (event) => {
       gisterMeals,
       actieveDoelen,
       weektraining,
+      wellnessTrend,
       history
     ] = await Promise.all([
       extractiePromise ? extractiePromise.catch(err => { console.error('Extractie fout:', err); return null }) : Promise.resolve(null),
@@ -236,6 +249,10 @@ export const handler = async (event) => {
           zone2_min, zone3_min, zone4_min, notities
         FROM trainingen WHERE user_id = ${userId}
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
+      sql`SELECT datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
+          hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief
+        FROM dagelijkse_wellness WHERE user_id = ${userId}
+        AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`.catch(() => []),
       sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 100`
     ])
     opgeslagen = _opgeslagen
@@ -337,18 +354,46 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
         }).join('\n')
       : '  Geen InBody metingen beschikbaar'
 
-    // ── HRV/slaap trend opbouwen ──
-    const hrvRegels = hrvTrend.length > 0
-      ? hrvTrend.map(m => {
+    // ── HRV/herstel: merge trainingen (handmatig) + dagelijkse_wellness (Suunto) ──
+    const wByDatum = new Map(wellnessTrend.map(w => [String(w.datum).slice(0, 10), w]))
+    const tByDatum = new Map(hrvTrend.map(h => [String(h.datum).slice(0, 10), h]))
+    const allHerstelDatums = [...new Set([...wByDatum.keys(), ...tByDatum.keys()])].sort().reverse().slice(0, 7)
+    const mergedHerstel = allHerstelDatums.map(datum => {
+      const t = tByDatum.get(datum) || {}
+      const w = wByDatum.get(datum) || {}
+      return {
+        datum,
+        hrv:           t.hrv_ochtend   ?? w.hrv_ochtend   ?? null,
+        slaap:         t.slaap_uur     ?? w.slaap_uur     ?? null,
+        slaapscore:    t.slaapscore    ?? w.slaap_score   ?? null,
+        herstelbalans: t.herstelbalans ?? (w.herstel_balans != null ? parseFloat(w.herstel_balans) * 100 : null),
+        diepe_slaap:   w.diepe_slaap_min ?? null,
+        rem_slaap:     w.rem_slaap_min   ?? null,
+        rust_hartslag: w.rust_hartslag   ?? null,
+        stappen:       w.stappen        ?? null,
+        stress_pct:    w.stress_pct     ?? null,
+        bron: t.hrv_ochtend ? 'handmatig' : 'suunto',
+      }
+    })
+
+    const herstelRegels = mergedHerstel.length > 0
+      ? mergedHerstel.map(m => {
           const parts = [
-            m.hrv_ochtend ? `HRV ${m.hrv_ochtend}ms` : null,
-            m.slaap_uur ? `slaap ${m.slaap_uur}u` : null,
-            m.slaapscore ? `score ${m.slaapscore}` : null,
-            m.herstelbalans != null ? `balans ${m.herstelbalans > 0 ? '+' : ''}${m.herstelbalans}` : null,
+            m.hrv          ? `HRV ${m.hrv}ms` : null,
+            m.slaap        ? `slaap ${m.slaap}u` : null,
+            m.slaapscore   ? `score ${m.slaapscore}` : null,
+            m.herstelbalans != null ? `balans ${parseFloat(m.herstelbalans) > 0 ? '+' : ''}${Math.round(m.herstelbalans)}` : null,
+            m.diepe_slaap  ? `diepe slaap ${m.diepe_slaap}min` : null,
+            m.rem_slaap    ? `REM ${m.rem_slaap}min` : null,
+            m.rust_hartslag ? `rust-HR ${m.rust_hartslag}bpm` : null,
+            m.stappen      ? `${m.stappen.toLocaleString('nl-NL')} stappen` : null,
+            m.stress_pct != null ? `stress ${m.stress_pct}%` : null,
           ].filter(Boolean).join(' | ')
-          return `  • ${m.datum}: ${parts}`
+          return `  • ${m.datum} [${m.bron}]: ${parts || 'geen data'}`
         }).join('\n')
       : '  Geen hersteldata beschikbaar'
+
+    const recentHerstel = mergedHerstel[0] || {}
 
     // ── Trainingen detail opbouwen ──
     const trainingRegels = weektraining.length > 0
@@ -390,8 +435,8 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     if (heeftKracht && totaalMinWeek >= 60) eiwitPerKg = 1.6
     if (heeftKracht && tdee && totVandaag.kcal && totVandaag.kcal < tdee - 300) eiwitPerKg = 2.0
     const minEiwit = profiel?.gewicht_kg ? Math.round(profiel.gewicht_kg * eiwitPerKg) : 100
-    const recentHrv = hrvTrend[0]?.hrv_ochtend || null
-    const recentSlaap = hrvTrend[0]?.slaap_uur || null
+    const recentHrv = recentHerstel.hrv || null
+    const recentSlaap = recentHerstel.slaap || null
 
     const heeftHyrox = profiel?.sporten?.includes('hyrox')
     const hyroxKennis = heeftHyrox ? `
@@ -427,6 +472,7 @@ Proactieve HYROX coaching regels (gebruik ALTIJD als data aanleiding geeft):
 ` : ''
 
     const systemPrompt = `Je bent ${coachNaam}, een persoonlijke AI-coachingassistent voor ${naam}.
+HUIDIGE DATUM EN TIJD: ${dagNaamNL} ${vandaag}, ${tijdStr} (Nederlandse tijd — gebruik dit als referentie voor "vandaag", "gisteren", "deze week", etc.)
 
 ROL: Combineer trainer, diëtist, fysioloog en coach. Geef altijd concreet, gepersonaliseerd advies op basis van onderstaande actuele data. Gebruik alle beschikbare data actief.
 
@@ -465,8 +511,19 @@ Dagtotaal: ${Math.round(totVandaag.kcal)}kcal | ${Math.round(totVandaag.eiwit)}g
 Resterend: ${Math.round(restKcal)}kcal | ${Math.round(restEiwit)}g eiwit
 ${gisterMeals.length ? `Gisteren: ${Math.round(totGister.kcal)}kcal | ${Math.round(totGister.eiwit)}g eiwit` : ''}
 
+═══ SUUNTO MEETMETHODE — VERPLICHT BEGRIJPEN ═══
+Alle wellness-data komt van de Suunto smartwatch. Interpreteer de cijfers ALTIJD zo:
+• HRV (hrv_ochtend): Gemiddelde HRV gemeten TIJDENS DE SLAAP (nacht), niet een losse ochtendmeting. Betrouwbaarder dan een handmatige meting. Datum = dag waarop de gebruiker wakker werd.
+• Rusthartslag (rust_hartslag): Laagste hartslag gemeten tussen 03:00–06:00 's nachts. Nauwkeuriger dan een handmatige polsmeting omdat het altijd in rust is.
+• Herstelbalans (balans): Suunto's Training Load Balance — positief = meer herstelcapaciteit dan trainingsbelasting; negatief = overbelast. Gemiddeld over 04:00–09:00 ochtend.
+• Slaap: Automatisch gedetecteerd door de watch (geen knop drukken nodig). Bevat diepe slaap, REM en lichte slaap in minuten.
+• Actieve kcal: Calorieën verbrand BOVEN het rustmetabolisme — dit zijn niet de totale dagcalorieën.
+• Stappen: Dagtotaal van de watch.
+• Stress %: Gebaseerd op HRV-variabiliteit overdag; 0% = ontspannen, 100% = gestrest.
+• Bron [suunto] = automatisch gemeten; [handmatig] = door gebruiker ingevoerd via het ochtendformulier.
+
 ═══ HERSTEL & HRV (afgelopen 7 dagen) ═══
-${hrvRegels}
+${herstelRegels}
 
 ═══ TRAININGEN DEZE WEEK ═══
 Aantal sessies: ${echteTrainingenW.length} | Zone2 totaal: ${echteTrainingenW.reduce((s, t) => s + (t.zone2_min || 0), 0)}min | Meest recente HRV: ${recentHrv ? `${recentHrv}ms` : 'geen'} | Slaap: ${recentSlaap ? `${recentSlaap}u` : 'geen'}
@@ -527,7 +584,7 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
             && Number.isFinite(eiwit) && eiwit >= 0 && eiwit <= 300
             && !lijktVraag
           if (geldigeMaaltijd) {
-            const vandaagStr = new Date().toISOString().split('T')[0]
+            const vandaagStr = vandaagAms()
             const maaltijdType = d.maaltijd_type || getMaaltijdType()
             const [row] = await sql`
               INSERT INTO maaltijden (user_id, datum, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g)
