@@ -126,18 +126,34 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
     }
   }
 
-  async function syncSuunto() {
+  async function syncSuunto(reset = false) {
+    if (reset && !confirm('Weet je het zeker? Alle Suunto-records worden gewist en opnieuw geïmporteerd.')) return
     setSuuntoSyncing(true)
     setMelding(null)
     try {
-      const res = await api.post('/suunto-sync', {})
+      const path = reset ? '/suunto-sync?reset=1' : '/suunto-sync'
+      const res = await api.post(path, {})
       const fout = res.debug?.workouts_error ? ` ⚠️ ${res.debug.workouts_error}` : ''
-      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, tijdstip: new Date() })
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend${fout}` })
+      const ontvangen = res.debug?.workouts_received ?? 0
+      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, ontvangen, tijdstip: new Date() })
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend (API gaf ${ontvangen} workouts)${fout}` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Suunto sync mislukt: ' + err.message })
     } finally {
       setSuuntoSyncing(false)
+    }
+  }
+
+  async function diagnoseSuunto() {
+    setMelding(null)
+    try {
+      const res = await api.get('/suunto-debug')
+      const tekst = JSON.stringify(res, null, 2)
+      const blob = new Blob([tekst], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Diagnose mislukt: ' + err.message })
     }
   }
 
@@ -439,9 +455,15 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                 <p className="integratie-beschrijving" style={{ marginTop: 10 }}>
                   Suunto is gekoppeld. Workouts worden direct vanuit de Suunto cloud gesynchroniseerd.
                 </p>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncSuunto} disabled={suuntoSyncing}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" style={{ flex: '1 1 140px' }} onClick={() => syncSuunto(false)} disabled={suuntoSyncing}>
                     {suuntoSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => syncSuunto(true)} disabled={suuntoSyncing} title="Wist bestaande Suunto-records en haalt alles opnieuw op">
+                    ⟲ Volledig opnieuw
+                  </button>
+                  <button className="btn btn-ghost" onClick={diagnoseSuunto} title="Toon ruwe Suunto API response in nieuw tabblad">
+                    🔍 Diagnose
                   </button>
                   <button className="btn btn-ghost" onClick={ontkoppelSuunto}>Ontkoppelen</button>
                 </div>
