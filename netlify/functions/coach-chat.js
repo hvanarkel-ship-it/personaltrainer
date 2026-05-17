@@ -501,6 +501,111 @@ Wacht NOOIT tot de gebruiker vraagt. Analyseer de data en reageer proactief:
 • Geen hersteldata gelogd → herinner aan ochtend HRV/slaap log
 Geef altijd een concrete aanbeveling voor de VOLGENDE 24 uur als dat relevant is.
 
+═══ EXPERT KENNISBANK — TRAINING, VOEDING, HERSTEL & HRV ═══
+
+── HRV-INTERPRETATIE & OPTIMALISATIE ──
+HRV meet parasympathische activiteit. Hoge HRV = goed hersteld zenuwstelsel. Suunto-waarden zijn nachtgemiddelden (betrouwbaarder dan ochtendprik).
+Absolute richtwaarden (individueel — trend telt zwaarder dan één meting):
+• >65ms → uitstekend | 55–65ms → goed | 45–55ms → matig | <45ms → herstel vereist
+Trendanalyse (gebruik de 7-daagse data):
+• Dalende trend over 3+ dagen → accumulerende vermoeidheid, verhoog geen volume
+• HRV laag + slaap kort → gecombineerd signaal; intensieve training gecontra-indiceerd
+• HRV hoog na rustdag → supercompensatie window; ideaal moment voor zware sessie
+Bewezen HRV-verbeteraars (evidentiebased):
+1. Zone 2 training (3+ uur/week) — structurele parasympathische versterking na 6–12 weken
+2. Slaap 7,5–9u consistent — HRV herstelt primair in diepe slaap en REM
+3. Resonantieademhaling (5–6 ademhalingen/min, 10min/dag) — acuut en chronisch effect
+4. Omega-3 EPA/DHA 2–3g/dag — anti-inflammatoir, bewezen HRV-verbetering
+5. Magnesiumglycinaat 300–400mg voor slaap — diepe slaap + HRV-effect
+6. Alcohol vermijden — zelfs 1–2 glazen onderdrukken HRV die nacht significant
+7. Koude blootstelling (koud douchen 2–3min) — acute parasympathische boost
+
+── TRAININGSWETENSCHAPPEN ──
+Polarized model (meest effectief voor recreatieve atleten tot gevorderd niveau):
+• 80% lage intensiteit (Z1–Z2: kan neusloos ademen, kan praten in zinnen)
+• 15% hoge intensiteit (Z4–Z5: echte intervaltraining)
+• 5% matig (Z3: "garbage miles" — vermoeit zonder optimaal te prikkelen)
+
+Zone 2 is de hoeksteen van alle sporten:
+• Definitie: maximale intensiteit waarbij lactaat <2mmol/L (neusloos ademen = goede proxy)
+• Efficiëntst in sessies van 60–90min; korter (<45min) minder effectief voor mitochondriale aanpassing
+• Minimum effectieve dosis: 3u/week voor VO2max-progressie
+• Verbetert: vetverbranding, mitochondriale dichtheid, herstelcapaciteit, HRV
+
+Intervaltraining (Z4–Z5, 1–2x/week max):
+• 4×4min op 90–95% HRmax → bewezen VO2max-verbetering (Norsk methode)
+• 30/30 Billat → kort maar effectief voor duuratleten
+• Minimaal 48u herstel tussen zware sessies
+
+Kracht:
+• 2–3x/week per spiergroep voor hypertrofie en kracht
+• Progressive overload: verhoog gewicht als >2 sets met 2+ herhalingen boven target
+• Compound > isolatie voor atletische prestatie (squat, deadlift, press, pull)
+• Post-workout eiwitvenster: 30–60min voor maximale eiwitsynthese
+
+Periodisering:
+• 3:1 opbouw/herstel (3 weken laden, 1 week deload: volume −40%, intensiteit behouden)
+• Volume-toename: max 10% per week om blessures te voorkomen
+• Supercompensatie: treedt op TIJDENS herstel — niet tijdens training
+• Tapering voor race/event: 2 weken; volume −50–70%, intensiteit behouden
+
+── SPORTERSVOEDING ──
+Eiwit (meest kritisch voor atleten):
+• Spieranabole drempel: 0,3–0,4g/kg per maaltijdmoment (niet enkel dagstotaal)
+• Leucine-drempel: minimaal 2–3g leucine per maaltijd activeert mTOR (whey, ei, kwark, vlees)
+• Post-training: binnen 30–60min — maximale anabole respons
+• Pre-slaap: 30–40g caseïne of kwark — nacht-spieronderhoud
+• Spreiding: 4 maaltijden à 30–40g beter dan 2 grote maaltijden
+
+Koolhydraten (brandstof & herstel):
+• <70% HRmax: vet als primaire brandstof; koolhydraten minder kritisch
+• >70% HRmax: spierglycogeen dominant; prestatie daalt bij tekort
+• Carb-timing: 2–4u voor training grote maaltijd; 30–60min voor: snel verteerbaar (banaan, rijstwafel)
+• Post-training: 0,8g/kg koolhydraten + eiwit binnen 45min — glycogeenresynthese piek
+• Carb-periodisering: hogere intake op trainings-/wedstrijddagen, lager op rustdagen
+
+Vetten:
+• Omega-3 (EPA+DHA): 2–3g/dag — anti-inflammatoir, HRV-verbetering, cognitie
+• Niet vlak voor training: vet vertraagt maaglediging en verlaagt prestatie
+• Volkoren, avocado, olijfolie → stabiele energie en hormonale gezondheid
+
+Timing rondom slaap:
+• Laatste grote maaltijd 2–3u voor slaap — kerntemperatuur daalt voor slaap
+• Licht eiwitsnack voor bed OK → stimuleert nacht-anabolisme zonder slaap te storen
+
+Hydratatie:
+• 2% uitdroging → −10–20% prestatieverlies
+• 500ml 2u voor training; 150–250ml per 15–20min tijdens
+• Elektrolyten bij sessies >60min of zweten
+
+── SLAAP & HERSTELOPTIMALISATIE ──
+Slaaparchitectuur (Suunto meet dit):
+• Diepe slaap (NREM3): groeihormoon, fysiek herstel — concentreert in eerste helft nacht
+• REM: cognitief herstel, motorisch leren, emotionele verwerking — meer in tweede helft nacht
+• Alarmsignalen: diepe slaap <15% totaal, REM <20% totaal
+• Consistentie van slaaptijden > absolute duur voor circadiaan ritme
+
+Slaap verbeteren (evidentiebased):
+• Vaste slaap/waktijd (ook weekend) — sterkste ingreep
+• Slaapkamer 16–20°C — kerntemperatuur daling triggert diepe slaap
+• Geen blauw licht 90min voor slaap (melatoninesuppressie)
+• Geen alcohol — onderbreekt REM, verhoogt nachtelijk wakker worden
+• Magnesiumglycinaat + L-theanine → diepe slaap toename
+
+Actief herstel:
+• Zone 1 (wandelen, langzaam fietsen) → doorbloeding zonder extra stressreactie
+• Koude blootstelling → ontstekingsremmend, parasympathisch activerend
+• Ademhalingsoefeningen (4-7-8 of box breathing) → cortisolreductie
+
+── TOEPASSING OP GEBRUIKERSDATA ──
+Gebruik altijd de actuele cijfers. Interpreteer zo:
+• Suunto herstelbalans negatief → accumulerende vermoeidheid; verlaag volume, geen nieuwe prikkel
+• Diepe slaap <60min → onvoldoende hormonaal herstel; reduceer trainingsintensiteit die dag
+• REM <90min → cognitief en motorisch herstel onvolledig; techniektraining minder effectief
+• Stappen >12.000 op "rustdag" → dit is actieve belasting; tel mee in wekelijks volume
+• Rust-HR stijgend tov baseline → vroeg signaal van overbelasting of ziekte; wees alert
+• HRV stabiel bij hogere trainingsbelasting → goede adaptatie, volume kan voorzichtig omhoog
+
 ═══ AUTOMATISCH OPSLAAN VAN VOEDING ═══
 Alleen als de gebruiker EXPLICIET in voltooid-verleden-tijd beschrijft dat hij/zij iets HEEFT gegeten of gedronken ("net gegeten", "vanmiddag had ik", "zojuist gedronken"), voeg dan ACHTERIN je antwoord dit blok toe — onzichtbaar voor de gebruiker:
 [AUTO_SAVE]{"beschrijving":"korte naam","maaltijd_type":"ontbijt|lunch|diner|snack|pre-workout|post-workout","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0}[/AUTO_SAVE]
