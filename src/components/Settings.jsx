@@ -22,6 +22,7 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [runalyzeForm, setRunalyzeForm] = useState({ api_token: '' })
   const [runalyzeConnecting, setRunalyzeConnecting] = useState(false)
   const [runalyzeSyncing, setRunalyzeSyncing] = useState(false)
+  const [runalyzeLaatste, setRunalyzeLaatste] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
 
@@ -133,7 +134,8 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
     try {
       const res = await api.post('/runalyze-sync', {})
       const debugInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} activiteit${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} overgeslagen)${debugInfo}` })
+      setRunalyzeLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, tijdstip: new Date() })
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend${debugInfo}` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Runalyze sync mislukt: ' + err.message })
     } finally {
@@ -384,12 +386,42 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
                 <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
                   Runalyze is gekoppeld. Activiteiten van je Suunto (en andere toestellen) worden gesynchroniseerd inclusief hartslagdata en trainingsanalyses.
                 </p>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: '8px' }}>
+                  🕕 Auto-sync elke ochtend om 07:00 (NL tijd). Suunto-data wordt 's nachts gesynchroniseerd naar Runalyze.
+                </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncRunalyze} disabled={runalyzeSyncing}>
                     {runalyzeSyncing ? '...' : '↻ Nu synchroniseren'}
                   </button>
                   <button className="btn btn-ghost" onClick={ontkoppelRunalyze}>Ontkoppelen</button>
                 </div>
+                {runalyzeLaatste && (
+                  <div style={{ marginTop: '12px', padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem' }}>
+                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: '6px' }}>
+                      Laatste sync: {runalyzeLaatste.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+                      {' — '}{runalyzeLaatste.nieuw.length} nieuw, {runalyzeLaatste.overgeslagen} al bekend
+                    </div>
+                    {runalyzeLaatste.nieuw.length > 0 ? (
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {runalyzeLaatste.nieuw.slice(0, 10).map((a, i) => (
+                          <li key={i} style={{ color: '#166534' }}>
+                            • <strong>{a.datum}</strong> — {a.sport}
+                            {a.titel && a.titel !== a.sport ? ` (${a.titel})` : ''}
+                            {a.duur_min ? ` — ${a.duur_min}min` : ''}
+                            {a.km ? ` — ${a.km}km` : ''}
+                            {a.kcal ? ` — ${a.kcal}kcal` : ''}
+                            {a.gem_hartslag ? ` — gem ${a.gem_hartslag}bpm` : ''}
+                          </li>
+                        ))}
+                        {runalyzeLaatste.nieuw.length > 10 && (
+                          <li style={{ color: '#166534', fontStyle: 'italic' }}>...en {runalyzeLaatste.nieuw.length - 10} meer</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <div style={{ color: '#166534', fontStyle: 'italic' }}>Geen nieuwe activiteiten — alle data is al up-to-date.</div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <>

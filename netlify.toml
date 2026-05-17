@@ -15,6 +15,9 @@
 [functions."coach-chat"]
   timeout = 26
 
+[functions."runalyze-cron"]
+  schedule = "0 6 * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
