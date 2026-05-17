@@ -286,37 +286,32 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
 
   let gesynchroniseerd = 0
   const nieuweActiviteiten = []
-  const BATCH = 200
-  for (let i = 0; i < nieuweRijen.length; i += BATCH) {
-    const batch = nieuweRijen.slice(i, i + BATCH)
-    const insertRows = batch.map(({ _km, _titel, _hoogte, _tss, user_id_placeholder, ...row }) => row)
+  for (const row of nieuweRijen) {
     const result = await sql`
       INSERT INTO trainingen
         (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
          zone2_min, zone3_min, zone4_min, stemming, notities, bron, suunto_id)
-      VALUES ${sql(insertRows,
-        'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag',
-        'zone2_min', 'zone3_min', 'zone4_min', 'stemming', 'notities', 'bron', 'suunto_id')}
+      VALUES
+        (${row.user_id}, ${row.datum}, ${row.sport}, ${row.duur_min}, ${row.kcal},
+         ${row.gem_hartslag}, ${row.max_hartslag}, ${row.zone2_min}, ${row.zone3_min},
+         ${row.zone4_min}, ${row.stemming}, ${row.notities}, ${row.bron}, ${row.suunto_id})
       ON CONFLICT (user_id, suunto_id) WHERE suunto_id IS NOT NULL DO NOTHING
       RETURNING suunto_id
     `
-    const ingevoerd = new Set(result.map(r => String(r.suunto_id)))
-    for (const row of batch) {
-      if (ingevoerd.has(String(row.suunto_id))) {
-        nieuweActiviteiten.push({
-          datum:        row.datum,
-          sport:        row.sport,
-          titel:        row._titel,
-          duur_min:     row.duur_min,
-          km:           row._km,
-          kcal:         row.kcal,
-          gem_hartslag: row.gem_hartslag,
-          hoogte:       row._hoogte,
-          tss:          row._tss,
-        })
-      }
+    if (result.length > 0) {
+      nieuweActiviteiten.push({
+        datum:        row.datum,
+        sport:        row.sport,
+        titel:        row._titel,
+        duur_min:     row.duur_min,
+        km:           row._km,
+        kcal:         row.kcal,
+        gem_hartslag: row.gem_hartslag,
+        hoogte:       row._hoogte,
+        tss:          row._tss,
+      })
+      gesynchroniseerd++
     }
-    gesynchroniseerd += result.length
   }
 
   return { gesynchroniseerd, overgeslagen, nieuweActiviteiten, debug }
@@ -513,34 +508,32 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   }
 
   let opgeslagen = 0
-  if (rows.length > 0) {
-    const BATCH = 100
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const batch = rows.slice(i, i + BATCH)
-      const res = await sql`
-        INSERT INTO dagelijkse_wellness
-          (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
-           hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, bron)
-        VALUES ${sql(batch, 'user_id', 'datum', 'slaap_uur', 'slaap_score', 'diepe_slaap_min', 'rem_slaap_min', 'lichte_slaap_min',
-                     'hrv_ochtend', 'herstel_balans', 'stress_pct', 'rust_hartslag', 'stappen', 'kcal_actief', 'bron')}
-        ON CONFLICT (user_id, datum) DO UPDATE SET
-          slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
-          slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
-          diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
-          rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
-          lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
-          hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
-          herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
-          stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
-          rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
-          stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
-          kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
-          bron             = EXCLUDED.bron,
-          updated_at       = NOW()
-        RETURNING datum
-      `
-      opgeslagen += res.length
-    }
+  for (const row of rows) {
+    const res = await sql`
+      INSERT INTO dagelijkse_wellness
+        (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
+         hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, bron)
+      VALUES
+        (${row.user_id}, ${row.datum}, ${row.slaap_uur}, ${row.slaap_score}, ${row.diepe_slaap_min},
+         ${row.rem_slaap_min}, ${row.lichte_slaap_min}, ${row.hrv_ochtend}, ${row.herstel_balans},
+         ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.bron})
+      ON CONFLICT (user_id, datum) DO UPDATE SET
+        slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
+        slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
+        diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
+        rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
+        lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
+        hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
+        herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
+        stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
+        rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
+        stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
+        kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
+        bron             = EXCLUDED.bron,
+        updated_at       = NOW()
+      RETURNING datum
+    `
+    opgeslagen += res.length
   }
 
   return { wellness_dagen: opgeslagen, debug }
