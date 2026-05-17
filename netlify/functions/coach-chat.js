@@ -266,19 +266,30 @@ export const handler = async (event) => {
     const naam = profiel?.name || 'gebruiker'
     const coachNaam = profiel?.coach_naam || 'APEX Coach'
     const leeftijd = profiel?.geboortejaar ? new Date().getFullYear() - profiel.geboortejaar : null
+    // Fallback naar leeftijd 35 als geboortejaar ontbreekt — anders krijgt user nooit TDEE
+    const leeftijdVoorBMR = leeftijd || 35
+    const leeftijdGeschat = !leeftijd
 
     let tdeeStr = ''
-    if (profiel?.gewicht_kg && profiel?.lengte_cm && leeftijd) {
+    let tdee = null
+    if (profiel?.gewicht_kg && profiel?.lengte_cm) {
       const bmr = profiel.geslacht?.toLowerCase() === 'vrouw'
-        ? (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijd) - 161
-        : (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijd) + 5
+        ? (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijdVoorBMR) - 161
+        : (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijdVoorBMR) + 5
+      // Activiteitsfactor o.b.v. weektotaal trainingsminuten (fysiologisch correct: volume telt, niet sessies)
       const echteT = weektraining.filter(t => t.sport !== 'herstel')
-      const actFactor = echteT.length >= 5 ? 1.725 : echteT.length >= 3 ? 1.55 : echteT.length >= 1 ? 1.375 : 1.2
-      const tdee = Math.round(bmr * actFactor)
+      const totaalMinW = echteT.reduce((s, t) => s + (t.duur_min || 0), 0)
+      const actFactor = totaalMinW >= 420 ? 1.725   // ≥7u/week — zware atleet
+                      : totaalMinW >= 240 ? 1.55    // ≥4u/week — actief
+                      : totaalMinW >= 120 ? 1.375   // ≥2u/week — licht actief
+                      : totaalMinW >= 30  ? 1.3
+                      : 1.2
+      tdee = Math.round(bmr * actFactor)
       const balans = totVandaag.kcal ? totVandaag.kcal - tdee : null
-      tdeeStr = `Geschatte TDEE: ~${tdee} kcal/dag (BMR × ${actFactor}, ${echteT.length} trainingen/week)
+      const ouderwetsLabel = leeftijdGeschat ? ' (leeftijd 35 aangenomen — vul geboortejaar in voor exacte berekening)' : ''
+      tdeeStr = `Geschatte TDEE: ~${tdee} kcal/dag (BMR × ${actFactor}, ${totaalMinW}min training/week)${ouderwetsLabel}
 Voedingsbalans vandaag: ${balans !== null ? `${balans > 0 ? '+' : ''}${balans} kcal` : 'onbekend'}${balans !== null ? ` (${balans > 400 ? 'grote surplus' : balans > 0 ? 'lichte surplus' : balans > -400 ? 'licht tekort' : 'groot tekort'})` : ''}
-Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toFixed(1) : '?'} g/kg (aanbevolen: 1.6–2.2 g/kg voor sporters)`
+Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toFixed(1) : '?'} g/kg`
     }
 
     const stijlInstructie = {
@@ -362,8 +373,19 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
         }).join('\n')
       : '  Geen actieve doelen'
 
-    const minEiwit = profiel?.gewicht_kg ? Math.round(profiel.gewicht_kg * 1.6) : 120
+    // Eiwit-aanbeveling schalen naar sport + volume (i.p.v. blind 1.6 g/kg)
     const echteTrainingenW = weektraining.filter(t => t.sport !== 'herstel')
+    const totaalMinWeek = echteTrainingenW.reduce((s, t) => s + (t.duur_min || 0), 0)
+    const sporten = profiel?.sporten || []
+    const heeftKracht = sporten.some(s => ['fitness', 'hyrox', 'crossfit'].includes(s))
+    const heeftDuursport = sporten.some(s => ['hardlopen', 'fietsen', 'wielrennen', 'zwemmen'].includes(s))
+    // 0.8 sedentair, 1.2 recreatief, 1.4 duursport, 1.6 kracht/hyrox, 2.0 cut+kracht
+    let eiwitPerKg = 0.8
+    if (totaalMinWeek >= 30) eiwitPerKg = 1.2
+    if (totaalMinWeek >= 120 && heeftDuursport) eiwitPerKg = 1.4
+    if (heeftKracht && totaalMinWeek >= 60) eiwitPerKg = 1.6
+    if (heeftKracht && tdee && totVandaag.kcal && totVandaag.kcal < tdee - 300) eiwitPerKg = 2.0
+    const minEiwit = profiel?.gewicht_kg ? Math.round(profiel.gewicht_kg * eiwitPerKg) : 100
     const recentHrv = hrvTrend[0]?.hrv_ochtend || null
     const recentSlaap = hrvTrend[0]?.slaap_uur || null
 
@@ -409,15 +431,21 @@ Wacht NOOIT tot de gebruiker vraagt. Analyseer de data en reageer proactief:
 • HRV < 45ms of slaap < 6u → waarschuw direct: geen intensieve training, prioriteit herstel
 • HRV > 55ms + minder dan 2 trainingen/week → daag uit: "Je lichaam is klaar, wanneer ga je trainen?"
 • Kcal < TDEE − 400 op een trainingsdag → wijs op ondervoedering en herstelrisico
-• Eiwit < ${minEiwit}g/dag (1.6g/kg) → geef concreet plan om dit aan te vullen
+• Eiwit < ${minEiwit}g/dag (${eiwitPerKg}g/kg, afgestemd op sportprofiel) → geef concreet plan om dit aan te vullen
 • Zone2-training < 60min/week → adviseer aerobe basis opbouwen voor vetverbranding en herstel
 • Geen hersteldata gelogd → herinner aan ochtend HRV/slaap log
 Geef altijd een concrete aanbeveling voor de VOLGENDE 24 uur als dat relevant is.
 
 ═══ AUTOMATISCH OPSLAAN VAN VOEDING ═══
-Als de gebruiker beschrijft dat hij/zij iets heeft GEGETEN of GEDRONKEN (een feit, geen vraag), voeg dan ACHTERIN je antwoord dit blok toe — onzichtbaar voor de gebruiker:
+Alleen als de gebruiker EXPLICIET in voltooid-verleden-tijd beschrijft dat hij/zij iets HEEFT gegeten of gedronken ("net gegeten", "vanmiddag had ik", "zojuist gedronken"), voeg dan ACHTERIN je antwoord dit blok toe — onzichtbaar voor de gebruiker:
 [AUTO_SAVE]{"beschrijving":"korte naam","maaltijd_type":"ontbijt|lunch|diner|snack|pre-workout|post-workout","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0}[/AUTO_SAVE]
-Combineer meerdere producten die samen gegeten zijn in één entry. Gebruik standaard porties als geen hoeveelheid gegeven is. Doe dit NIET bij vragen over voeding of macro-berekeningen zonder dat de gebruiker aangeeft het gegeten te hebben.
+Combineer meerdere producten die samen gegeten zijn in één entry. Gebruik standaard porties als geen hoeveelheid gegeven is.
+DOE DIT ABSOLUUT NIET BIJ:
+• Vragen ("hoeveel kcal in X?", "wat zit er in Y?", "mag ik Z eten?")
+• Hypothetische plannen ("vanavond wil ik...", "ik denk aan...")
+• Algemene voorkeuren ("ik hou van pizza", "ik eet meestal...")
+• Voedingsfeiten of berekeningen zonder duidelijk consumptiemoment
+Bij twijfel: SLA NIET OP. De gebruiker kan altijd handmatig loggen via de maaltijden-pagina.
 
 ═══ GEBRUIKERSPROFIEL ═══
 Naam: ${naam}${leeftijd ? ` | ${leeftijd} jaar` : ''}${profiel?.geslacht ? ` | ${profiel.geslacht}` : ''}
@@ -483,22 +511,34 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
       if (autoSaveMatch) {
         try {
           const d = JSON.parse(autoSaveMatch[1].trim())
-          if (d.beschrijving && (d.kcal || d.eiwit_g)) {
+          const kcal = Number(d.kcal)
+          const eiwit = Number(d.eiwit_g)
+          // Strict validatie: realistische macro-waarden, geen 0/NaN, en niet duidelijk een vraag
+          const userVraag = (bericht || '').toLowerCase()
+          const lijktVraag = /\?$|^(hoeveel|wat|hoe veel|kan ik|mag ik|moet ik)\b/.test(userVraag.trim())
+          const geldigeMaaltijd = d.beschrijving
+            && typeof d.beschrijving === 'string'
+            && d.beschrijving.length >= 2
+            && Number.isFinite(kcal) && kcal >= 30 && kcal <= 4000
+            && Number.isFinite(eiwit) && eiwit >= 0 && eiwit <= 300
+            && !lijktVraag
+          if (geldigeMaaltijd) {
             const vandaagStr = new Date().toISOString().split('T')[0]
             const maaltijdType = d.maaltijd_type || getMaaltijdType()
             const [row] = await sql`
               INSERT INTO maaltijden (user_id, datum, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g)
               VALUES (${userId}, ${vandaagStr}, ${maaltijdType}, ${d.beschrijving},
-                ${d.kcal || null}, ${d.eiwit_g || null}, ${d.koolhydraten_g || null}, ${d.vetten_g || null})
+                ${kcal}, ${eiwit}, ${Number(d.koolhydraten_g) || null}, ${Number(d.vetten_g) || null})
               RETURNING id`
             opgeslagen = {
-              type: 'maaltijd', id: row.id, data: d,
+              type: 'maaltijd', id: row.id, data: { ...d, kcal, eiwit_g: eiwit },
               label: `${d.beschrijving} (${maaltijdType})`,
-              samenvatting: `${d.beschrijving} — ${d.kcal}kcal | ${d.eiwit_g}g eiwit | ${d.koolhydraten_g}g kh | ${d.vetten_g}g vet`
+              samenvatting: `${d.beschrijving} — ${kcal}kcal | ${eiwit}g eiwit | ${d.koolhydraten_g || 0}g kh | ${d.vetten_g || 0}g vet`
             }
+          } else {
+            console.warn('AUTO_SAVE geweigerd:', { lijktVraag, kcal, eiwit, beschrijving: d.beschrijving })
           }
         } catch (err) { console.error('AUTO_SAVE parse fout:', err) }
-        // Strip het blok uit het antwoord
         antwoord = antwoord.replace(/\s*\[AUTO_SAVE\][\s\S]*?\[\/AUTO_SAVE\]/, '').trim()
       }
     }

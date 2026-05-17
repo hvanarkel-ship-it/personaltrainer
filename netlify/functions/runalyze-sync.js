@@ -150,12 +150,14 @@ export const handler = async (event) => {
     const BATCH = 200
     for (let i = 0; i < nieuweRijen.length; i += BATCH) {
       const batch = nieuweRijen.slice(i, i + BATCH)
-      await sql`
+      const result = await sql`
         INSERT INTO trainingen
           (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, hrv_ochtend, notities, bron, runalyze_id)
         VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'hrv_ochtend', 'notities', 'bron', 'runalyze_id')}
+        ON CONFLICT (user_id, runalyze_id) WHERE runalyze_id IS NOT NULL DO NOTHING
+        RETURNING id
       `
-      gesynchroniseerd += batch.length
+      gesynchroniseerd += result.length
     }
 
     return cors({ success: true, gesynchroniseerd, overgeslagen, debug })

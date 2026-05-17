@@ -148,8 +148,21 @@ CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datu
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user       ON gesprekken(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doelen_user           ON doelen(user_id, actief);
-CREATE INDEX IF NOT EXISTS idx_trainingen_intervals_id ON trainingen(intervals_id) WHERE intervals_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_trainingen_runalyze_id ON trainingen(runalyze_id) WHERE runalyze_id IS NOT NULL;
+-- UNIQUE per (user, externe_id) — voorkomt duplicates bij gelijktijdige syncs (race condition)
+-- Eerst bestaande duplicates opruimen (behoud laagste id per groep)
+DELETE FROM trainingen a USING trainingen b
+  WHERE a.id > b.id AND a.user_id = b.user_id
+    AND a.intervals_id IS NOT NULL AND a.intervals_id = b.intervals_id;
+DELETE FROM trainingen a USING trainingen b
+  WHERE a.id > b.id AND a.user_id = b.user_id
+    AND a.runalyze_id IS NOT NULL AND a.runalyze_id = b.runalyze_id;
+
+DROP INDEX IF EXISTS idx_trainingen_intervals_id;
+DROP INDEX IF EXISTS idx_trainingen_runalyze_id;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_intervals_id
+  ON trainingen(user_id, intervals_id) WHERE intervals_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_runalyze_id
+  ON trainingen(user_id, runalyze_id) WHERE runalyze_id IS NOT NULL;
 
 -- ── Trigger: auto-update user_profile.updated_at ──────────────────────────
 

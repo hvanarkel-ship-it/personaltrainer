@@ -116,7 +116,10 @@ CREATE INDEX IF NOT EXISTS idx_trainingen_user_datum ON trainingen(user_id, datu
 CREATE INDEX IF NOT EXISTS idx_maaltijden_user_datum ON maaltijden(user_id, datum DESC);
 CREATE INDEX IF NOT EXISTS idx_gesprekken_user ON gesprekken(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doelen_user ON doelen(user_id, actief);
-CREATE INDEX IF NOT EXISTS idx_trainingen_intervals_id ON trainingen(intervals_id) WHERE intervals_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_intervals_id
+  ON trainingen(user_id, intervals_id) WHERE intervals_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_runalyze_id
+  ON trainingen(user_id, runalyze_id) WHERE runalyze_id IS NOT NULL;
 
 -- Auto-update user_profile timestamp
 CREATE OR REPLACE FUNCTION update_profile_timestamp()

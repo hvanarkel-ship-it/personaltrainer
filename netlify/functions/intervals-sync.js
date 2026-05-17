@@ -126,12 +126,14 @@ export const handler = async (event) => {
       const BATCH = 200
       for (let i = 0; i < nieuweRijen.length; i += BATCH) {
         const batch = nieuweRijen.slice(i, i + BATCH)
-        await sql`
+        const result = await sql`
           INSERT INTO trainingen
             (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, notities, bron, intervals_id)
           VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'notities', 'bron', 'intervals_id')}
+          ON CONFLICT (user_id, intervals_id) WHERE intervals_id IS NOT NULL DO NOTHING
+          RETURNING id
         `
-        gesynchroniseerd += batch.length
+        gesynchroniseerd += result.length
       }
     } else {
       const errText = await activitiesRes.text()
