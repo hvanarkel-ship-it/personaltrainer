@@ -2,10 +2,10 @@
 // Docs: https://apizone.suunto.com (login required)
 // Env vars nodig: SUUNTO_CLIENT_ID, SUUNTO_CLIENT_SECRET, SUUNTO_SUBSCRIPTION_KEY
 
-// TODO: verifieer deze URL's in jouw Suunto developer portal
-export const SUUNTO_AUTH_URL   = 'https://apizone.suunto.com/oauth/authorize'
-export const SUUNTO_TOKEN_URL  = 'https://apizone.suunto.com/oauth/token'
-export const SUUNTO_API_BASE   = 'https://apizone.suunto.com'
+// Suunto Cloud API OAuth2 endpoints
+export const SUUNTO_AUTH_URL   = 'https://cloudapi-oauth.suunto.com/oauth/authorize'
+export const SUUNTO_TOKEN_URL  = 'https://cloudapi-oauth.suunto.com/oauth/token'
+export const SUUNTO_API_BASE   = 'https://cloudapi.suunto.com'
 
 export function suuntoHeaders(accessToken) {
   const headers = {
