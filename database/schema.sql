@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS user_profile (
   intervals_athlete_id TEXT,
   intervals_api_key TEXT,
   runalyze_api_token TEXT,
+  suunto_access_token  TEXT,
+  suunto_refresh_token TEXT,
+  suunto_token_expiry  TIMESTAMPTZ,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -66,6 +69,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   bron TEXT DEFAULT 'handmatig',
   intervals_id TEXT,
   runalyze_id TEXT,
+  suunto_id   TEXT,
   rpe SMALLINT,
   stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()

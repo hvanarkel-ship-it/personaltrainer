@@ -18,6 +18,9 @@
 [functions."runalyze-cron"]
   schedule = "0 6 * * *"
 
+[functions."suunto-sync"]
+  timeout = 26
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

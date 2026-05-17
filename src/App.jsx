@@ -82,6 +82,7 @@ export default function App() {
   const [updateReg, setUpdateReg] = useState(null)
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
+  const [suuntoStatus, setSuuntoStatus] = useState(() => new URLSearchParams(window.location.search).get('suunto'))
 
   useEffect(() => {
     // Auth
@@ -159,6 +160,14 @@ export default function App() {
     window.location.reload()
   }
 
+  // Na Suunto OAuth callback: navigeer naar instellingen en toon resultaat
+  useEffect(() => {
+    if (suuntoStatus && user) {
+      window.history.replaceState({}, '', window.location.pathname)
+      setScherm('settings')
+    }
+  }, [suuntoStatus, user])
+
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (resetToken) return (
     <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {
@@ -223,6 +232,7 @@ export default function App() {
         <Scherm
           user={user}
           {...navProps}
+          {...(scherm === 'settings' ? { suuntoStatus, onSuuntoStatusClear: () => setSuuntoStatus(null) } : {})}
         />
       )}
 

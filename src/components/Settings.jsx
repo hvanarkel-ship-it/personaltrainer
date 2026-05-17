@@ -10,7 +10,7 @@ const STIJLEN = [
   { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
 ]
 
-export default function Settings({ user, onNavigeer, onUitloggen }) {
+export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, onSuuntoStatusClear }) {
   const [tab, setTab] = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden] = useState(true)
@@ -23,6 +23,8 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [runalyzeConnecting, setRunalyzeConnecting] = useState(false)
   const [runalyzeSyncing, setRunalyzeSyncing] = useState(false)
   const [runalyzeLaatste, setRunalyzeLaatste] = useState(null)
+  const [suuntoSyncing, setSuuntoSyncing] = useState(false)
+  const [suuntoLaatste, setSuuntoLaatste] = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
 
@@ -46,6 +48,7 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
         intervals_verbonden: !!data.intervals_athlete_id,
         intervals_athlete_id: data.intervals_athlete_id || null,
         runalyze_verbonden: !!data.runalyze_verbonden,
+        suunto_verbonden:   !!data.suunto_verbonden,
       })
     } catch {
       setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
@@ -108,6 +111,42 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       await api.put('/profiel', { ontkoppel_intervals: true })
       setProfiel(p => ({ ...p, intervals_verbonden: false, intervals_athlete_id: null }))
       setMelding({ type: 'success', tekst: 'Intervals.icu ontkoppeld.' })
+    } catch {
+      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
+    }
+  }
+
+  async function verbindSuunto() {
+    setMelding(null)
+    try {
+      const { url } = await api.get('/suunto-connect')
+      window.location.href = url
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Suunto koppelen mislukt: ' + err.message })
+    }
+  }
+
+  async function syncSuunto() {
+    setSuuntoSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/suunto-sync', {})
+      const fout = res.debug?.workouts_error ? ` ⚠️ ${res.debug.workouts_error}` : ''
+      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, tijdstip: new Date() })
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend${fout}` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Suunto sync mislukt: ' + err.message })
+    } finally {
+      setSuuntoSyncing(false)
+    }
+  }
+
+  async function ontkoppelSuunto() {
+    try {
+      await api.put('/profiel', { ontkoppel_suunto: true })
+      setProfiel(p => ({ ...p, suunto_verbonden: false }))
+      setSuuntoLaatste(null)
+      setMelding({ type: 'success', tekst: 'Suunto ontkoppeld.' })
     } catch {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
@@ -365,6 +404,87 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
                     {intervalsConnecting ? 'Verbinden...' : 'Verbinden met Intervals.icu'}
                   </button>
                 </div>
+              </>
+            )}
+          </div>
+
+          {/* Suunto callback melding */}
+          {suuntoStatus && (
+            <div style={{
+              padding: '12px 16px', borderRadius: 10, marginBottom: 12, fontSize: '0.875rem', fontWeight: 600,
+              background: suuntoStatus === 'verbonden' ? '#f0fdf4' : '#fff1f2',
+              border: `1px solid ${suuntoStatus === 'verbonden' ? '#bbf7d0' : '#fecdd3'}`,
+              color: suuntoStatus === 'verbonden' ? '#166534' : '#be123c',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span>{suuntoStatus === 'verbonden' ? '✓ Suunto succesvol gekoppeld! Klik op "Nu synchroniseren" om je workouts te importeren.' : `Suunto koppelen mislukt. Probeer opnieuw.`}</span>
+              <button onClick={() => { onSuuntoStatusClear?.(); laadProfiel() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', color: 'inherit' }}>×</button>
+            </div>
+          )}
+
+          {/* Suunto */}
+          <div className="card integratie-card">
+            <div className="integratie-header">
+              <div className="integratie-logo" style={{ background: '#e3f2fd', fontSize: '0.7rem', fontWeight: 800, color: '#1565c0', letterSpacing: '-0.5px' }}>SUN</div>
+              <div className="integratie-info">
+                <strong>Suunto</strong>
+                <span>Directe workout import via OAuth</span>
+              </div>
+              <span className={`integratie-badge ${profiel.suunto_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.suunto_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              </span>
+            </div>
+            {profiel.suunto_verbonden ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: 10 }}>
+                  Suunto is gekoppeld. Workouts worden direct vanuit de Suunto cloud gesynchroniseerd.
+                </p>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncSuunto} disabled={suuntoSyncing}>
+                    {suuntoSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={ontkoppelSuunto}>Ontkoppelen</button>
+                </div>
+                {suuntoLaatste && (
+                  <div style={{ marginTop: 12, padding: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: '0.82rem' }}>
+                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: 6 }}>
+                      Laatste sync: {suuntoLaatste.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+                      {' — '}{suuntoLaatste.nieuw.length} nieuw, {suuntoLaatste.overgeslagen} al bekend
+                    </div>
+                    {suuntoLaatste.nieuw.length > 0 ? (
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {suuntoLaatste.nieuw.slice(0, 10).map((a, i) => (
+                          <li key={i} style={{ color: '#166534' }}>
+                            • <strong>{a.datum}</strong> — {a.sport}
+                            {a.titel && a.titel !== a.sport ? ` (${a.titel})` : ''}
+                            {a.duur_min ? ` — ${a.duur_min}min` : ''}
+                            {a.km ? ` — ${a.km}km` : ''}
+                            {a.kcal ? ` — ${a.kcal}kcal` : ''}
+                            {a.gem_hartslag ? ` — gem ${a.gem_hartslag}bpm` : ''}
+                          </li>
+                        ))}
+                        {suuntoLaatste.nieuw.length > 10 && (
+                          <li style={{ color: '#166534', fontStyle: 'italic' }}>...en {suuntoLaatste.nieuw.length - 10} meer</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <div style={{ color: '#166534', fontStyle: 'italic' }}>Alle data al up-to-date.</div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: 10 }}>
+                  Koppel Suunto direct via OAuth2 voor automatische workout import. Je hebt een Suunto developer account nodig met <code>client_id</code>, <code>client_secret</code> en <code>subscription_key</code>.
+                </p>
+                <button
+                  className="btn btn-full"
+                  onClick={verbindSuunto}
+                  style={{ background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', marginTop: 12 }}
+                >
+                  Verbinden met Suunto →
+                </button>
               </>
             )}
           </div>

@@ -17,7 +17,8 @@ export const handler = async (event) => {
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
           p.intervals_athlete_id, p.updated_at,
-          CASE WHEN p.runalyze_api_token IS NOT NULL THEN true ELSE false END AS runalyze_verbonden
+          CASE WHEN p.runalyze_api_token   IS NOT NULL THEN true ELSE false END AS runalyze_verbonden,
+          CASE WHEN p.suunto_access_token IS NOT NULL THEN true ELSE false END AS suunto_verbonden
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
@@ -45,9 +46,17 @@ export const handler = async (event) => {
 
       if (d.ontkoppel_runalyze) {
         await sql`
+          UPDATE user_profile SET runalyze_api_token = NULL, updated_at = NOW()
+          WHERE user_id = ${userId}
+        `
+        return cors({ success: true })
+      }
+
+      if (d.ontkoppel_suunto) {
+        await sql`
           UPDATE user_profile SET
-            runalyze_api_token = NULL,
-            updated_at = NOW()
+            suunto_access_token = NULL, suunto_refresh_token = NULL,
+            suunto_token_expiry = NULL, updated_at = NOW()
           WHERE user_id = ${userId}
         `
         return cors({ success: true })

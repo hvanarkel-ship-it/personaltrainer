@@ -133,6 +133,12 @@ ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone4_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS bron TEXT DEFAULT 'handmatig';
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS intervals_id TEXT;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS runalyze_id TEXT;
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS suunto_id   TEXT;
+
+-- user_profile: Suunto OAuth tokens
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_access_token  TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_refresh_token TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_token_expiry  TIMESTAMPTZ;
 
 -- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
@@ -163,6 +169,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_intervals_id
   ON trainingen(user_id, intervals_id) WHERE intervals_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_runalyze_id
   ON trainingen(user_id, runalyze_id) WHERE runalyze_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_suunto_id
+  ON trainingen(user_id, suunto_id) WHERE suunto_id IS NOT NULL;
 
 -- ── Trigger: auto-update user_profile.updated_at ──────────────────────────
 
