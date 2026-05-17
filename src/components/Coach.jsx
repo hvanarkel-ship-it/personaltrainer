@@ -35,6 +35,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   const inputRef = useRef(null)
   const fileRef = useRef(null)
   const recognitionRef = useRef(null)
+  const scrollInstantRef = useRef(false)
 
   const heeftStem = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
@@ -72,14 +73,16 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   useEffect(() => {
     api.get('/coach-chat')
       .then(rows => {
-        if (!rows?.length) { setHistLaden(false); return }
+        if (!rows?.length) return
         const geladen = rows.map(r => ({
           rol: r.is_ai ? 'ai' : 'user',
           tekst: r.bericht,
           datum: r.created_at,
           upload_type: r.upload_type,
         }))
+        scrollInstantRef.current = true
         setBerichten(geladen)
+        setNieuweMsg(true)
       })
       .catch(() => {})
       .finally(() => setHistLaden(false))
@@ -95,7 +98,11 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   }, [coachTrigger, histLaden])
 
   useEffect(() => {
-    if (nieuweMsg) { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); setNieuweMsg(false) }
+    if (nieuweMsg) {
+      bottomRef.current?.scrollIntoView({ behavior: scrollInstantRef.current ? 'instant' : 'smooth' })
+      scrollInstantRef.current = false
+      setNieuweMsg(false)
+    }
   }, [berichten, nieuweMsg])
 
   function selectUploadType(type) {

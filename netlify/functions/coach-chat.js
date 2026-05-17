@@ -232,7 +232,7 @@ export const handler = async (event) => {
           zone2_min, zone3_min, zone4_min, notities
         FROM trainingen WHERE user_id = ${userId}
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
-      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 60`
+      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 100`
     ])
     opgeslagen = _opgeslagen
 
@@ -474,7 +474,7 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
       { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : userContent }
     ]
 
-    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1600, system: systemPrompt, messages })
+    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 2500, system: systemPrompt, messages })
     let antwoord = response.content[0].text
 
     // ── Check voor AUTO_SAVE blok in AI response (fallback als haiku/regex niets vindt) ──
