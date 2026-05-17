@@ -15,7 +15,6 @@ function berekenGereedheid(h) {
   }
   if (h.herstelbalans != null) {
     const v = parseFloat(h.herstelbalans)
-    // Suunto Body Resources is 0–100%; traditionele herstelbalans is -20 tot +20
     const isPct = Math.abs(v) > 20
     const score = isPct
       ? (v >= 90 ? 100 : v >= 75 ? 80 : v >= 60 ? 60 : v >= 45 ? 40 : 20)
@@ -29,28 +28,57 @@ function berekenGereedheid(h) {
 
 function gereedheidsInfo(score) {
   if (score >= 75) return {
-    kleur: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', ring: '#86efac',
+    kleur: '#16a34a', bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+    border: '#bbf7d0', ringFrom: '#22c55e', ringTo: '#16a34a',
     label: 'Klaar voor intensief',
     advies: 'Je lichaam is goed hersteld. Ideaal voor een zware training of nieuwe prikkel.',
     aangeraden: 'Interval, krachttraining of hoge intensiteit',
-    icon: '🟢',
+    badge: 'GO',
   }
   if (score >= 50) return {
-    kleur: '#b45309', bg: '#fffbeb', border: '#fcd34d', ring: '#fde68a',
+    kleur: '#b45309', bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+    border: '#fcd34d', ringFrom: '#fbbf24', ringTo: '#d97706',
     label: 'Matige intensiteit',
-    advies: 'Houd het bij zone 2 duurtraining of techniekwerk. Vermijd maximale inspanning.',
+    advies: 'Zone 2 duurtraining of techniekwerk aanbevolen.',
     aangeraden: 'Zone 2 duurtraining of mobiliteit (45–60 min)',
-    icon: '🟡',
+    badge: 'OK',
   }
   return {
-    kleur: '#dc2626', bg: '#fef2f2', border: '#fca5a5', ring: '#fecaca',
+    kleur: '#dc2626', bg: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+    border: '#fca5a5', ringFrom: '#f87171', ringTo: '#dc2626',
     label: 'Herstel aanbevolen',
     advies: 'Intensief trainen vertraagt je herstel. Prioriteer slaap en voeding.',
     aangeraden: 'Actief herstel: wandelen, yoga of volledige rust',
-    icon: '🔴',
+    badge: 'REST',
   }
 }
 
+function GereedheidsRing({ score, gInfo }) {
+  const size = 120
+  const stroke = 10
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const dash = (score / 100) * circ
+
+  return (
+    <div className="gereedheid-ring-wrap">
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+        <circle
+          cx={size/2} cy={size/2} r={r} fill="none"
+          stroke={gInfo.ringFrom} strokeWidth={stroke}
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(0.4,0,0.2,1)' }}
+        />
+      </svg>
+      <div className="gereedheid-ring-inner">
+        <span className="gereedheid-ring-pct">{score}</span>
+        <span className="gereedheid-ring-sym">%</span>
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [data, setData] = useState(null)
@@ -114,61 +142,69 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     ? Math.floor((Date.now() - new Date(datumStr(h.datum) + 'T12:00:00').getTime()) / 86400000)
     : null
 
-  // 7-daagse HRV trend vanuit weektrainingen
   const pad2 = n => String(n).padStart(2, '0')
   const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
   const vandaag = dagStr(new Date())
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = dagStr(d)
-    const trainingRecord = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
-    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: trainingRecord?.hrv_ochtend || null, isVandaag: ds === vandaag }
+    const rec = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
+    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: rec?.hrv_ochtend || null, isVandaag: ds === vandaag }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
   const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
   const hrvTrendLaag = recenteHrv.length >= 3 && recenteHrv.slice(-3).every(d => d.hrv < 45)
 
-  // Weektraining stats (excl. herstel-only records)
   const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
   const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
   const weekKcal = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
   const heeftTrainingVandaag = echteTrainingen.some(t => datumStr(t.datum) === vandaag)
 
+  const voornaam = (p.name || user.name)?.split(' ')[0]
+
   return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Hey, {(p.name || user.name)?.split(' ')[0]} 👋</h1>
-          <p className="subtitle">{dag}</p>
-        </div>
-        <button className="icon-btn" onClick={onUitloggen} title="Uitloggen"><span>⎋</span></button>
-      </header>
+    <div className="page dash-page">
 
-      {/* ══ HERSTEL & GEREEDHEID — Hero card ══ */}
-      <div className="card herstel-hero-card">
-        <div className="card-header">
-          <h3>Herstel & Gereedheid</h3>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
-              onClick={() => setToonOchtendForm(f => !f)}
-            >
-              {toonOchtendForm ? 'Annuleer' : '+ Log ochtend'}
-            </button>
+      {/* ── HERO HEADER ── */}
+      <div className="dash-hero">
+        <div className="dash-hero-text">
+          <h1 className="dash-hero-name">Hey, {voornaam}</h1>
+          <p className="dash-hero-dag">{dag}</p>
+          {streak >= 2 && (
+            <span className="dash-streak-pill">🔥 {streak} dagen streak</span>
+          )}
+        </div>
+        <button className="icon-btn dash-logout-btn" onClick={onUitloggen} title="Uitloggen">
+          <span>⎋</span>
+        </button>
+      </div>
+
+      {/* ── GEREEDHEID HERO CARD ── */}
+      <div className="card dash-gereedheid-card" style={gInfo ? { background: gInfo.bg, borderColor: gInfo.border } : {}}>
+        <div className="dash-gereedheid-header">
+          <div>
+            <h3 className="dash-gereedheid-titel">Gereedheid vandaag</h3>
+            {gInfo && <span className="dash-gereedheid-label" style={{ color: gInfo.kleur }}>{gInfo.label}</span>}
           </div>
+          <button
+            className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
+            onClick={() => setToonOchtendForm(f => !f)}
+          >
+            {toonOchtendForm ? 'Annuleer' : '+ Ochtend'}
+          </button>
         </div>
 
-        {/* Inline ochtend log form */}
+        {/* Ochtend log form */}
         {toonOchtendForm && (
           <div className="ochtend-form">
             <p className="ochtend-form-intro">Log je ochtendmetingen voor trainingsadvies op maat:</p>
             <div className="ochtend-form-grid">
               <div className="form-group">
-                <label>HRV (ms) *</label>
+                <label>HRV (ms)</label>
                 <input type="number" value={oForm.hrv_ochtend} onChange={e => setOForm(f => ({ ...f, hrv_ochtend: e.target.value }))} placeholder="65" autoFocus />
               </div>
               <div className="form-group">
-                <label>Slaap (uur) *</label>
+                <label>Slaap (uur)</label>
                 <input type="number" step="0.1" value={oForm.slaap_uur} onChange={e => setOForm(f => ({ ...f, slaap_uur: e.target.value }))} placeholder="7.5" />
               </div>
               <div className="form-group">
@@ -199,169 +235,164 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
         )}
 
-        {/* Leeg staat */}
+        {/* Lege staat */}
         {!heeftHerstelData && !toonOchtendForm && (
-          <div className="herstel-leeg">
-            <div className="herstel-leeg-icon">📊</div>
+          <div className="dash-gereedheid-leeg">
+            <div className="dash-gereedheid-leeg-icon">📊</div>
             <div>
-              <strong>Log dagelijks je ochtenddata</strong>
-              <p>HRV en slaap vormen de basis van je trainingsplanning. Zonder deze data kan de coach geen gerichte adviezen geven.</p>
+              <strong>Log je ochtenddata</strong>
+              <p>HRV en slaap vormen de basis van je trainingsplanning.</p>
             </div>
             <button className="btn btn-primary" onClick={() => setToonOchtendForm(true)}>
-              Start: log HRV & slaap
+              Start logging
             </button>
           </div>
         )}
 
-        {/* Gereedheid score + advies */}
+        {/* Score ring + metrics */}
         {heeftHerstelData && !toonOchtendForm && (
-          <>
+          <div className="dash-gereedheid-content">
             {herstelDagen > 1 && (
-              <p className="stale-warning">⚠️ Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden — log vandaag je ochtenddata</p>
+              <p className="stale-warning">⚠️ Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden</p>
             )}
 
-            {gInfo && (
-              <div className="gereedheid-banner" style={{ background: gInfo.bg, borderColor: gInfo.border }}>
-                <div className="gereedheid-ring" style={{ borderColor: gInfo.ring, color: gInfo.kleur }}>
-                  <span className="gereedheid-pct">{gereedheid}</span>
-                  <span className="gereedheid-sym">%</span>
-                </div>
-                <div className="gereedheid-tekst">
-                  <strong style={{ color: gInfo.kleur }}>{gInfo.icon} {gInfo.label}</strong>
-                  <p>{gInfo.advies}</p>
-                  <p className="gereedheid-aangeraden">→ {gInfo.aangeraden}</p>
-                </div>
-              </div>
-            )}
+            <div className="dash-gereedheid-body">
+              {gInfo && gereedheid !== null && (
+                <GereedheidsRing score={gereedheid} gInfo={gInfo} />
+              )}
 
-            <div className="metrics-grid metrics-grid--3" style={{ marginTop: 12 }}>
-              <div className="metric-card">
-                <div className="metric-icon">💓</div>
-                <div className="metric-value">{h.hrv_ochtend || '—'}</div>
-                <div className="metric-label">HRV (ms)</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">😴</div>
-                <div className="metric-value">{h.slaap_uur || '—'}</div>
-                <div className="metric-label">Slaap (uur)</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">🔋</div>
-                <div className="metric-value">{h.herstelbalans != null ? `${Math.round(h.herstelbalans)}%` : '—'}</div>
-                <div className="metric-label">Reserves</div>
+              <div className="dash-gereedheid-metrics">
+                <div className="dash-metric-pill">
+                  <span className="dash-metric-icon">💓</span>
+                  <div>
+                    <span className="dash-metric-val">{h.hrv_ochtend || '—'}</span>
+                    <span className="dash-metric-unit">ms HRV</span>
+                  </div>
+                </div>
+                <div className="dash-metric-pill">
+                  <span className="dash-metric-icon">😴</span>
+                  <div>
+                    <span className="dash-metric-val">{h.slaap_uur || '—'}</span>
+                    <span className="dash-metric-unit">uur slaap</span>
+                  </div>
+                </div>
+                <div className="dash-metric-pill">
+                  <span className="dash-metric-icon">🔋</span>
+                  <div>
+                    <span className="dash-metric-val">
+                      {h.herstelbalans != null ? `${Math.round(h.herstelbalans)}${Math.abs(parseFloat(h.herstelbalans)) > 20 ? '%' : ''}` : '—'}
+                    </span>
+                    <span className="dash-metric-unit">reserves</span>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {gInfo && (
+              <div className="dash-gereedheid-advies">
+                <span className="dash-advies-arrow">→</span>
+                <span>{gInfo.aangeraden}</span>
+              </div>
+            )}
+
             {/* 7-daagse HRV trend */}
             {heeftHrvTrend && (
-              <>
+              <div className="dash-hrv-trend-wrap">
                 {hrvTrendLaag && (
-                  <p className="hrv-waarschuwing">⚠️ Je HRV is de laatste dagen laag — herstel heeft voorrang op intensiteit.</p>
+                  <p className="hrv-waarschuwing">⚠️ HRV laag — herstel heeft voorrang</p>
                 )}
-                <div className="hrv-trend">
-                  {hrv7Dagen.map((d, i) => {
-                    const kleur = !d.hrv ? '#e5e7eb'
+                <div className="dash-hrv-trend">
+                  {hrv7Dagen.map((d) => {
+                    const kleur = !d.hrv ? 'var(--border)'
                       : d.hrv >= 60 ? '#22c55e'
                       : d.hrv >= 45 ? '#eab308'
                       : '#ef4444'
                     return (
-                      <div key={d.datum} className={`hrv-dag ${d.isVandaag ? 'hrv-dag--vandaag' : ''}`}>
-                        <div className="hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
-                        {d.hrv && <span className="hrv-val">{d.hrv}</span>}
-                        <span className="hrv-label">{d.label}</span>
+                      <div key={d.datum} className={`dash-hrv-dag ${d.isVandaag ? 'dash-hrv-dag--vandaag' : ''}`}>
+                        <div className="dash-hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
+                        {d.hrv && <span className="dash-hrv-val">{d.hrv}</span>}
+                        <span className="dash-hrv-lbl">{d.label.slice(0, 2)}</span>
                       </div>
                     )
                   })}
                 </div>
-              </>
+              </div>
             )}
-          </>
+          </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-          <button className="link-btn small" onClick={() => onNavigeer('coach')}>
-            💬 Vraag coach om analyse →
-          </button>
-        </div>
+        <button className="dash-coach-link" onClick={() => onNavigeer('coach')}>
+          💬 Vraag coach om analyse →
+        </button>
       </div>
 
-      {/* Week training samenvatting */}
+      {/* ── WEEK TRAINING ── */}
       {echteTrainingen.length > 0 && (
-        <div className="card">
+        <div className="card dash-week-card">
           <div className="card-header">
             <h3>Training deze week</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {streak >= 2 && <span className="streak-badge">🔥 {streak} dagen</span>}
-              <button className="link-btn small" onClick={() => onNavigeer('training')}>Bekijk →</button>
-            </div>
+            <button className="link-btn small" onClick={() => onNavigeer('training')}>Bekijk →</button>
           </div>
-          <div className="week-stats-grid">
-            <div className="week-stat">
-              <span className="week-stat-val">{echteTrainingen.length}</span>
-              <span className="week-stat-label">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</span>
+          <div className="dash-week-stats">
+            <div className="dash-week-stat">
+              <span className="dash-week-stat-val">{echteTrainingen.length}</span>
+              <span className="dash-week-stat-lbl">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</span>
             </div>
-            <div className="week-stat">
-              <span className="week-stat-val">
+            <div className="dash-week-stat-divider" />
+            <div className="dash-week-stat">
+              <span className="dash-week-stat-val">
                 {weekMinuten >= 60
                   ? `${Math.floor(weekMinuten / 60)}u${weekMinuten % 60 ? weekMinuten % 60 + 'm' : ''}`
                   : `${weekMinuten}m`}
               </span>
-              <span className="week-stat-label">trainingstijd</span>
+              <span className="dash-week-stat-lbl">trainingstijd</span>
             </div>
             {weekKcal > 0 && (
-              <div className="week-stat">
-                <span className="week-stat-val">{weekKcal}</span>
-                <span className="week-stat-label">kcal verbrand</span>
-              </div>
+              <>
+                <div className="dash-week-stat-divider" />
+                <div className="dash-week-stat">
+                  <span className="dash-week-stat-val">{weekKcal}</span>
+                  <span className="dash-week-stat-lbl">kcal</span>
+                </div>
+              </>
             )}
           </div>
-          <div className="week-sports-strip">
+          <div className="dash-week-sports">
             {echteTrainingen.slice(0, 7).map((t, i) => (
-              <span key={t.id || i} className="week-sport-pill" title={`${t.sport}${t.duur_min ? ' — ' + normMin(t.duur_min) + 'min' : ''}`}>
+              <div key={t.id || i} className="dash-sport-chip" title={`${t.sport}${t.duur_min ? ' — ' + normMin(t.duur_min) + 'min' : ''}`}>
                 <SportIcoon sport={t.sport} size={16} />
-              </span>
+                {t.duur_min && <span className="dash-sport-duur">{normMin(t.duur_min) >= 60 ? `${Math.floor(normMin(t.duur_min)/60)}u` : `${normMin(t.duur_min)}m`}</span>}
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Macro voortgang vandaag */}
+      {/* ── VOEDING VANDAAG ── */}
       <div className="card">
         <div className="card-header">
           <h3>Voeding vandaag</h3>
-          <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Bekijk alles →</button>
+          <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Log →</button>
         </div>
-        {heeftTrainingVandaag
-          ? <div className="dag-context dag-context--training">⚡ Trainingsdag — prioriteer koolhydraten voor herstel</div>
-          : <div className="dag-context dag-context--rust">💤 Rustdag — focus op eiwit (1.6–2 g/kg lichaamsgewicht)</div>
-        }
-        <div className="dash-macro-blokken">
-          <div className="dash-macro-blok">
-            <span className="dash-macro-val">{v.kcal || 0}</span>
-            <span className="dash-macro-sub">
-              / {doel_kcal_aangepast} kcal
-              {training_kcal_vandaag > 0 && <span className="training-kcal-badge">+{training_kcal_vandaag} 🔥</span>}
-            </span>
+        <div className={`dash-dag-badge ${heeftTrainingVandaag ? 'dash-dag-badge--training' : 'dash-dag-badge--rust'}`}>
+          {heeftTrainingVandaag ? '⚡ Trainingsdag — prioriteer koolhydraten' : '💤 Rustdag — focus op eiwit (1.6–2 g/kg)'}
+        </div>
+
+        <div className="dash-macro-grid">
+          <div className="dash-macro-main">
+            <span className="dash-macro-main-val">{v.kcal || 0}</span>
+            <span className="dash-macro-main-sub">/ {doel_kcal_aangepast} kcal{training_kcal_vandaag > 0 && <span className="dash-training-kcal"> +{training_kcal_vandaag}🔥</span>}</span>
+            <div className="dash-macro-bar-wrap">
+              <div className="dash-macro-bar dash-macro-bar--primary" style={{ width: kcalPct + '%' }} />
+            </div>
           </div>
-          <div className="dash-macro-blok dash-macro-groen">
-            <span className="dash-macro-val">{Math.round(v.eiwit || 0)}g</span>
-            <span className="dash-macro-sub">/ {p.doel_eiwit_g || 160}g eiwit</span>
-          </div>
-          <div className="dash-macro-blok dash-macro-blauw">
-            <span className="dash-macro-val">{Math.round(v.koolhydraten || 0)}g</span>
-            <span className="dash-macro-sub">/ {p.doel_koolhydraten_g || 250}g kh</span>
-          </div>
-          <div className="dash-macro-blok dash-macro-oranje">
-            <span className="dash-macro-val">{Math.round(v.vetten || 0)}g</span>
-            <span className="dash-macro-sub">/ {p.doel_vetten_g || 80}g vet</span>
+          <div className="dash-macro-trio">
+            <MacroMini label="Eiwit" val={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} pct={eiwitPct} kleur="green" />
+            <MacroMini label="Koolh." val={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} pct={khPct} kleur="blue" />
+            <MacroMini label="Vet" val={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} pct={vetPct} kleur="orange" />
           </div>
         </div>
-        <div style={{ marginTop: 10 }}>
-          <MacroBalk label="Calorieën" huidig={v.kcal||0} doel={doel_kcal_aangepast} eenheid="kcal" pct={kcalPct} kleur="primary" />
-          <MacroBalk label="Eiwit" huidig={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} eenheid="g" pct={eiwitPct} kleur="green" />
-          <MacroBalk label="Koolhydraten" huidig={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} eenheid="g" pct={khPct} kleur="blue" />
-          <MacroBalk label="Vetten" huidig={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} eenheid="g" pct={vetPct} kleur="orange" />
-        </div>
+
         {v.maaltijden_lijst?.length > 0 && (
           <div className="dash-maaltijd-lijst">
             {v.maaltijden_lijst.map((m, i) => (
@@ -372,7 +403,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 </div>
                 <div className="dash-maaltijd-macros">
                   {m.kcal != null && <span>{m.kcal} kcal</span>}
-                  {m.eiwit_g != null && <span className="eiwit-tag">{parseFloat(m.eiwit_g).toFixed(0)}g eiwit</span>}
+                  {m.eiwit_g != null && <span className="eiwit-tag">{parseFloat(m.eiwit_g).toFixed(0)}g</span>}
                 </div>
               </div>
             ))}
@@ -380,7 +411,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         )}
       </div>
 
-      {/* Gewichtstrend */}
+      {/* ── GEWICHT TREND ── */}
       {trend.length > 1 && (
         <div className="card">
           <h3>Gewicht trend</h3>
@@ -401,12 +432,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
       )}
 
-      {/* Doelen */}
+      {/* ── DOELEN ── */}
       {doelen.length > 0 && (
         <div className="card">
           <div className="card-header">
             <h3>Actieve doelen</h3>
-            <button className="link-btn" onClick={() => onNavigeer('doelen')}>Bekijk alle →</button>
+            <button className="link-btn" onClick={() => onNavigeer('doelen')}>Bekijk →</button>
           </div>
           {doelen.slice(0, 3).map(d => {
             const pct = d.doel_waarde && d.huidige_waarde
@@ -430,16 +461,17 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   )
 }
 
-function MacroBalk({ label, huidig, doel, eenheid, pct, kleur }) {
+function MacroMini({ label, val, doel, pct, kleur }) {
   return (
-    <div className="macro-rij">
-      <div className="macro-info">
-        <span className="macro-label">{label}</span>
-        <span className="macro-waarde">{huidig} <em>/ {doel} {eenheid}</em></span>
+    <div className="dash-macro-mini">
+      <div className="dash-macro-mini-header">
+        <span className="dash-macro-mini-lbl">{label}</span>
+        <span className="dash-macro-mini-val">{val}g</span>
       </div>
-      <div className="voortgang-balk">
-        <div className={`voortgang-fill voortgang-${kleur}`} style={{ width: pct + '%' }} />
+      <div className="dash-macro-mini-bar">
+        <div className={`dash-macro-mini-fill dash-macro-fill--${kleur}`} style={{ width: pct + '%' }} />
       </div>
+      <span className="dash-macro-mini-doel">/ {doel}g</span>
     </div>
   )
 }

@@ -11,6 +11,9 @@
 [functions."intervals-sync"]
   timeout = 26
 
+[functions."runalyze-sync"]
+  timeout = 26
+
 [dev]
   command = "npm run dev"
   port = 8888

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
   coach_stijl TEXT DEFAULT 'direct',
   intervals_athlete_id TEXT,
   intervals_api_key TEXT,
+  runalyze_api_token TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   notities TEXT,
   bron TEXT DEFAULT 'handmatig',
   intervals_id TEXT,
+  runalyze_id TEXT,
   rpe SMALLINT,
   stemming SMALLINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
