@@ -124,7 +124,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const p = data?.profiel || {}
   const v = data?.vandaag || {}
   const hOrig = data?.herstel || {}
-  // Merge Suunto wellness (laatste dag) als handmatige herstel-data ontbreekt
   const laatsteWellness = wellness[0] || null
   const h = {
     ...hOrig,
@@ -170,12 +169,10 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
       hrv: rec?.hrv_ochtend || w?.hrv_ochtend || null,
       slaap: w?.slaap_uur ? parseFloat(w.slaap_uur) : null,
-      balans: w?.herstel_balans != null ? parseFloat(w.herstel_balans) : null,
-      stappen: w?.stappen || null,
       isVandaag: ds === vandaag,
     }
   })
-  const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
+  const heeftTrendData = hrv7Dagen.some(d => d.hrv !== null || d.slaap !== null)
   const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
   const hrvTrendLaag = recenteHrv.length >= 3 && recenteHrv.slice(-3).every(d => d.hrv < 45)
 
@@ -186,10 +183,16 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   const voornaam = (p.name || user.name)?.split(' ')[0]
 
+  const extraWellness = [
+    { icon: '💗', val: `${laatsteWellness?.rust_hartslag} bpm`, lbl: 'rust-HR', show: !!(laatsteWellness?.rust_hartslag) },
+    { icon: '👟', val: (laatsteWellness?.stappen || 0).toLocaleString('nl-NL'), lbl: 'stappen', show: !!(laatsteWellness?.stappen) },
+    { icon: '🔥', val: `${laatsteWellness?.kcal_actief}`, lbl: 'actieve kcal', show: !!(laatsteWellness?.kcal_actief) },
+  ].filter(x => x.show)
+
   return (
     <div className="page dash-page">
 
-      {/* ── HERO HEADER ── */}
+      {/* ── HERO ── */}
       <div className="dash-hero">
         <div className="dash-hero-text">
           <h1 className="dash-hero-name">Hey, {voornaam}</h1>
@@ -203,7 +206,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </button>
       </div>
 
-      {/* ── GEREEDHEID HERO CARD ── */}
+      {/* ── GEREEDHEID & HERSTEL ── */}
       <div className="card dash-gereedheid-card" style={gInfo ? { background: gInfo.bg, borderColor: gInfo.border } : {}}>
         <div className="dash-gereedheid-header">
           <div>
@@ -273,45 +276,69 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
         )}
 
-        {/* Score ring + metrics */}
+        {/* Data aanwezig */}
         {heeftHerstelData && !toonOchtendForm && (
           <div className="dash-gereedheid-content">
             {herstelDagen > 1 && (
               <p className="stale-warning">⚠️ Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden</p>
             )}
 
+            {/* Ring + primaire metrics */}
             <div className="dash-gereedheid-body">
               {gInfo && gereedheid !== null && (
                 <GereedheidsRing score={gereedheid} gInfo={gInfo} />
               )}
-
               <div className="dash-gereedheid-metrics">
-                <div className="dash-metric-pill">
-                  <span className="dash-metric-icon">💓</span>
-                  <div>
-                    <span className="dash-metric-val">{h.hrv_ochtend || '—'}</span>
-                    <span className="dash-metric-unit">ms HRV</span>
+                {h.hrv_ochtend && (
+                  <div className="dash-metric-pill">
+                    <span className="dash-metric-icon">💓</span>
+                    <div>
+                      <span className="dash-metric-val">{h.hrv_ochtend}</span>
+                      <span className="dash-metric-unit">ms HRV</span>
+                    </div>
                   </div>
-                </div>
-                <div className="dash-metric-pill">
-                  <span className="dash-metric-icon">😴</span>
-                  <div>
-                    <span className="dash-metric-val">{h.slaap_uur || '—'}</span>
-                    <span className="dash-metric-unit">uur slaap</span>
+                )}
+                {h.slaap_uur && (
+                  <div className="dash-metric-pill">
+                    <span className="dash-metric-icon">😴</span>
+                    <div>
+                      <span className="dash-metric-val">{h.slaap_uur}</span>
+                      <span className="dash-metric-unit">uur slaap</span>
+                    </div>
                   </div>
-                </div>
-                <div className="dash-metric-pill">
-                  <span className="dash-metric-icon">🔋</span>
-                  <div>
-                    <span className="dash-metric-val">
-                      {h.herstelbalans != null ? `${Math.round(h.herstelbalans)}${Math.abs(parseFloat(h.herstelbalans)) > 20 ? '%' : ''}` : '—'}
-                    </span>
-                    <span className="dash-metric-unit">reserves</span>
+                )}
+                {h.herstelbalans != null && (
+                  <div className="dash-metric-pill">
+                    <span className="dash-metric-icon">🔋</span>
+                    <div>
+                      <span className="dash-metric-val">
+                        {`${Math.round(h.herstelbalans)}${Math.abs(parseFloat(h.herstelbalans)) > 20 ? '%' : ''}`}
+                      </span>
+                      <span className="dash-metric-unit">reserves</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
+            {/* Suunto extra metrics (rust-HR, stappen, actieve kcal) */}
+            {extraWellness.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {extraWellness.map(x => (
+                  <div key={x.lbl} style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(0,0,0,0.06)',
+                    borderRadius: 8, padding: '5px 10px', fontSize: '0.78rem',
+                  }}>
+                    <span>{x.icon}</span>
+                    <span style={{ fontWeight: 700 }}>{x.val}</span>
+                    <span style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{x.lbl}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Advies */}
             {gInfo && (
               <div className="dash-gereedheid-advies">
                 <span className="dash-advies-arrow">→</span>
@@ -319,26 +346,44 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               </div>
             )}
 
-            {/* 7-daagse HRV trend */}
-            {heeftHrvTrend && (
+            {/* 7-daagse gecombineerde grafiek: slaapbalken + HRV-labels */}
+            {heeftTrendData && (
               <div className="dash-hrv-trend-wrap">
                 {hrvTrendLaag && (
                   <p className="hrv-waarschuwing">⚠️ HRV laag — herstel heeft voorrang</p>
                 )}
-                <div className="dash-hrv-trend">
-                  {hrv7Dagen.map((d) => {
-                    const kleur = !d.hrv ? 'var(--border)'
-                      : d.hrv >= 60 ? '#22c55e'
-                      : d.hrv >= 45 ? '#eab308'
+                <div style={{ display: 'flex', gap: 4, height: 88, alignItems: 'flex-end', marginBottom: 4 }}>
+                  {hrv7Dagen.map(d => {
+                    const slaapHoogte = d.slaap ? Math.min(100, (d.slaap / 9) * 100) : 4
+                    const slaapKleur = !d.slaap ? 'var(--border)'
+                      : d.slaap >= 7.5 ? '#22c55e'
+                      : d.slaap >= 6.5 ? '#eab308'
                       : '#ef4444'
+                    const hrvKleur = !d.hrv ? 'transparent'
+                      : d.hrv >= 60 ? '#16a34a'
+                      : d.hrv >= 45 ? '#b45309'
+                      : '#dc2626'
                     return (
-                      <div key={d.datum} className={`dash-hrv-dag ${d.isVandaag ? 'dash-hrv-dag--vandaag' : ''}`}>
-                        <div className="dash-hrv-dot" style={{ background: kleur }} title={d.hrv ? `HRV ${d.hrv}ms` : 'Geen data'} />
-                        {d.hrv && <span className="dash-hrv-val">{d.hrv}</span>}
-                        <span className="dash-hrv-lbl">{d.label.slice(0, 2)}</span>
+                      <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: '0.58rem', fontWeight: 700, color: hrvKleur, lineHeight: 1, minHeight: 10 }}>
+                          {d.hrv || ''}
+                        </span>
+                        <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                          <div
+                            style={{ width: '100%', height: `${slaapHoogte}%`, background: slaapKleur, borderRadius: 4, minHeight: 4, transition: 'height 0.4s' }}
+                            title={[d.slaap ? `${d.slaap}u slaap` : null, d.hrv ? `HRV ${d.hrv}ms` : null].filter(Boolean).join(' · ') || d.label}
+                          />
+                        </div>
+                        <span style={{ fontSize: '0.65rem', fontWeight: d.isVandaag ? 700 : 400, color: d.isVandaag ? 'var(--accent)' : '#64748b' }}>
+                          {d.label.slice(0, 2)}
+                        </span>
                       </div>
                     )
                   })}
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <span>Balk: slaap&nbsp;<span style={{ color: '#22c55e' }}>●</span>≥7,5u&nbsp;<span style={{ color: '#eab308' }}>●</span>6,5–7,5u&nbsp;<span style={{ color: '#ef4444' }}>●</span>&lt;6,5u</span>
+                  <span>Getal: HRV (ms)</span>
                 </div>
               </div>
             )}
@@ -349,83 +394,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           💬 Vraag coach om analyse →
         </button>
       </div>
-
-      {/* ── SUUNTO WELLNESS (slaap/HRV/herstel/stappen) ── */}
-      {wellness.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
-            <h3>⌚ Wellness (Suunto)</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>laatste 7 dagen</span>
-          </div>
-
-          {/* Vandaag samenvatting */}
-          {laatsteWellness && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
-              {laatsteWellness.slaap_uur && (
-                <div style={{ padding: 10, background: '#eff6ff', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#1e3a8a', fontWeight: 600 }}>💤 SLAAP</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af' }}>{laatsteWellness.slaap_uur}u</div>
-                  {laatsteWellness.slaap_score && <div style={{ fontSize: '0.7rem', color: '#64748b' }}>score {laatsteWellness.slaap_score}</div>}
-                </div>
-              )}
-              {laatsteWellness.hrv_ochtend && (
-                <div style={{ padding: 10, background: '#f0fdf4', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#14532d', fontWeight: 600 }}>❤️ HRV</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#166534' }}>{laatsteWellness.hrv_ochtend}<span style={{ fontSize: '0.8rem', fontWeight: 400 }}>ms</span></div>
-                </div>
-              )}
-              {laatsteWellness.herstel_balans != null && (
-                <div style={{ padding: 10, background: '#fef3c7', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#78350f', fontWeight: 600 }}>🔋 HERSTEL</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#92400e' }}>{Math.round(parseFloat(laatsteWellness.herstel_balans) * 100)}%</div>
-                </div>
-              )}
-              {laatsteWellness.rust_hartslag && (
-                <div style={{ padding: 10, background: '#fce7f3', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#831843', fontWeight: 600 }}>💗 RUST-HR</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#9d174d' }}>{laatsteWellness.rust_hartslag}<span style={{ fontSize: '0.8rem', fontWeight: 400 }}>bpm</span></div>
-                </div>
-              )}
-              {laatsteWellness.stappen && (
-                <div style={{ padding: 10, background: '#f5f3ff', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#4c1d95', fontWeight: 600 }}>👟 STAPPEN</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#6d28d9' }}>{laatsteWellness.stappen.toLocaleString('nl-NL')}</div>
-                </div>
-              )}
-              {laatsteWellness.kcal_actief && (
-                <div style={{ padding: 10, background: '#fef2f2', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#7f1d1d', fontWeight: 600 }}>🔥 KCAL</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#991b1b' }}>{laatsteWellness.kcal_actief}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 7-daagse staafjes voor slaap */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80, marginBottom: 8 }}>
-            {hrv7Dagen.map(d => {
-              const hoogte = d.slaap ? Math.min(100, (d.slaap / 9) * 100) : 4
-              const kleur = !d.slaap ? 'var(--border)'
-                : d.slaap >= 7.5 ? '#22c55e'
-                : d.slaap >= 6.5 ? '#eab308'
-                : '#ef4444'
-              return (
-                <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{ fontSize: '0.65rem', color: '#64748b', minHeight: 12 }}>{d.slaap ? `${d.slaap}u` : ''}</div>
-                  <div style={{ width: '100%', height: `${hoogte}%`, background: kleur, borderRadius: 4, transition: 'height 0.4s', minHeight: 4 }}
-                       title={d.slaap ? `${d.label}: ${d.slaap}u slaap` : `${d.label}: geen data`} />
-                  <span style={{ fontSize: '0.65rem', fontWeight: d.isVandaag ? 700 : 400, color: d.isVandaag ? 'var(--accent)' : '#64748b' }}>
-                    {d.label.slice(0, 2)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--muted)', textAlign: 'center' }}>
-            Slaap-uren per dag · <span style={{ color: '#22c55e' }}>●</span> ≥7,5u  <span style={{ color: '#eab308' }}>●</span> 6,5-7,5u  <span style={{ color: '#ef4444' }}>●</span> &lt;6,5u
-          </div>
-        </div>
-      )}
 
       {/* ── WEEK TRAINING ── */}
       {echteTrainingen.length > 0 && (
