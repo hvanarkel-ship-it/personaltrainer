@@ -2,9 +2,8 @@ import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 import { getValidToken, suuntoHeaders, SUUNTO_API_BASE } from './_suunto.js'
 
-// Debug endpoint: probeert meerdere Suunto endpoints om te zien wat beschikbaar is
-// Gebruik: GET /api/suunto-debug
-//          GET /api/suunto-debug?path=/v2/sleep  → enkel endpoint testen
+// Test de Suunto 247samples API (sleep, activity, recovery)
+// Vereist SUUNTO_SUBSCRIPTION_KEY in env vars
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
   const auth = requireAuth(event)
@@ -16,60 +15,22 @@ export const handler = async (event) => {
 
   try {
     const accessToken = await getValidToken(sql, userId)
-    const single = event.queryStringParameters?.path
-    const sinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const to = Date.now()
+    const from = to - 14 * 86400_000 // laatste 14 dagen
 
-    // Probeer de "24/7 API" — bekend uit Suunto API portal
-    // (new-247-api / daily-activity-samples)
-    const today = new Date().toISOString().slice(0, 10)
-    const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)
-    const endpoints = single ? [single] : [
-      // 24/7 API variaties
-      `/247/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
-      `/247/daily-activity-samples`,
-      `/v1/247/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
-      `/247/sleep?startDate=${weekAgo}&endDate=${today}`,
-      `/247/sleep`,
-      `/247/hrv?startDate=${weekAgo}&endDate=${today}`,
-      `/247/hrv`,
-      `/247/recovery?startDate=${weekAgo}&endDate=${today}`,
-      `/247/recovery`,
-      `/247/heartrate?startDate=${weekAgo}&endDate=${today}`,
-      `/247/heartrate`,
-      `/247/steps?startDate=${weekAgo}&endDate=${today}`,
-      `/247/steps`,
-      `/247/calories?startDate=${weekAgo}&endDate=${today}`,
-      `/247/stress?startDate=${weekAgo}&endDate=${today}`,
-      `/247/`,
-      // Direct (zonder /247 prefix)
-      `/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
-      `/sleep?startDate=${weekAgo}&endDate=${today}`,
-      // Bevestig dat /v2/workouts nog werkt
-      '/v2/workouts?limit=1',
+    const endpoints = [
+      `/247samples/sleep?from=${from}&to=${to}`,
+      `/247samples/activity?from=${from}&to=${to}`,
+      `/247samples/recovery?from=${from}&to=${to}`,
+      `/247samples/daily-activity-statistics?startdate=${new Date(from).toISOString()}&enddate=${new Date(to).toISOString()}`,
     ]
 
-    // Probeer ook alternatieve hosts voor de 24/7 API
-    const altHosts = [
-      'https://apizone.suunto.com',
-      'https://cloudapi.suunto.com/247',
-    ]
-    const altPaths = [
-      `/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
-      `/sleep?startDate=${weekAgo}&endDate=${today}`,
-      `/hrv?startDate=${weekAgo}&endDate=${today}`,
-    ]
-    for (const host of altHosts) {
-      for (const p of altPaths) {
-        endpoints.push({ __fullUrl: `${host}${p}` })
-      }
-    }
-
+    const heeftKey = !!process.env.SUUNTO_SUBSCRIPTION_KEY
     const results = []
-    for (const item of endpoints) {
-      const fullUrl = typeof item === 'object' ? item.__fullUrl : `${SUUNTO_API_BASE}${item}`
-      const path = typeof item === 'object' ? fullUrl : item
+    for (const path of endpoints) {
+      const url = `${SUUNTO_API_BASE}${path}`
       try {
-        const res = await fetch(fullUrl, { headers: suuntoHeaders(accessToken) })
+        const res = await fetch(url, { headers: suuntoHeaders(accessToken) })
         const txt = await res.text()
         let body
         try { body = JSON.parse(txt) } catch { body = txt.slice(0, 200) }
@@ -77,17 +38,18 @@ export const handler = async (event) => {
           path,
           status: res.status,
           ok: res.ok,
-          // Beperk omvang
-          preview: typeof body === 'string'
-            ? body
-            : JSON.stringify(body).slice(0, 400),
+          preview: typeof body === 'string' ? body : JSON.stringify(body).slice(0, 800),
         })
       } catch (err) {
         results.push({ path, error: err.message })
       }
     }
 
-    return cors({ results })
+    return cors({
+      heeftSubscriptionKey: heeftKey,
+      hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
+      results,
+    })
   } catch (err) {
     return cors({ error: err.message }, 500)
   }
