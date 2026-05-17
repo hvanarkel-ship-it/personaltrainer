@@ -16,7 +16,8 @@ export const handler = async (event) => {
           p.geboortejaar, p.lengte_cm, p.gewicht_kg,
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
-          p.intervals_athlete_id, p.updated_at
+          p.intervals_athlete_id, p.updated_at,
+          CASE WHEN p.runalyze_api_token IS NOT NULL THEN true ELSE false END AS runalyze_verbonden
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
@@ -36,6 +37,16 @@ export const handler = async (event) => {
           UPDATE user_profile SET
             intervals_athlete_id = NULL,
             intervals_api_key = NULL,
+            updated_at = NOW()
+          WHERE user_id = ${userId}
+        `
+        return cors({ success: true })
+      }
+
+      if (d.ontkoppel_runalyze) {
+        await sql`
+          UPDATE user_profile SET
+            runalyze_api_token = NULL,
             updated_at = NOW()
           WHERE user_id = ${userId}
         `

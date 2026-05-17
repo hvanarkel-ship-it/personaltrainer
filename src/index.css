@@ -1054,6 +1054,141 @@ body {
 ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
 
+/* ===== DASHBOARD REDESIGN ===== */
+.dash-page { padding-top: 0; }
+
+.dash-hero {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 16px 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white; margin: 0 -16px 16px; position: relative;
+}
+.dash-hero-text { flex: 1; min-width: 0; }
+.dash-hero-name { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.3px; color: white; }
+.dash-hero-dag { font-size: 0.8rem; color: rgba(255,255,255,0.75); margin-top: 2px; text-transform: capitalize; }
+.dash-streak-pill {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px;
+  background: rgba(255,255,255,0.2); border-radius: 20px;
+  padding: 3px 10px; font-size: 0.75rem; font-weight: 600; color: white;
+}
+.dash-logout-btn { color: rgba(255,255,255,0.7) !important; background: rgba(255,255,255,0.15) !important; border-radius: 8px !important; }
+
+/* Gereedheid card */
+.dash-gereedheid-card {
+  border-width: 1.5px; margin-bottom: 12px;
+  transition: background 0.4s, border-color 0.4s;
+}
+.dash-gereedheid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.dash-gereedheid-titel { font-size: 0.85rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.dash-gereedheid-label { display: block; font-size: 1rem; font-weight: 700; margin-top: 2px; }
+
+.dash-gereedheid-leeg { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; padding: 12px 0; }
+.dash-gereedheid-leeg-icon { font-size: 2.5rem; }
+.dash-gereedheid-leeg p { font-size: 0.82rem; color: var(--text-2); margin-top: 4px; }
+
+.dash-gereedheid-content { display: flex; flex-direction: column; gap: 12px; }
+.dash-gereedheid-body { display: flex; align-items: center; gap: 16px; }
+
+/* Ring gauge */
+.gereedheid-ring-wrap {
+  position: relative; flex-shrink: 0;
+  width: 120px; height: 120px;
+}
+.gereedheid-ring-wrap svg { position: absolute; top: 0; left: 0; }
+.gereedheid-ring-inner {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.gereedheid-ring-pct { font-size: 2rem; font-weight: 800; line-height: 1; }
+.gereedheid-ring-sym { font-size: 0.8rem; font-weight: 600; opacity: 0.6; }
+
+/* Metric pills */
+.dash-gereedheid-metrics { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.dash-metric-pill {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px; padding: 8px 12px;
+}
+.dash-metric-icon { font-size: 1.2rem; flex-shrink: 0; }
+.dash-metric-val { font-size: 1.05rem; font-weight: 700; line-height: 1.2; display: block; }
+.dash-metric-unit { font-size: 0.7rem; color: var(--text-2); display: block; }
+
+.dash-gereedheid-advies {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: rgba(255,255,255,0.5); border-radius: 8px; padding: 8px 12px;
+  font-size: 0.82rem; color: var(--text); font-weight: 500;
+}
+.dash-advies-arrow { font-weight: 800; flex-shrink: 0; }
+
+/* HRV mini trend */
+.dash-hrv-trend-wrap { padding-top: 4px; }
+.dash-hrv-trend { display: flex; align-items: center; justify-content: space-between; gap: 2px; }
+.dash-hrv-dag { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; }
+.dash-hrv-dag--vandaag .dash-hrv-lbl { font-weight: 700; color: var(--text); }
+.dash-hrv-dot { width: 10px; height: 10px; border-radius: 50%; transition: background 0.3s; }
+.dash-hrv-val { font-size: 0.6rem; font-weight: 700; color: var(--text-2); }
+.dash-hrv-lbl { font-size: 0.65rem; color: var(--text-3); }
+
+.dash-coach-link {
+  display: block; width: 100%; margin-top: 12px;
+  background: rgba(255,255,255,0.5); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 8px 12px; text-align: center;
+  font-size: 0.82rem; font-weight: 500; color: var(--text-2);
+  cursor: pointer; font-family: var(--font);
+  transition: background 0.15s;
+}
+.dash-coach-link:active { background: rgba(255,255,255,0.8); }
+
+/* Week training card */
+.dash-week-card { margin-bottom: 12px; }
+.dash-week-stats { display: flex; align-items: center; gap: 0; margin-bottom: 12px; }
+.dash-week-stat { flex: 1; text-align: center; }
+.dash-week-stat-val { display: block; font-size: 1.4rem; font-weight: 800; line-height: 1; }
+.dash-week-stat-lbl { display: block; font-size: 0.7rem; color: var(--text-3); margin-top: 2px; }
+.dash-week-stat-divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+
+.dash-week-sports { display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-sport-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--border-light); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 10px 4px 8px;
+  font-size: 0.72rem; color: var(--text-2);
+}
+.dash-sport-duur { font-size: 0.65rem; font-weight: 600; color: var(--text-3); }
+
+/* Nutrition card */
+.dash-dag-badge {
+  font-size: 0.78rem; font-weight: 500; padding: 6px 10px;
+  border-radius: 8px; margin-bottom: 12px;
+}
+.dash-dag-badge--training { background: #fffbeb; color: #92400e; }
+.dash-dag-badge--rust { background: var(--border-light); color: var(--text-2); }
+
+.dash-macro-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.dash-macro-main { display: flex; flex-direction: column; gap: 2px; }
+.dash-macro-main-val { font-size: 2rem; font-weight: 800; line-height: 1; }
+.dash-macro-main-sub { font-size: 0.8rem; color: var(--text-2); }
+.dash-training-kcal { font-size: 0.72rem; margin-left: 4px; font-weight: 600; }
+
+.dash-macro-bar-wrap {
+  height: 6px; background: var(--border-light); border-radius: 3px;
+  overflow: hidden; margin-top: 6px;
+}
+.dash-macro-bar { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.dash-macro-bar--primary { background: var(--primary); }
+
+.dash-macro-trio { display: flex; gap: 8px; }
+.dash-macro-mini { flex: 1; }
+.dash-macro-mini-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 3px; }
+.dash-macro-mini-lbl { font-size: 0.7rem; color: var(--text-3); }
+.dash-macro-mini-val { font-size: 0.85rem; font-weight: 700; }
+.dash-macro-mini-bar { height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
+.dash-macro-mini-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+.dash-macro-fill--green { background: #22c55e; }
+.dash-macro-fill--blue { background: #3b82f6; }
+.dash-macro-fill--orange { background: #f97316; }
+.dash-macro-mini-doel { font-size: 0.65rem; color: var(--text-3); }
+
 /* ===== NARROW SCREENS (<360px) ===== */
 @media (max-width: 360px) {
   .page { padding: 12px 12px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px); }

@@ -19,6 +19,9 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [intervalsConnecting, setIntervalsConnecting] = useState(false)
   const [intervalsForm, setIntervalsForm] = useState({ athlete_id: '', api_key: '' })
   const [melding, setMelding] = useState(null)
+  const [runalyzeForm, setRunalyzeForm] = useState({ api_token: '' })
+  const [runalyzeConnecting, setRunalyzeConnecting] = useState(false)
+  const [runalyzeSyncing, setRunalyzeSyncing] = useState(false)
 
   useEffect(() => { laadProfiel() }, [])
 
@@ -41,6 +44,7 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
         coach_stijl: data.coach_stijl || 'direct',
         intervals_verbonden: !!data.intervals_athlete_id,
         intervals_athlete_id: data.intervals_athlete_id || null,
+        runalyze_verbonden: !!data.runalyze_verbonden,
       })
     } catch {
       setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
@@ -103,6 +107,44 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       await api.put('/profiel', { ontkoppel_intervals: true })
       setProfiel(p => ({ ...p, intervals_verbonden: false, intervals_athlete_id: null }))
       setMelding({ type: 'success', tekst: 'Intervals.icu ontkoppeld.' })
+    } catch {
+      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
+    }
+  }
+
+  async function verbindRunalyze() {
+    setRunalyzeConnecting(true)
+    setMelding(null)
+    try {
+      await api.post('/runalyze-connect', runalyzeForm)
+      setProfiel(p => ({ ...p, runalyze_verbonden: true }))
+      setRunalyzeForm({ api_token: '' })
+      setMelding({ type: 'success', tekst: '✓ Runalyze gekoppeld' })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
+    } finally {
+      setRunalyzeConnecting(false)
+    }
+  }
+
+  async function syncRunalyze() {
+    setRunalyzeSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/runalyze-sync', {})
+      setMelding({ type: res.gesynchroniseerd > 0 ? 'success' : 'error', tekst: `↻ ${res.gesynchroniseerd} activiteit${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} overgeslagen)` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Runalyze sync mislukt: ' + err.message })
+    } finally {
+      setRunalyzeSyncing(false)
+    }
+  }
+
+  async function ontkoppelRunalyze() {
+    try {
+      await api.put('/profiel', { ontkoppel_runalyze: true })
+      setProfiel(p => ({ ...p, runalyze_verbonden: false }))
+      setMelding({ type: 'success', tekst: 'Runalyze ontkoppeld.' })
     } catch {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
@@ -318,6 +360,59 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
                     style={{ background: '#1a1a2e', color: '#e94560', border: '1px solid #e94560', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
                   >
                     {intervalsConnecting ? 'Verbinden...' : 'Verbinden met Intervals.icu'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Runalyze */}
+          <div className="card integratie-card">
+            <div className="integratie-header">
+              <div className="integratie-logo" style={{ background: '#e8f5e9', fontSize: '0.7rem', fontWeight: 800, color: '#2e7d32', letterSpacing: '-0.5px' }}>RUN</div>
+              <div className="integratie-info">
+                <strong>Runalyze</strong>
+                <span>Suunto trainingen & analyses</span>
+              </div>
+              <span className={`integratie-badge ${profiel.runalyze_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.runalyze_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              </span>
+            </div>
+            {profiel.runalyze_verbonden ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Runalyze is gekoppeld. Activiteiten van je Suunto (en andere toestellen) worden gesynchroniseerd inclusief hartslagdata en trainingsanalyses.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncRunalyze} disabled={runalyzeSyncing}>
+                    {runalyzeSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={ontkoppelRunalyze}>Ontkoppelen</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Koppel Runalyze voor directe import van je Suunto-activiteiten. Runalyze synct automatisch met de Suunto app en biedt diepgaande trainingsanalyses. Haal je API token op via Runalyze → Instellingen → Apps.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>API Token <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(Runalyze → Instellingen → Apps → API)</span></label>
+                    <input
+                      type="password"
+                      value={runalyzeForm.api_token}
+                      onChange={e => setRunalyzeForm(f => ({ ...f, api_token: e.target.value }))}
+                      placeholder="••••••••••••••••"
+                      autoCapitalize="none"
+                    />
+                  </div>
+                  <button
+                    className="btn btn-full"
+                    onClick={verbindRunalyze}
+                    disabled={runalyzeConnecting || !runalyzeForm.api_token}
+                    style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+                  >
+                    {runalyzeConnecting ? 'Verbinden...' : 'Verbinden met Runalyze'}
                   </button>
                 </div>
               </>
