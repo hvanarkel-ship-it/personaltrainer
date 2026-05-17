@@ -5,6 +5,14 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."intervals-sync"]
+  timeout = 26
+
+[functions."runalyze-sync"]
+  timeout = 26
+
+[functions."coach-chat"]
   timeout = 26
 
 [[redirects]]
