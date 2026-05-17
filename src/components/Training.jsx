@@ -136,6 +136,7 @@ export default function Training({ onNavigeer, user }) {
   })
   const [opslaan, setOpslaan] = useState(false)
   const [fout, setFout] = useState('')
+  const [bronFilter, setBronFilter] = useState('alle')
 
   useEffect(() => {
     api.get('/training?limit=2000').then(setTrainingen).catch(e => setFout(e.message)).finally(() => setLaden(false))
@@ -186,6 +187,12 @@ export default function Training({ onNavigeer, user }) {
   const weekLoad = week.reduce((s, d) => s + d.load, 0)
 
   const echte = trainingen.filter(t => t.sport !== 'herstel')
+  const echteGefilterd = bronFilter === 'alle' ? echte : echte.filter(t => (t.bron || 'handmatig') === bronFilter)
+  const bronTelling = echte.reduce((acc, t) => {
+    const b = t.bron || 'handmatig'
+    acc[b] = (acc[b] || 0) + 1
+    return acc
+  }, {})
 
   return (
     <div className="page">
@@ -312,15 +319,54 @@ export default function Training({ onNavigeer, user }) {
         </div>
       )}
 
+      {/* Bron-filter */}
+      {!laden && echte.length > 0 && Object.keys(bronTelling).length > 1 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          <button
+            onClick={() => setBronFilter('alle')}
+            style={{
+              padding: '4px 10px', borderRadius: 12, fontSize: '0.78rem', fontWeight: 600,
+              border: bronFilter === 'alle' ? '1px solid #1976d2' : '1px solid #e0e0e0',
+              background: bronFilter === 'alle' ? '#e3f2fd' : '#fff',
+              color: bronFilter === 'alle' ? '#1565c0' : '#616161',
+              cursor: 'pointer'
+            }}
+          >Alles ({echte.length})</button>
+          {Object.entries(bronTelling).sort((a, b) => b[1] - a[1]).map(([bronKey, aantal]) => {
+            const s = BRON_STIJL[bronKey] || BRON_STIJL.handmatig
+            const actief = bronFilter === bronKey
+            return (
+              <button
+                key={bronKey}
+                onClick={() => setBronFilter(bronKey)}
+                style={{
+                  padding: '4px 10px', borderRadius: 12, fontSize: '0.78rem', fontWeight: 600,
+                  border: actief ? `1px solid ${s.color}` : `1px solid ${s.border}`,
+                  background: actief ? s.bg : '#fff',
+                  color: s.color, cursor: 'pointer'
+                }}
+              >{s.icon} {s.label} ({aantal})</button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Trainingslijst */}
       {laden
         ? <div className="center-loader"><div className="spinner" /></div>
-        : echte.length === 0
-          ? <div className="leeg-staat"><p style={{ fontSize: '2rem' }}>🏃</p><p>Nog geen trainingen gelogd.</p></div>
-          : <div className="lijst">{echte.map(t => <TrainingKaart key={t.id} t={t} onVerwijder={verwijder} />)}</div>
+        : echteGefilterd.length === 0
+          ? <div className="leeg-staat"><p style={{ fontSize: '2rem' }}>🏃</p><p>{echte.length === 0 ? 'Nog geen trainingen gelogd.' : 'Geen trainingen voor dit filter.'}</p></div>
+          : <div className="lijst">{echteGefilterd.map(t => <TrainingKaart key={t.id} t={t} onVerwijder={verwijder} />)}</div>
       }
     </div>
   )
+}
+
+const BRON_STIJL = {
+  runalyze:  { label: 'Runalyze', icon: '⌚', bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+  intervals: { label: 'Intervals.icu', icon: '📊', bg: '#fff3e0', color: '#e65100', border: '#ffcc80' },
+  suunto:    { label: 'Suunto', icon: '⌚', bg: '#e3f2fd', color: '#1565c0', border: '#90caf9' },
+  handmatig: { label: 'Handmatig', icon: '✏️', bg: '#f5f5f5', color: '#616161', border: '#e0e0e0' },
 }
 
 function TrainingKaart({ t, onVerwijder }) {
@@ -329,6 +375,7 @@ function TrainingKaart({ t, onVerwijder }) {
   const rpe = t.rpe ? parseInt(t.rpe) : null
   const rpeI = rpeInfo(rpe)
   const trainingLoad = rpe && t.duur_min ? Math.round(t.duur_min * rpe / 10) : null
+  const bron = BRON_STIJL[t.bron] || BRON_STIJL.handmatig
 
   return (
     <div className="card training-kaart" style={{ borderLeft: `3px solid ${kleur.kleur}` }}>
@@ -345,6 +392,16 @@ function TrainingKaart({ t, onVerwijder }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            title={`Bron: ${bron.label}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '2px 8px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 600,
+              background: bron.bg, color: bron.color, border: `1px solid ${bron.border}`,
+            }}
+          >
+            {bron.icon} {bron.label}
+          </span>
           {rpe && (
             <span className="rpe-badge" style={{ background: rpeI.bg, color: rpeI.kleur }}>
               RPE {rpe}
