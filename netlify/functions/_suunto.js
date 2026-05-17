@@ -1,7 +1,6 @@
 // Shared Suunto Cloud API v2 logica
 // Docs: https://cloudapi.suunto.com
-// Env vars nodig: SUUNTO_CLIENT_ID, SUUNTO_CLIENT_SECRET
-// Optioneel: SUUNTO_SUBSCRIPTION_KEY (Ocp-Apim-Subscription-Key)
+// Response-structuur geverifieerd via /v2/workouts in mei 2026
 
 export const SUUNTO_AUTH_URL   = 'https://cloudapi-oauth.suunto.com/oauth/authorize'
 export const SUUNTO_TOKEN_URL  = 'https://cloudapi-oauth.suunto.com/oauth/token'
@@ -19,41 +18,71 @@ export function suuntoHeaders(accessToken) {
 }
 
 // Suunto activityId → onze sport-namen
+// Bron: Suunto Sports API v2 activiteitenlijst
 const SPORT_MAP = {
-  1:   'hardlopen',   // Running
-  2:   'fietsen',     // Cycling
-  3:   'wandelen',    // Nordic walking
-  4:   'overig',      // Ski touring
-  5:   'overig',      // Other
-  6:   'fitness',     // Fitness training
-  7:   'zwemmen',     // Swimming
-  8:   'overig',      // Triathlon
-  16:  'wandelen',    // Hiking
-  56:  'fitness',     // Gym
-  58:  'yoga',        // Yoga
-  82:  'hardlopen',   // Trail running (alt id)
-  91:  'hardlopen',   // Trail running
-  108: 'fietsen',     // Indoor cycling
-  109: 'zwemmen',     // Open water swimming
-  112: 'fitness',     // Strength training
-  130: 'yoga',        // Pilates
+  0:   'overig',     // Other
+  1:   'wandelen',   // Walking
+  2:   'fietsen',    // Cycling
+  3:   'overig',     // Cross-country skiing
+  5:   'fitness',    // Other indoor
+  6:   'overig',     // Mountain biking (oude id)
+  10:  'overig',     // Triathlon
+  11:  'fietsen',    // Mountain biking
+  12:  'wandelen',   // Hiking
+  13:  'overig',     // Roller skating
+  14:  'overig',     // Downhill skiing
+  15:  'overig',     // Paddling
+  16:  'overig',     // Rowing
+  17:  'overig',     // Golf
+  18:  'fitness',    // Indoor
+  20:  'overig',     // Ball games
+  21:  'fitness',    // Outdoor gym
+  22:  'zwemmen',    // Swimming
+  23:  'hardlopen',  // Trail running
+  24:  'fitness',    // Gym
+  25:  'wandelen',   // Nordic walking
+  29:  'overig',     // Water sports
+  30:  'overig',     // Climbing
+  31:  'overig',     // Snowboarding
+  33:  'fitness',    // Fitness class
+  34:  'voetbal',    // Soccer
+  35:  'tennis',     // Tennis
+  37:  'overig',     // Badminton
+  53:  'hardlopen',  // Running (newer id)
+  56:  'fitness',    // Strength training
+  58:  'yoga',       // Yoga
+  75:  'fitness',    // Strength / functional training
+  82:  'hardlopen',  // Trail running (alt)
+  91:  'hardlopen',  // Trail running
+  108: 'fietsen',    // Indoor cycling
+  109: 'zwemmen',    // Open water swimming
+  112: 'fitness',
+  130: 'yoga',       // Pilates
 }
 
-function mapSport(activityId, activityName) {
-  const n = (activityName || '').toLowerCase()
-  if (/hyrox/.test(n))          return 'hyrox'
-  if (/padel/.test(n))          return 'padel'
-  if (/tennis/.test(n))         return 'tennis'
-  if (/voetbal|soccer/.test(n)) return 'voetbal'
-  if (/yoga/.test(n))           return 'yoga'
-  if (/pilates/.test(n))        return 'yoga'
+// Naam van het activiteitstype voor de titel
+const ACTIVITY_NAMES = {
+  0: 'Activiteit', 1: 'Wandelen', 2: 'Fietsen', 3: 'Langlaufen',
+  11: 'Mountainbiken', 12: 'Hiken', 18: 'Indoor training', 21: 'Outdoor gym',
+  22: 'Zwemmen', 23: 'Trailrunning', 24: 'Gym', 25: 'Nordic walking',
+  30: 'Klimmen', 33: 'Fitness class', 34: 'Voetbal', 35: 'Tennis',
+  53: 'Hardlopen', 56: 'Krachttraining', 58: 'Yoga', 75: 'Functional training',
+  82: 'Trailrun', 91: 'Trailrun', 108: 'Indoor fietsen', 109: 'Open water zwemmen',
+  130: 'Pilates',
+}
+
+function mapSport(activityId) {
   return SPORT_MAP[activityId] || 'overig'
 }
 
-// Suunto feeling (1-5) → stemming (1-5) — schaal is gelijk
-function mapFeeling(feeling) {
-  const v = parseInt(feeling, 10)
-  return (v >= 1 && v <= 5) ? v : null
+function activityTitle(activityId) {
+  return ACTIVITY_NAMES[activityId] || `Suunto activiteit ${activityId}`
+}
+
+// Vind extensie op type binnen workout
+function ext(w, type) {
+  const exts = Array.isArray(w?.extensions) ? w.extensions : []
+  return exts.find(e => e?.type === type) || null
 }
 
 export async function refreshSuuntoToken(sql, userId, refreshToken) {
@@ -100,12 +129,108 @@ export async function getValidToken(sql, userId) {
   return p.suunto_access_token
 }
 
-// Lees veld uit workout — Suunto API geeft camelCase, sommige responses PascalCase
-function field(w, ...keys) {
-  for (const k of keys) {
-    if (w[k] !== undefined && w[k] !== null) return w[k]
+// Converteer Unix ms + timezone offset (minuten) → lokale YYYY-MM-DD
+function localDateFromMs(ms, offsetMinutes = 0) {
+  if (!ms) return null
+  const d = new Date(ms + (offsetMinutes || 0) * 60 * 1000)
+  return d.toISOString().slice(0, 10)
+}
+
+function parseWorkout(w) {
+  const id = String(w.workoutKey || '')
+  if (!id) return null
+
+  const startMs = parseInt(w.startTime, 10)
+  const offset = parseInt(w.timeOffsetInMinutes, 10) || 0
+  const datum = localDateFromMs(startMs, offset)
+  if (!datum) return null
+
+  const sec = parseFloat(w.totalTime) || 0
+  const duur_min = sec > 0 ? Math.round(sec / 60) : null
+
+  const distM = parseFloat(w.totalDistance) || 0
+  const km = distM > 0 ? (distM / 1000).toFixed(1) : null
+
+  const kcalRaw = parseFloat(w.energyConsumption) || 0
+  const kcal = kcalRaw > 0 ? Math.round(kcalRaw) : null
+
+  // HR uit hrdata blok
+  const hrAvg = parseFloat(w.hrdata?.workoutAvgHR ?? w.hrdata?.avg) || 0
+  const hrMax = parseFloat(w.hrdata?.workoutMaxHR ?? w.hrdata?.hrmax ?? w.hrdata?.max) || 0
+  const gem_hartslag = hrAvg > 0 ? Math.round(hrAvg) : null
+  const max_hartslag = hrMax > 0 ? Math.round(hrMax) : null
+
+  // Hoogtemeters
+  const ascent = parseFloat(w.totalAscent) || 0
+  const hoogte = ascent > 0 ? Math.round(ascent) : null
+
+  // Stemming uit SummaryExtension.feeling (1-5)
+  const summary = ext(w, 'SummaryExtension')
+  const feeling = parseInt(summary?.feeling, 10)
+  const stemming = (feeling >= 1 && feeling <= 5) ? feeling : null
+
+  // HR-zones (seconden → minuten). Suunto: zone1=rust, zone2=L1, zone3=L2, zone4=L3, zone5=L4/5
+  // Wij gebruiken zone2_min (L2), zone3_min (L3), zone4_min (L4+L5)
+  const intens = ext(w, 'IntensityExtension')
+  const hrZones = intens?.zones?.heartRate
+  const z2 = parseFloat(hrZones?.zone3?.totalTime) || 0
+  const z3 = parseFloat(hrZones?.zone4?.totalTime) || 0
+  const z4 = parseFloat(hrZones?.zone5?.totalTime) || 0
+  const zone2_min = z2 > 0 ? Math.round(z2 / 60) : null
+  const zone3_min = z3 > 0 ? Math.round(z3 / 60) : null
+  const zone4_min = z4 > 0 ? Math.round(z4 / 60) : null
+
+  // TSS
+  const tss = parseFloat(w.tss?.trainingStressScore) || 0
+  const tssRound = tss > 0 ? Math.round(tss) : null
+
+  // Sport en titel
+  const activityId = parseInt(w.activityId, 10)
+  const sport = mapSport(activityId)
+  const titel = activityTitle(activityId)
+
+  // Pace voor hardlopen: totaalSec / 1000 / distM = sec per meter → omkeren naar min/km
+  let pace = null
+  if (sport === 'hardlopen' && distM > 0 && sec > 0) {
+    const secPerKm = sec / (distM / 1000)
+    const m = Math.floor(secPerKm / 60)
+    const s = Math.round(secPerKm % 60).toString().padStart(2, '0')
+    pace = `${m}:${s}/km`
   }
-  return null
+  // Snelheid voor fietsen
+  let kmh = null
+  if (sport === 'fietsen' && distM > 0 && sec > 0) {
+    kmh = ((distM / 1000) / (sec / 3600)).toFixed(1)
+  }
+
+  const notitiesParts = [titel]
+  if (km)         notitiesParts.push(`${km}km`)
+  if (pace)       notitiesParts.push(pace)
+  if (kmh)        notitiesParts.push(`${kmh}km/u`)
+  if (hoogte)     notitiesParts.push(`↑${hoogte}m`)
+  if (tssRound)   notitiesParts.push(`TSS ${tssRound}`)
+  notitiesParts.push(`[suunto:${id}]`)
+
+  return {
+    user_id_placeholder: true,
+    datum,
+    sport,
+    duur_min,
+    kcal,
+    gem_hartslag,
+    max_hartslag,
+    zone2_min,
+    zone3_min,
+    zone4_min,
+    stemming,
+    notities: notitiesParts.join(' — '),
+    bron: 'suunto',
+    suunto_id: id,
+    _km: km,
+    _titel: titel,
+    _hoogte: hoogte,
+    _tss: tssRound,
+  }
 }
 
 export async function syncSuuntoForUser(sql, userId, accessToken) {
@@ -120,13 +245,13 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   let overgeslagen = 0
   const nieuweRijen = []
 
+  // Suunto API gebruikt epoch ms voor since/until
   const heeftBestaande = bestaandeIds.size > 0
-  // Eerste sync: alles vanaf 2015. Daarna: laatste 90 dagen.
-  const since = heeftBestaande
-    ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    : new Date(2015, 0, 1).toISOString()
+  const sinceMs = heeftBestaande
+    ? Date.now() - 90 * 24 * 60 * 60 * 1000
+    : new Date(2015, 0, 1).getTime()
 
-  let nextUrl = `${SUUNTO_API_BASE}/v2/workouts?since=${encodeURIComponent(since)}&limit=100`
+  let nextUrl = `${SUUNTO_API_BASE}/v2/workouts?since=${sinceMs}&limit=100`
 
   while (nextUrl) {
     const res = await fetch(nextUrl, { headers: suuntoHeaders(accessToken) })
@@ -138,77 +263,25 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
     }
 
     const data = await res.json()
-    const workouts = Array.isArray(data) ? data : (data.payload ?? data.Items ?? data.workouts ?? [])
-    nextUrl = (!Array.isArray(data) && (data.next || data.NextUrl)) ? (data.next || data.NextUrl) : null
+    const workouts = Array.isArray(data?.payload) ? data.payload
+                   : Array.isArray(data) ? data
+                   : (data?.Items ?? data?.workouts ?? [])
+    nextUrl = data?.metadata?.next || data?.next || null
 
     debug.workouts_received = (debug.workouts_received || 0) + workouts.length
 
     if (workouts.length === 0) break
-    if (workouts[0]) {
-      debug.sample = workouts[0]
-      console.log('Suunto workout sample:', JSON.stringify(workouts[0]).slice(0, 500))
-    }
 
     for (const w of workouts) {
-      // workoutKey is de stabiele identifier in v2
-      const id = String(
-        field(w, 'workoutKey', 'WorkoutKey', 'id', 'Id') ?? ''
-      )
-      if (!id) continue
-      if (bestaandeIds.has(id)) { overgeslagen++; continue }
-
-      const startTime = field(w, 'startTime', 'StartTime') || ''
-      const datum = startTime.slice(0, 10)
-      if (!datum) continue
-
-      // Duur in seconden
-      const sec = parseFloat(field(w, 'totalTime', 'TotalTime', 'duration', 'Duration') ?? 0)
-      const duur_min = sec > 0 ? Math.round(sec / 60) : null
-
-      // Afstand meters → km
-      const distM = parseFloat(field(w, 'totalDistance', 'TotalDistance', 'distance', 'Distance') ?? 0)
-      const km = distM > 0 ? (distM / 1000).toFixed(1) : null
-
-      const kcalRaw = field(w, 'totalCalories', 'TotalCalories', 'calories', 'Calories')
-      const kcal = kcalRaw > 0 ? Math.round(kcalRaw) : null
-
-      const gemHr = field(w, 'averageHeartRate', 'AverageHeartRate', 'avgHeartRate', 'avgHr')
-      const maxHr = field(w, 'peakHeartRate', 'PeakHeartRate', 'maxHeartRate', 'MaxHeartRate', 'MaximumHeartRate')
-
-      // Hoogtemeters (ascent in meters)
-      const ascentRaw = field(w, 'totalAscent', 'TotalAscent', 'ascent', 'Ascent')
-      const hoogtemeters = ascentRaw > 0 ? Math.round(ascentRaw) : null
-
-      // Stemming: Suunto 'feeling' 1-5
-      const stemming = mapFeeling(field(w, 'feeling', 'Feeling'))
-
-      const activityId = field(w, 'activityId', 'ActivityId')
-      const activityName = field(w, 'activityName', 'ActivityName') || ''
-      const sport = mapSport(activityId, activityName)
-      const titel = activityName || sport
-
-      const notitiesParts = [titel]
-      if (km) notitiesParts.push(`${km}km`)
-      if (hoogtemeters) notitiesParts.push(`↑${hoogtemeters}m`)
-      notitiesParts.push(`[suunto:${id}]`)
-
-      nieuweRijen.push({
-        user_id:      userId,
-        datum,
-        sport,
-        duur_min,
-        kcal,
-        gem_hartslag: gemHr ? Math.round(gemHr) : null,
-        max_hartslag: maxHr ? Math.round(maxHr) : null,
-        stemming,
-        notities:     notitiesParts.join(' — '),
-        bron:         'suunto',
-        suunto_id:    id,
-        _km:          km,
-        _titel:       titel,
-        _hoogte:      hoogtemeters,
-      })
+      const parsed = parseWorkout(w)
+      if (!parsed) continue
+      if (bestaandeIds.has(parsed.suunto_id)) { overgeslagen++; continue }
+      parsed.user_id_placeholder = false
+      nieuweRijen.push({ ...parsed, user_id: userId })
     }
+
+    // Veiligheid: stop als geen next link
+    if (!nextUrl) break
   }
 
   let gesynchroniseerd = 0
@@ -216,11 +289,14 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   const BATCH = 200
   for (let i = 0; i < nieuweRijen.length; i += BATCH) {
     const batch = nieuweRijen.slice(i, i + BATCH)
-    const insertRows = batch.map(({ _km, _titel, _hoogte, ...row }) => row)
+    const insertRows = batch.map(({ _km, _titel, _hoogte, _tss, user_id_placeholder, ...row }) => row)
     const result = await sql`
       INSERT INTO trainingen
-        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, stemming, notities, bron, suunto_id)
-      VALUES ${sql(insertRows, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'stemming', 'notities', 'bron', 'suunto_id')}
+        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
+         zone2_min, zone3_min, zone4_min, stemming, notities, bron, suunto_id)
+      VALUES ${sql(insertRows,
+        'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag',
+        'zone2_min', 'zone3_min', 'zone4_min', 'stemming', 'notities', 'bron', 'suunto_id')}
       ON CONFLICT (user_id, suunto_id) WHERE suunto_id IS NOT NULL DO NOTHING
       RETURNING suunto_id
     `
@@ -236,6 +312,7 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
           kcal:         row.kcal,
           gem_hartslag: row.gem_hartslag,
           hoogte:       row._hoogte,
+          tss:          row._tss,
         })
       }
     }
