@@ -1,8 +1,8 @@
-// Shared Suunto Sports API v2 logica
-// Docs: https://apizone.suunto.com (login required)
-// Env vars nodig: SUUNTO_CLIENT_ID, SUUNTO_CLIENT_SECRET, SUUNTO_SUBSCRIPTION_KEY
+// Shared Suunto Cloud API v2 logica
+// Docs: https://cloudapi.suunto.com
+// Env vars nodig: SUUNTO_CLIENT_ID, SUUNTO_CLIENT_SECRET
+// Optioneel: SUUNTO_SUBSCRIPTION_KEY (Ocp-Apim-Subscription-Key)
 
-// Suunto Cloud API OAuth2 endpoints
 export const SUUNTO_AUTH_URL   = 'https://cloudapi-oauth.suunto.com/oauth/authorize'
 export const SUUNTO_TOKEN_URL  = 'https://cloudapi-oauth.suunto.com/oauth/token'
 export const SUUNTO_API_BASE   = 'https://cloudapi.suunto.com'
@@ -12,15 +12,13 @@ export function suuntoHeaders(accessToken) {
     'Authorization': `Bearer ${accessToken}`,
     'Accept': 'application/json',
   }
-  // Subscription key is alleen nodig als jouw Suunto API product 'm vereist
   if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
     headers['Ocp-Apim-Subscription-Key'] = process.env.SUUNTO_SUBSCRIPTION_KEY
   }
   return headers
 }
 
-// Suunto ActivityId → onze sport-namen
-// Volledige lijst: https://apizone.suunto.com/api-details#api=sports-api
+// Suunto activityId → onze sport-namen
 const SPORT_MAP = {
   1:   'hardlopen',   // Running
   2:   'fietsen',     // Cycling
@@ -33,21 +31,31 @@ const SPORT_MAP = {
   16:  'wandelen',    // Hiking
   56:  'fitness',     // Gym
   58:  'yoga',        // Yoga
+  82:  'hardlopen',   // Trail running (alt id)
   91:  'hardlopen',   // Trail running
   108: 'fietsen',     // Indoor cycling
   109: 'zwemmen',     // Open water swimming
+  112: 'fitness',     // Strength training
+  130: 'yoga',        // Pilates
 }
 
-function mapSport(activityId, sportName) {
-  const n = (sportName || '').toLowerCase()
-  if (/hyrox/.test(n))   return 'hyrox'
-  if (/padel/.test(n))   return 'padel'
-  if (/tennis/.test(n))  return 'tennis'
+function mapSport(activityId, activityName) {
+  const n = (activityName || '').toLowerCase()
+  if (/hyrox/.test(n))          return 'hyrox'
+  if (/padel/.test(n))          return 'padel'
+  if (/tennis/.test(n))         return 'tennis'
   if (/voetbal|soccer/.test(n)) return 'voetbal'
+  if (/yoga/.test(n))           return 'yoga'
+  if (/pilates/.test(n))        return 'yoga'
   return SPORT_MAP[activityId] || 'overig'
 }
 
-// Vernieuw access token met refresh token
+// Suunto feeling (1-5) → stemming (1-5) — schaal is gelijk
+function mapFeeling(feeling) {
+  const v = parseInt(feeling, 10)
+  return (v >= 1 && v <= 5) ? v : null
+}
+
 export async function refreshSuuntoToken(sql, userId, refreshToken) {
   const res = await fetch(SUUNTO_TOKEN_URL, {
     method: 'POST',
@@ -77,7 +85,6 @@ export async function refreshSuuntoToken(sql, userId, refreshToken) {
   return data.access_token
 }
 
-// Haal geldig access token op — vernieuw automatisch als verlopen
 export async function getValidToken(sql, userId) {
   const [p] = await sql`
     SELECT suunto_access_token, suunto_refresh_token, suunto_token_expiry
@@ -85,7 +92,6 @@ export async function getValidToken(sql, userId) {
   `
   if (!p?.suunto_access_token) throw new Error('Suunto niet gekoppeld')
 
-  // Vernieuw als token binnen 5 minuten verloopt
   const expiry = p.suunto_token_expiry ? new Date(p.suunto_token_expiry) : null
   const verlooptBinnenkort = !expiry || expiry < new Date(Date.now() + 5 * 60 * 1000)
   if (verlooptBinnenkort && p.suunto_refresh_token) {
@@ -94,11 +100,17 @@ export async function getValidToken(sql, userId) {
   return p.suunto_access_token
 }
 
-// Sync alle Suunto workouts voor een user
+// Lees veld uit workout — Suunto API geeft camelCase, sommige responses PascalCase
+function field(w, ...keys) {
+  for (const k of keys) {
+    if (w[k] !== undefined && w[k] !== null) return w[k]
+  }
+  return null
+}
+
 export async function syncSuuntoForUser(sql, userId, accessToken) {
   const debug = {}
 
-  // Haal bestaande Suunto IDs op om duplicates te vermijden
   const bestaand = await sql`
     SELECT suunto_id FROM trainingen
     WHERE user_id = ${userId} AND suunto_id IS NOT NULL
@@ -108,12 +120,11 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   let overgeslagen = 0
   const nieuweRijen = []
 
-  // Suunto workouts ophalen (paginering via 'since' parameter)
-  // Eerste keer: sync alles; daarna alleen nieuw (laatste 90 dagen is voldoende)
   const heeftBestaande = bestaandeIds.size > 0
+  // Eerste sync: alles vanaf 2015. Daarna: laatste 90 dagen.
   const since = heeftBestaande
     ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    : new Date(2020, 0, 1).toISOString()
+    : new Date(2015, 0, 1).toISOString()
 
   let nextUrl = `${SUUNTO_API_BASE}/v2/workouts?since=${encodeURIComponent(since)}&limit=100`
 
@@ -127,42 +138,58 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
     }
 
     const data = await res.json()
-    // Suunto kan returnen als array of als { Items: [...], NextUrl: '...' }
-    const workouts = Array.isArray(data) ? data : (data.Items ?? data.workouts ?? [])
-    nextUrl = (!Array.isArray(data) && data.NextUrl) ? data.NextUrl : null
+    const workouts = Array.isArray(data) ? data : (data.payload ?? data.Items ?? data.workouts ?? [])
+    nextUrl = (!Array.isArray(data) && (data.next || data.NextUrl)) ? (data.next || data.NextUrl) : null
 
     debug.workouts_received = (debug.workouts_received || 0) + workouts.length
 
     if (workouts.length === 0) break
-    if (workouts[0]) console.log('Suunto workout sample:', JSON.stringify(workouts[0]).slice(0, 300))
+    if (workouts[0]) {
+      debug.sample = workouts[0]
+      console.log('Suunto workout sample:', JSON.stringify(workouts[0]).slice(0, 500))
+    }
 
     for (const w of workouts) {
-      const id = String(w.WorkoutKey || w.Id || '')
+      // workoutKey is de stabiele identifier in v2
+      const id = String(
+        field(w, 'workoutKey', 'WorkoutKey', 'id', 'Id') ?? ''
+      )
       if (!id) continue
       if (bestaandeIds.has(id)) { overgeslagen++; continue }
 
-      // Datum: StartTime is UTC, gebruik lokale datum
-      const startTime = w.StartTime || w.startTime || ''
+      const startTime = field(w, 'startTime', 'StartTime') || ''
       const datum = startTime.slice(0, 10)
       if (!datum) continue
 
-      // Duur: TotalTime in seconden
-      const sec = parseFloat(w.TotalTime ?? w.Duration ?? 0)
+      // Duur in seconden
+      const sec = parseFloat(field(w, 'totalTime', 'TotalTime', 'duration', 'Duration') ?? 0)
       const duur_min = sec > 0 ? Math.round(sec / 60) : null
 
-      // Afstand: TotalDistance in meters → km
-      const distM = parseFloat(w.TotalDistance ?? w.Distance ?? 0)
+      // Afstand meters → km
+      const distM = parseFloat(field(w, 'totalDistance', 'TotalDistance', 'distance', 'Distance') ?? 0)
       const km = distM > 0 ? (distM / 1000).toFixed(1) : null
 
-      const kcal = w.TotalCalories > 0 ? Math.round(w.TotalCalories) : null
-      const gem_hr = w.AverageHeartRate ?? null
-      const max_hr = w.MaximumHeartRate ?? null
+      const kcalRaw = field(w, 'totalCalories', 'TotalCalories', 'calories', 'Calories')
+      const kcal = kcalRaw > 0 ? Math.round(kcalRaw) : null
 
-      const sport = mapSport(w.ActivityId, w.ActivityName || '')
-      const titel = w.ActivityName || sport
+      const gemHr = field(w, 'averageHeartRate', 'AverageHeartRate', 'avgHeartRate', 'avgHr')
+      const maxHr = field(w, 'peakHeartRate', 'PeakHeartRate', 'maxHeartRate', 'MaxHeartRate', 'MaximumHeartRate')
+
+      // Hoogtemeters (ascent in meters)
+      const ascentRaw = field(w, 'totalAscent', 'TotalAscent', 'ascent', 'Ascent')
+      const hoogtemeters = ascentRaw > 0 ? Math.round(ascentRaw) : null
+
+      // Stemming: Suunto 'feeling' 1-5
+      const stemming = mapFeeling(field(w, 'feeling', 'Feeling'))
+
+      const activityId = field(w, 'activityId', 'ActivityId')
+      const activityName = field(w, 'activityName', 'ActivityName') || ''
+      const sport = mapSport(activityId, activityName)
+      const titel = activityName || sport
 
       const notitiesParts = [titel]
       if (km) notitiesParts.push(`${km}km`)
+      if (hoogtemeters) notitiesParts.push(`↑${hoogtemeters}m`)
       notitiesParts.push(`[suunto:${id}]`)
 
       nieuweRijen.push({
@@ -171,13 +198,15 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
         sport,
         duur_min,
         kcal,
-        gem_hartslag: gem_hr ? Math.round(gem_hr) : null,
-        max_hartslag: max_hr ? Math.round(max_hr) : null,
+        gem_hartslag: gemHr ? Math.round(gemHr) : null,
+        max_hartslag: maxHr ? Math.round(maxHr) : null,
+        stemming,
         notities:     notitiesParts.join(' — '),
         bron:         'suunto',
         suunto_id:    id,
         _km:          km,
         _titel:       titel,
+        _hoogte:      hoogtemeters,
       })
     }
   }
@@ -187,11 +216,11 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   const BATCH = 200
   for (let i = 0; i < nieuweRijen.length; i += BATCH) {
     const batch = nieuweRijen.slice(i, i + BATCH)
-    const insertRows = batch.map(({ _km, _titel, ...row }) => row)
+    const insertRows = batch.map(({ _km, _titel, _hoogte, ...row }) => row)
     const result = await sql`
       INSERT INTO trainingen
-        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, notities, bron, suunto_id)
-      VALUES ${sql(insertRows, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'notities', 'bron', 'suunto_id')}
+        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, stemming, notities, bron, suunto_id)
+      VALUES ${sql(insertRows, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'stemming', 'notities', 'bron', 'suunto_id')}
       ON CONFLICT (user_id, suunto_id) WHERE suunto_id IS NOT NULL DO NOTHING
       RETURNING suunto_id
     `
@@ -206,6 +235,7 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
           km:           row._km,
           kcal:         row.kcal,
           gem_hartslag: row.gem_hartslag,
+          hoogte:       row._hoogte,
         })
       }
     }
