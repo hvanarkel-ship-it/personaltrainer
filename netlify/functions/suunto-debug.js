@@ -19,28 +19,33 @@ export const handler = async (event) => {
     const single = event.queryStringParameters?.path
     const sinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000
 
+    // Probeer de "24/7 API" — bekend uit Suunto API portal
+    // (new-247-api / daily-activity-samples)
+    const today = new Date().toISOString().slice(0, 10)
+    const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)
     const endpoints = single ? [single] : [
+      // 24/7 API variaties
+      `/247/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
+      `/247/daily-activity-samples`,
+      `/v1/247/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
+      `/247/sleep?startDate=${weekAgo}&endDate=${today}`,
+      `/247/sleep`,
+      `/247/hrv?startDate=${weekAgo}&endDate=${today}`,
+      `/247/hrv`,
+      `/247/recovery?startDate=${weekAgo}&endDate=${today}`,
+      `/247/recovery`,
+      `/247/heartrate?startDate=${weekAgo}&endDate=${today}`,
+      `/247/heartrate`,
+      `/247/steps?startDate=${weekAgo}&endDate=${today}`,
+      `/247/steps`,
+      `/247/calories?startDate=${weekAgo}&endDate=${today}`,
+      `/247/stress?startDate=${weekAgo}&endDate=${today}`,
+      `/247/`,
+      // Direct (zonder /247 prefix)
+      `/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
+      `/sleep?startDate=${weekAgo}&endDate=${today}`,
+      // Bevestig dat /v2/workouts nog werkt
       '/v2/workouts?limit=1',
-      '/v2/sleep?limit=5',
-      '/v2/sleep',
-      '/v2/recovery?limit=5',
-      '/v2/recovery',
-      `/v2/sleep?since=${sinceMs}&limit=5`,
-      `/v2/recovery?since=${sinceMs}&limit=5`,
-      '/v2/user',
-      '/v2/user/me',
-      '/v2/users/me',
-      '/v2/profile',
-      '/v2/heartrate',
-      '/v2/heartrate/daily',
-      '/v2/hrv',
-      `/v2/hrv?since=${sinceMs}`,
-      '/v2/dailyactivity',
-      `/v2/dailyactivity?since=${sinceMs}`,
-      '/v2/steps',
-      `/v2/steps?since=${sinceMs}`,
-      '/v2/wellness',
-      `/v2/wellness?since=${sinceMs}`,
     ]
 
     const results = []
