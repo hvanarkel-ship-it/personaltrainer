@@ -210,15 +210,15 @@ export const handler = async (event) => {
       extractiePromise = detecteerMaaltijdTekst(sql, userId, bericht)
     }
 
-    // ── Suunto wellness bijwerken als data ouder is dan 60 minuten ──
+    // ── Suunto wellness altijd bijwerken voor ieder gesprek (max 1x per 5 min) ──
     try {
       const [laatste] = await sql`
         SELECT updated_at FROM dagelijkse_wellness
         WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
       `
-      const isVerouderd = !laatste?.updated_at ||
-        (Date.now() - new Date(laatste.updated_at).getTime()) > 60 * 60 * 1000
-      if (isVerouderd) {
+      const ouderDan5Min = !laatste?.updated_at ||
+        (Date.now() - new Date(laatste.updated_at).getTime()) > 5 * 60 * 1000
+      if (ouderDan5Min) {
         const token = await getValidToken(sql, userId).catch(() => null)
         if (token) await syncSuuntoWellnessForUser(sql, userId, token, 2)
       }
