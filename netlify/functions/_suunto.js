@@ -8,11 +8,15 @@ export const SUUNTO_TOKEN_URL  = 'https://apizone.suunto.com/oauth/token'
 export const SUUNTO_API_BASE   = 'https://apizone.suunto.com'
 
 export function suuntoHeaders(accessToken) {
-  return {
+  const headers = {
     'Authorization': `Bearer ${accessToken}`,
-    'Ocp-Apim-Subscription-Key': process.env.SUUNTO_SUBSCRIPTION_KEY || '',
     'Accept': 'application/json',
   }
+  // Subscription key is alleen nodig als jouw Suunto API product 'm vereist
+  if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
+    headers['Ocp-Apim-Subscription-Key'] = process.env.SUUNTO_SUBSCRIPTION_KEY
+  }
+  return headers
 }
 
 // Suunto ActivityId → onze sport-namen
