@@ -48,11 +48,28 @@ export const handler = async (event) => {
       '/v2/workouts?limit=1',
     ]
 
+    // Probeer ook alternatieve hosts voor de 24/7 API
+    const altHosts = [
+      'https://apizone.suunto.com',
+      'https://cloudapi.suunto.com/247',
+    ]
+    const altPaths = [
+      `/daily-activity-samples?startDate=${weekAgo}&endDate=${today}`,
+      `/sleep?startDate=${weekAgo}&endDate=${today}`,
+      `/hrv?startDate=${weekAgo}&endDate=${today}`,
+    ]
+    for (const host of altHosts) {
+      for (const p of altPaths) {
+        endpoints.push({ __fullUrl: `${host}${p}` })
+      }
+    }
+
     const results = []
-    for (const path of endpoints) {
-      const url = `${SUUNTO_API_BASE}${path}`
+    for (const item of endpoints) {
+      const fullUrl = typeof item === 'object' ? item.__fullUrl : `${SUUNTO_API_BASE}${item}`
+      const path = typeof item === 'object' ? fullUrl : item
       try {
-        const res = await fetch(url, { headers: suuntoHeaders(accessToken) })
+        const res = await fetch(fullUrl, { headers: suuntoHeaders(accessToken) })
         const txt = await res.text()
         let body
         try { body = JSON.parse(txt) } catch { body = txt.slice(0, 200) }
