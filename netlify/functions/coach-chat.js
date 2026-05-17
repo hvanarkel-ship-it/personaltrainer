@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
+import { getValidToken, syncSuuntoWellnessForUser } from './_suunto.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
@@ -208,6 +209,20 @@ export const handler = async (event) => {
     } else if (bericht && !upload_type) {
       extractiePromise = detecteerMaaltijdTekst(sql, userId, bericht)
     }
+
+    // ── Suunto wellness bijwerken als data ouder is dan 60 minuten ──
+    try {
+      const [laatste] = await sql`
+        SELECT updated_at FROM dagelijkse_wellness
+        WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
+      `
+      const isVerouderd = !laatste?.updated_at ||
+        (Date.now() - new Date(laatste.updated_at).getTime()) > 60 * 60 * 1000
+      if (isVerouderd) {
+        const token = await getValidToken(sql, userId).catch(() => null)
+        if (token) await syncSuuntoWellnessForUser(sql, userId, token, 2)
+      }
+    } catch { /* geen Suunto of sync mislukt — doorgaan met bestaande data */ }
 
     // ── Alle data parallel ophalen ──
     const vandaag = vandaagAms()
