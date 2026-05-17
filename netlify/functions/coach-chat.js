@@ -170,10 +170,14 @@ export const handler = async (event) => {
 
   try {
     if (event.httpMethod === 'GET') {
+      // Haal de laatste 200 berichten op (nieuwste eerst), dan omdraaien voor chronologische weergave
       const rows = await sql`
-        SELECT rol, bericht, is_ai, upload_type, created_at
-        FROM gesprekken WHERE user_id = ${userId}
-        ORDER BY created_at ASC, id ASC LIMIT 200`
+        SELECT rol, bericht, is_ai, upload_type, created_at FROM (
+          SELECT rol, bericht, is_ai, upload_type, created_at, id
+          FROM gesprekken WHERE user_id = ${userId}
+          ORDER BY created_at DESC, id DESC LIMIT 200
+        ) sub
+        ORDER BY created_at ASC, id ASC`
       return cors(rows)
     }
 
