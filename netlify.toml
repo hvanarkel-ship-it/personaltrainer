@@ -3,24 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  NODE_VERSION = "22"
+
 [functions]
   node_bundler = "esbuild"
-  included_files = ["netlify/functions/**"]
   timeout = 26
-
-[functions."intervals-sync"]
-  timeout = 26
-
-[functions."runalyze-sync"]
-  timeout = 26
-
-[dev]
-  command = "npm run dev"
-  port = 8888
-  targetPort = 5173
-  publish = "dist"
-  functions = "netlify/functions"
-  autoLaunch = false
 
 [[redirects]]
   from = "/api/*"
@@ -31,6 +19,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[context.production.environment]
-  NODE_ENV = "production"
