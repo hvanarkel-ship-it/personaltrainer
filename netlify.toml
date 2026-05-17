@@ -8,7 +8,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["netlify/functions/**"]
   timeout = 26
 
 [functions."intervals-sync"]
