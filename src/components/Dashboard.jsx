@@ -82,6 +82,7 @@ function GereedheidsRing({ score, gInfo }) {
 
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [data, setData] = useState(null)
+  const [wellness, setWellness] = useState([])
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
   const [toonOchtendForm, setToonOchtendForm] = useState(false)
@@ -89,10 +90,13 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
-    api.get('/dashboard')
-      .then(d => setData(d))
-      .catch(e => setFout(e.message))
-      .finally(() => setLaden(false))
+    Promise.all([
+      api.get('/dashboard').catch(e => { setFout(e.message); return null }),
+      api.get('/wellness?dagen=14').catch(() => ({ wellness: [] })),
+    ]).then(([d, w]) => {
+      if (d) setData(d)
+      setWellness(w?.wellness || [])
+    }).finally(() => setLaden(false))
   }, [])
 
   const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -119,7 +123,17 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   const p = data?.profiel || {}
   const v = data?.vandaag || {}
-  const h = data?.herstel || {}
+  const hOrig = data?.herstel || {}
+  // Merge Suunto wellness (laatste dag) als handmatige herstel-data ontbreekt
+  const laatsteWellness = wellness[0] || null
+  const h = {
+    ...hOrig,
+    hrv_ochtend:   hOrig.hrv_ochtend   ?? laatsteWellness?.hrv_ochtend,
+    slaap_uur:     hOrig.slaap_uur     ?? laatsteWellness?.slaap_uur,
+    slaapscore:    hOrig.slaapscore    ?? laatsteWellness?.slaap_score,
+    herstelbalans: hOrig.herstelbalans ?? (laatsteWellness?.herstel_balans != null ? laatsteWellness.herstel_balans * 100 : null),
+    datum:         hOrig.datum         ?? laatsteWellness?.datum,
+  }
   const doelen = data?.doelen || []
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
@@ -145,11 +159,21 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const pad2 = n => String(n).padStart(2, '0')
   const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
   const vandaag = dagStr(new Date())
+  const wellnessByDatum = new Map(wellness.map(w => [datumStr(w.datum), w]))
   const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = dagStr(d)
     const rec = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
-    return { datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }), hrv: rec?.hrv_ochtend || null, isVandaag: ds === vandaag }
+    const w = wellnessByDatum.get(ds)
+    return {
+      datum: ds,
+      label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
+      hrv: rec?.hrv_ochtend || w?.hrv_ochtend || null,
+      slaap: w?.slaap_uur ? parseFloat(w.slaap_uur) : null,
+      balans: w?.herstel_balans != null ? parseFloat(w.herstel_balans) : null,
+      stappen: w?.stappen || null,
+      isVandaag: ds === vandaag,
+    }
   })
   const heeftHrvTrend = hrv7Dagen.some(d => d.hrv !== null)
   const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
@@ -325,6 +349,83 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           💬 Vraag coach om analyse →
         </button>
       </div>
+
+      {/* ── SUUNTO WELLNESS (slaap/HRV/herstel/stappen) ── */}
+      {wellness.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h3>⌚ Wellness (Suunto)</h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>laatste 7 dagen</span>
+          </div>
+
+          {/* Vandaag samenvatting */}
+          {laatsteWellness && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
+              {laatsteWellness.slaap_uur && (
+                <div style={{ padding: 10, background: '#eff6ff', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#1e3a8a', fontWeight: 600 }}>💤 SLAAP</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af' }}>{laatsteWellness.slaap_uur}u</div>
+                  {laatsteWellness.slaap_score && <div style={{ fontSize: '0.7rem', color: '#64748b' }}>score {laatsteWellness.slaap_score}</div>}
+                </div>
+              )}
+              {laatsteWellness.hrv_ochtend && (
+                <div style={{ padding: 10, background: '#f0fdf4', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#14532d', fontWeight: 600 }}>❤️ HRV</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#166534' }}>{laatsteWellness.hrv_ochtend}<span style={{ fontSize: '0.8rem', fontWeight: 400 }}>ms</span></div>
+                </div>
+              )}
+              {laatsteWellness.herstel_balans != null && (
+                <div style={{ padding: 10, background: '#fef3c7', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#78350f', fontWeight: 600 }}>🔋 HERSTEL</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#92400e' }}>{Math.round(parseFloat(laatsteWellness.herstel_balans) * 100)}%</div>
+                </div>
+              )}
+              {laatsteWellness.rust_hartslag && (
+                <div style={{ padding: 10, background: '#fce7f3', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#831843', fontWeight: 600 }}>💗 RUST-HR</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#9d174d' }}>{laatsteWellness.rust_hartslag}<span style={{ fontSize: '0.8rem', fontWeight: 400 }}>bpm</span></div>
+                </div>
+              )}
+              {laatsteWellness.stappen && (
+                <div style={{ padding: 10, background: '#f5f3ff', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#4c1d95', fontWeight: 600 }}>👟 STAPPEN</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#6d28d9' }}>{laatsteWellness.stappen.toLocaleString('nl-NL')}</div>
+                </div>
+              )}
+              {laatsteWellness.kcal_actief && (
+                <div style={{ padding: 10, background: '#fef2f2', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#7f1d1d', fontWeight: 600 }}>🔥 KCAL</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#991b1b' }}>{laatsteWellness.kcal_actief}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 7-daagse staafjes voor slaap */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80, marginBottom: 8 }}>
+            {hrv7Dagen.map(d => {
+              const hoogte = d.slaap ? Math.min(100, (d.slaap / 9) * 100) : 4
+              const kleur = !d.slaap ? 'var(--border)'
+                : d.slaap >= 7.5 ? '#22c55e'
+                : d.slaap >= 6.5 ? '#eab308'
+                : '#ef4444'
+              return (
+                <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', minHeight: 12 }}>{d.slaap ? `${d.slaap}u` : ''}</div>
+                  <div style={{ width: '100%', height: `${hoogte}%`, background: kleur, borderRadius: 4, transition: 'height 0.4s', minHeight: 4 }}
+                       title={d.slaap ? `${d.label}: ${d.slaap}u slaap` : `${d.label}: geen data`} />
+                  <span style={{ fontSize: '0.65rem', fontWeight: d.isVandaag ? 700 : 400, color: d.isVandaag ? 'var(--accent)' : '#64748b' }}>
+                    {d.label.slice(0, 2)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--muted)', textAlign: 'center' }}>
+            Slaap-uren per dag · <span style={{ color: '#22c55e' }}>●</span> ≥7,5u  <span style={{ color: '#eab308' }}>●</span> 6,5-7,5u  <span style={{ color: '#ef4444' }}>●</span> &lt;6,5u
+          </div>
+        </div>
+      )}
 
       {/* ── WEEK TRAINING ── */}
       {echteTrainingen.length > 0 && (
