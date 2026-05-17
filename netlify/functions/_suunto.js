@@ -410,29 +410,52 @@ function aggregateActivity(entries) {
   return out
 }
 
-// Recovery: balance + stress per dag (gemiddeld over ochtend 04-09 lokaal)
-function aggregateRecovery(entries) {
-  const perDag = new Map() // datum → {bal: [], stress: []}
+// Recovery: balance + stress per dag
+// Vandaag → meest recente meting (hele dag); historisch → ochtend 04-09 gemiddelde
+function aggregateRecovery(entries, vandaag) {
+  // datum → { ochtend: {bal[], stress[]}, recent: {bal, ts, stress} }
+  const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
     if (!d || !e.timestamp) continue
     const datum = localDate(e.timestamp)
     const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
-    if (uur < 4 || uur >= 9) continue // alleen ochtend
-    const cur = perDag.get(datum) || { bal: [], stress: [] }
-    if (typeof d.Balance === 'number') cur.bal.push(d.Balance)
-    // StressState: 0=Invalid, 1=Relaxing, 2=Active, 3=Passive, 4=Stressful
-    if (d.StressState >= 1 && d.StressState <= 4) cur.stress.push(d.StressState)
+    const ts = new Date(e.timestamp).getTime()
+    const cur = perDag.get(datum) || { ochtend: { bal: [], stress: [] }, recent: { bal: null, ts: 0, stress: null } }
+
+    // Meest recente waarde altijd bijhouden (voor vandaag)
+    if (typeof d.Balance === 'number' && ts > cur.recent.ts) {
+      cur.recent.bal = d.Balance
+      cur.recent.ts  = ts
+    }
+    if (d.StressState >= 1 && d.StressState <= 4 && ts > cur.recent.ts) {
+      cur.recent.stress = d.StressState
+    }
+
+    // Ochtend aggregatie (04-09) voor historische dagen
+    if (uur >= 4 && uur < 9) {
+      if (typeof d.Balance === 'number') cur.ochtend.bal.push(d.Balance)
+      if (d.StressState >= 1 && d.StressState <= 4) cur.ochtend.stress.push(d.StressState)
+    }
+
     perDag.set(datum, cur)
   }
+
   const out = new Map()
   for (const [datum, v] of perDag) {
-    const avgBal = v.bal.length > 0 ? v.bal.reduce((a,b)=>a+b,0) / v.bal.length : null
-    const avgStress = v.stress.length > 0 ? v.stress.reduce((a,b)=>a+b,0) / v.stress.length : null
+    let avgBal, avgStress
+    if (datum === vandaag) {
+      // Vandaag: actuele stand (meest recente meting, ongeacht tijdstip)
+      avgBal    = v.recent.bal
+      avgStress = v.recent.stress
+    } else {
+      // Historisch: ochtenddoorsneede (fysiologisch meest betekenisvol)
+      avgBal    = v.ochtend.bal.length    > 0 ? v.ochtend.bal.reduce((a,b)=>a+b,0)    / v.ochtend.bal.length    : null
+      avgStress = v.ochtend.stress.length > 0 ? v.ochtend.stress.reduce((a,b)=>a+b,0) / v.ochtend.stress.length : null
+    }
     out.set(datum, {
-      herstel_balans: avgBal != null ? Number(avgBal.toFixed(2)) : null,
-      // StressState 1-4 → pct: relaxing(1)=0, active(2)=33, passive(3)=66, stressful(4)=100
-      stress_pct: avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
+      herstel_balans: avgBal    != null ? Number(avgBal.toFixed(2))                   : null,
+      stress_pct:     avgStress != null ? Math.round((avgStress - 1) / 3 * 100)       : null,
     })
   }
   return out
@@ -478,9 +501,12 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   debug.activity_entries = activity.length
   debug.recovery_entries = recovery.length
 
+  // Vandaag in lokale tijd (YYYY-MM-DD) — zelfde formaat als de timestamps in de API
+  const vandaagLokaal = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
+
   const slaapMap    = aggregateSleep(sleep)
   const activityMap = aggregateActivity(activity)
-  const recoveryMap = aggregateRecovery(recovery)
+  const recoveryMap = aggregateRecovery(recovery, vandaagLokaal)
 
   // Unie van alle datums
   const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys()])

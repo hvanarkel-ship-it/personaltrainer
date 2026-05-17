@@ -530,7 +530,7 @@ ${gisterMeals.length ? `Gisteren: ${Math.round(totGister.kcal)}kcal | ${Math.rou
 Alle wellness-data komt van de Suunto smartwatch. Interpreteer de cijfers ALTIJD zo:
 • HRV (hrv_ochtend): Gemiddelde HRV gemeten TIJDENS DE SLAAP (nacht), niet een losse ochtendmeting. Betrouwbaarder dan een handmatige meting. Datum = dag waarop de gebruiker wakker werd.
 • Rusthartslag (rust_hartslag): Laagste hartslag gemeten tussen 03:00–06:00 's nachts. Nauwkeuriger dan een handmatige polsmeting omdat het altijd in rust is.
-• Herstelbalans (balans): Suunto's Training Load Balance — positief = meer herstelcapaciteit dan trainingsbelasting; negatief = overbelast. Gemiddeld over 04:00–09:00 ochtend.
+• Herstelbalans (balans): Suunto's Training Load Balance — positief = meer herstelcapaciteit dan trainingsbelasting; negatief = overbelast. Vandaag = meest actuele meting van dit moment; historische dagen = ochtendgemiddelde 04:00–09:00.
 • Slaap: Automatisch gedetecteerd door de watch (geen knop drukken nodig). Bevat diepe slaap, REM en lichte slaap in minuten.
 • Actieve kcal: Calorieën verbrand BOVEN het rustmetabolisme — dit zijn niet de totale dagcalorieën.
 • Stappen: Dagtotaal van de watch.
