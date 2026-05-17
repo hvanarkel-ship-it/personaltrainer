@@ -10,20 +10,6 @@
   node_bundler = "esbuild"
   timeout = 26
 
-[functions."intervals-sync"]
-  timeout = 26
-
-[functions."runalyze-sync"]
-  timeout = 26
-
-[dev]
-  command = "npm run dev"
-  port = 8888
-  targetPort = 5173
-  publish = "dist"
-  functions = "netlify/functions"
-  autoLaunch = false
-
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -33,6 +19,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[context.production.environment]
-  NODE_ENV = "production"
