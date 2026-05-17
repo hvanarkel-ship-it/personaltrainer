@@ -135,8 +135,10 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
       const res = await api.post(path, {})
       const fout = res.debug?.workouts_error ? ` ⚠️ ${res.debug.workouts_error}` : ''
       const ontvangen = res.debug?.workouts_received ?? 0
-      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, ontvangen, tijdstip: new Date() })
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend (API gaf ${ontvangen} workouts)${fout}` })
+      const wellnessDagen = res.wellness?.wellness_dagen ?? 0
+      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, ontvangen, wellnessDagen, tijdstip: new Date() })
+      const wellnessTekst = wellnessDagen > 0 ? ` + ${wellnessDagen} dagen slaap/HRV/herstel` : ''
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuwe workouts, ${res.overgeslagen} al bekend${wellnessTekst}${fout}` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Suunto sync mislukt: ' + err.message })
     } finally {
@@ -472,6 +474,9 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                     <div style={{ fontWeight: 600, color: '#166534', marginBottom: 6 }}>
                       Laatste sync: {suuntoLaatste.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
                       {' — '}{suuntoLaatste.nieuw.length} nieuw, {suuntoLaatste.overgeslagen} al bekend
+                      {suuntoLaatste.wellnessDagen > 0 && (
+                        <> — 💤 {suuntoLaatste.wellnessDagen} dagen slaap/HRV</>
+                      )}
                     </div>
                     {suuntoLaatste.nieuw.length > 0 ? (
                       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -321,3 +321,228 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
 
   return { gesynchroniseerd, overgeslagen, nieuweActiviteiten, debug }
 }
+
+// ─── 247samples API: slaap, activiteit (HR/stappen), recovery ──────────────
+
+async function fetch247(path, accessToken) {
+  const res = await fetch(`${SUUNTO_API_BASE}${path}`, { headers: suuntoHeaders(accessToken) })
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '')
+    throw new Error(`247 API ${path} faalde (${res.status}): ${txt.slice(0, 100)}`)
+  }
+  return res.json()
+}
+
+// Lokale datum uit ISO string met timezone offset (vb. "2026-05-03T23:36:00.000+02:00")
+function localDate(iso) {
+  if (!iso) return null
+  return String(iso).slice(0, 10)
+}
+
+// Slaap aggregatie: hoofdslaap per nacht (IsNap=false), bedtimeEnd → datum
+function aggregateSleep(entries) {
+  const perDag = new Map() // datum → {slaap_min, score, deep, rem, light, hrv_sum, hrv_count}
+  const gezien = new Set() // dedupe op SleepId
+
+  for (const e of entries || []) {
+    const d = e?.entryData
+    if (!d) continue
+    if (d.IsNap) continue
+    if (d.SleepId && gezien.has(d.SleepId)) continue
+    if (d.SleepId) gezien.add(d.SleepId)
+
+    // Toewijzen aan datum waarop je opstond (bedtimeEnd) of timestamp
+    const datum = localDate(d.BedtimeEnd || e.timestamp)
+    if (!datum) continue
+
+    const cur = perDag.get(datum) || { slaap_min: 0, score: 0, deep: 0, rem: 0, light: 0, hrv_sum: 0, hrv_count: 0 }
+    const dur = parseFloat(d.Duration) || 0
+    cur.slaap_min += dur / 60
+    cur.deep  += (parseFloat(d.DeepSleepDuration)  || 0) / 60
+    cur.rem   += (parseFloat(d.REMSleepDuration)   || 0) / 60
+    cur.light += (parseFloat(d.LightSleepDuration) || 0) / 60
+    if (d.SleepQualityScore > cur.score) cur.score = d.SleepQualityScore
+    if (d.AvgHRV && d.AvgHRVSampleCount) {
+      cur.hrv_sum   += d.AvgHRV * d.AvgHRVSampleCount
+      cur.hrv_count += d.AvgHRVSampleCount
+    } else if (d.AvgHRV) {
+      cur.hrv_sum   += d.AvgHRV
+      cur.hrv_count += 1
+    }
+    perDag.set(datum, cur)
+  }
+
+  const out = new Map()
+  for (const [datum, v] of perDag) {
+    out.set(datum, {
+      slaap_uur:        v.slaap_min > 0 ? (v.slaap_min / 60).toFixed(1) : null,
+      slaap_score:      v.score > 0 ? Math.round(v.score) : null,
+      diepe_slaap_min:  v.deep  > 0 ? Math.round(v.deep)  : null,
+      rem_slaap_min:    v.rem   > 0 ? Math.round(v.rem)   : null,
+      lichte_slaap_min: v.light > 0 ? Math.round(v.light) : null,
+      hrv_ochtend:      v.hrv_count > 0 ? Math.round(v.hrv_sum / v.hrv_count) : null,
+    })
+  }
+  return out
+}
+
+// Activity samples (per 10 min): aggregeer per dag
+// - stappen = som StepCount
+// - kcal = som EnergyConsumption (joules → kcal: /4184)
+// - rust_HR = min HR tussen 03:00-06:00 lokaal
+function aggregateActivity(entries) {
+  const perDag = new Map() // datum → {stappen, joules, hrSlaap: []}
+  for (const e of entries || []) {
+    const d = e?.entryData
+    if (!d || !e.timestamp) continue
+    const datum = localDate(e.timestamp)
+    const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
+    const cur = perDag.get(datum) || { stappen: 0, joules: 0, hrSlaap: [] }
+    cur.stappen += parseInt(d.StepCount, 10) || 0
+    cur.joules  += parseFloat(d.EnergyConsumption) || 0
+    if (uur >= 3 && uur < 6 && d.HR > 30) cur.hrSlaap.push(d.HR)
+    perDag.set(datum, cur)
+  }
+  const out = new Map()
+  for (const [datum, v] of perDag) {
+    const hr = v.hrSlaap.length > 0 ? Math.round(Math.min(...v.hrSlaap)) : null
+    out.set(datum, {
+      stappen:       v.stappen > 0 ? v.stappen : null,
+      kcal_actief:   v.joules  > 0 ? Math.round(v.joules / 4184) : null,
+      rust_hartslag: hr,
+    })
+  }
+  return out
+}
+
+// Recovery: balance + stress per dag (gemiddeld over ochtend 04-09 lokaal)
+function aggregateRecovery(entries) {
+  const perDag = new Map() // datum → {bal: [], stress: []}
+  for (const e of entries || []) {
+    const d = e?.entryData
+    if (!d || !e.timestamp) continue
+    const datum = localDate(e.timestamp)
+    const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
+    if (uur < 4 || uur >= 9) continue // alleen ochtend
+    const cur = perDag.get(datum) || { bal: [], stress: [] }
+    if (typeof d.Balance === 'number') cur.bal.push(d.Balance)
+    // StressState: 0=Invalid, 1=Relaxing, 2=Active, 3=Passive, 4=Stressful
+    if (d.StressState >= 1 && d.StressState <= 4) cur.stress.push(d.StressState)
+    perDag.set(datum, cur)
+  }
+  const out = new Map()
+  for (const [datum, v] of perDag) {
+    const avgBal = v.bal.length > 0 ? v.bal.reduce((a,b)=>a+b,0) / v.bal.length : null
+    const avgStress = v.stress.length > 0 ? v.stress.reduce((a,b)=>a+b,0) / v.stress.length : null
+    out.set(datum, {
+      herstel_balans: avgBal != null ? Number(avgBal.toFixed(2)) : null,
+      // StressState 1-4 → pct: relaxing(1)=0, active(2)=33, passive(3)=66, stressful(4)=100
+      stress_pct: avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
+    })
+  }
+  return out
+}
+
+export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenTerug = 28) {
+  const debug = {}
+  // Suunto API max interval = 28 dagen
+  const to = Date.now()
+  const from = to - dagenTerug * 86400_000
+
+  // Auto-migratie: zorg dat tabel bestaat
+  await sql`
+    CREATE TABLE IF NOT EXISTS dagelijkse_wellness (
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      datum DATE NOT NULL,
+      slaap_uur NUMERIC(4,1),
+      slaap_score INTEGER,
+      diepe_slaap_min INTEGER,
+      rem_slaap_min INTEGER,
+      lichte_slaap_min INTEGER,
+      hrv_ochtend INTEGER,
+      herstel_balans NUMERIC(4,2),
+      stress_pct INTEGER,
+      rust_hartslag INTEGER,
+      stappen INTEGER,
+      kcal_actief INTEGER,
+      bron TEXT DEFAULT 'suunto',
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (user_id, datum)
+    )
+  `
+
+  let sleep = [], activity = [], recovery = []
+  try { sleep    = await fetch247(`/247samples/sleep?from=${from}&to=${to}`, accessToken) }
+  catch (e) { debug.sleep_error = e.message }
+  try { activity = await fetch247(`/247samples/activity?from=${from}&to=${to}`, accessToken) }
+  catch (e) { debug.activity_error = e.message }
+  try { recovery = await fetch247(`/247samples/recovery?from=${from}&to=${to}`, accessToken) }
+  catch (e) { debug.recovery_error = e.message }
+
+  debug.sleep_entries    = sleep.length
+  debug.activity_entries = activity.length
+  debug.recovery_entries = recovery.length
+
+  const slaapMap    = aggregateSleep(sleep)
+  const activityMap = aggregateActivity(activity)
+  const recoveryMap = aggregateRecovery(recovery)
+
+  // Unie van alle datums
+  const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys()])
+  const rows = []
+  for (const datum of allDates) {
+    const s = slaapMap.get(datum)    || {}
+    const a = activityMap.get(datum) || {}
+    const r = recoveryMap.get(datum) || {}
+    rows.push({
+      user_id:          userId,
+      datum,
+      slaap_uur:        s.slaap_uur        ?? null,
+      slaap_score:      s.slaap_score      ?? null,
+      diepe_slaap_min:  s.diepe_slaap_min  ?? null,
+      rem_slaap_min:    s.rem_slaap_min    ?? null,
+      lichte_slaap_min: s.lichte_slaap_min ?? null,
+      hrv_ochtend:      s.hrv_ochtend      ?? null,
+      herstel_balans:   r.herstel_balans   ?? null,
+      stress_pct:       r.stress_pct       ?? null,
+      rust_hartslag:    a.rust_hartslag    ?? null,
+      stappen:          a.stappen          ?? null,
+      kcal_actief:      a.kcal_actief      ?? null,
+      bron:             'suunto',
+    })
+  }
+
+  let opgeslagen = 0
+  if (rows.length > 0) {
+    const BATCH = 100
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH)
+      const res = await sql`
+        INSERT INTO dagelijkse_wellness
+          (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
+           hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, bron)
+        VALUES ${sql(batch, 'user_id', 'datum', 'slaap_uur', 'slaap_score', 'diepe_slaap_min', 'rem_slaap_min', 'lichte_slaap_min',
+                     'hrv_ochtend', 'herstel_balans', 'stress_pct', 'rust_hartslag', 'stappen', 'kcal_actief', 'bron')}
+        ON CONFLICT (user_id, datum) DO UPDATE SET
+          slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
+          slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
+          diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
+          rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
+          lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
+          hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
+          herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
+          stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
+          rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
+          stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
+          kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
+          bron             = EXCLUDED.bron,
+          updated_at       = NOW()
+        RETURNING datum
+      `
+      opgeslagen += res.length
+    }
+  }
+
+  return { wellness_dagen: opgeslagen, debug }
+}
+
