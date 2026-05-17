@@ -132,7 +132,8 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
     setMelding(null)
     try {
       const res = await api.post('/runalyze-sync', {})
-      setMelding({ type: res.gesynchroniseerd > 0 ? 'success' : 'error', tekst: `↻ ${res.gesynchroniseerd} activiteit${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} overgeslagen)` })
+      const debugInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
+      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} activiteit${res.gesynchroniseerd !== 1 ? 'en' : ''} gesynchroniseerd (${res.overgeslagen} overgeslagen)${debugInfo}` })
     } catch (err) {
       setMelding({ type: 'error', tekst: 'Runalyze sync mislukt: ' + err.message })
     } finally {

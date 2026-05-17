@@ -11,19 +11,23 @@ export const handler = async (event) => {
   if (!token?.trim()) return cors({ error: 'API token is verplicht' }, 400)
 
   try {
-    // Verify token by fetching athlete profile from Runalyze
+    // Verify token by fetching activities from Runalyze
     const res = await fetch('https://runalyze.com/api/v1/activities?limit=1', {
-      headers: {
-        'token': token.trim(),
-        'Accept': 'application/json',
-      }
+      headers: { 'token': token.trim(), 'Accept': 'application/json' }
     })
 
     if (res.status === 401 || res.status === 403) {
       return cors({ error: 'Ongeldig API token — controleer je Runalyze instellingen' }, 400)
     }
     if (!res.ok) {
-      return cors({ error: `Runalyze API fout (${res.status}) — probeer opnieuw` }, 400)
+      const body = await res.text().catch(() => '')
+      return cors({ error: `Runalyze API fout (${res.status})${body ? ': ' + body.slice(0, 100) : ''} — probeer opnieuw` }, 400)
+    }
+
+    // Some Runalyze responses wrap errors in a 200 JSON body
+    const json = await res.json().catch(() => null)
+    if (json && json.error) {
+      return cors({ error: `Runalyze: ${json.error}` }, 400)
     }
 
     const sql = getDb()
