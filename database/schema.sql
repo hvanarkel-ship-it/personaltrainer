@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   datum DATE NOT NULL DEFAULT CURRENT_DATE,
   sport TEXT NOT NULL,
   duur_min INTEGER,
+  km NUMERIC(7,2),
   kcal INTEGER,
   gem_hartslag INTEGER,
   max_hartslag INTEGER,

@@ -16,7 +16,7 @@ export const handler = async () => {
       const workouts = await syncSuuntoForUser(sql, user_id, token)
       let wellness = { wellness_dagen: 0 }
       if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
-        wellness = await syncSuuntoWellnessForUser(sql, user_id, token, 7)
+        wellness = await syncSuuntoWellnessForUser(sql, user_id, token, 28)
       }
       samenvatting.push({
         user_id,
