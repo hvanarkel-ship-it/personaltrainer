@@ -424,12 +424,10 @@ function aggregateRecovery(entries, vandaag) {
     const cur = perDag.get(datum) || { ochtend: { bal: [], stress: [] }, recent: { bal: null, ts: 0, stress: null } }
 
     // Meest recente waarde altijd bijhouden (voor vandaag)
-    if (typeof d.Balance === 'number' && ts > cur.recent.ts) {
-      cur.recent.bal = d.Balance
-      cur.recent.ts  = ts
-    }
-    if (d.StressState >= 1 && d.StressState <= 4 && ts > cur.recent.ts) {
-      cur.recent.stress = d.StressState
+    if (ts > cur.recent.ts) {
+      cur.recent.ts = ts
+      if (typeof d.Balance === 'number') cur.recent.bal = d.Balance
+      if (d.StressState >= 1 && d.StressState <= 4) cur.recent.stress = d.StressState
     }
 
     // Ochtend aggregatie (04-09) voor historische dagen
