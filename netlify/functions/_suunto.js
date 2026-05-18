@@ -149,7 +149,7 @@ function parseWorkout(w) {
   const duur_min = sec > 0 ? Math.round(sec / 60) : null
 
   const distM = parseFloat(w.totalDistance) || 0
-  const km = distM > 0 ? (distM / 1000).toFixed(1) : null
+  const km = distM > 0 ? Math.round(distM / 100) / 10 : null
 
   const kcalRaw = parseFloat(w.energyConsumption) || 0
   const kcal = kcalRaw > 0 ? Math.round(kcalRaw) : null
@@ -204,7 +204,7 @@ function parseWorkout(w) {
   }
 
   const notitiesParts = [titel]
-  if (km)         notitiesParts.push(`${km}km`)
+  if (km)         notitiesParts.push(`${km.toFixed(1)}km`)
   if (pace)       notitiesParts.push(pace)
   if (kmh)        notitiesParts.push(`${kmh}km/u`)
   if (hoogte)     notitiesParts.push(`↑${hoogte}m`)
@@ -216,6 +216,7 @@ function parseWorkout(w) {
     datum,
     sport,
     duur_min,
+    km,
     kcal,
     gem_hartslag,
     max_hartslag,
@@ -226,7 +227,6 @@ function parseWorkout(w) {
     notities: notitiesParts.join(' — '),
     bron: 'suunto',
     suunto_id: id,
-    _km: km,
     _titel: titel,
     _hoogte: hoogte,
     _tss: tssRound,
@@ -289,10 +289,10 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   for (const row of nieuweRijen) {
     const result = await sql`
       INSERT INTO trainingen
-        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
+        (user_id, datum, sport, duur_min, km, kcal, gem_hartslag, max_hartslag,
          zone2_min, zone3_min, zone4_min, stemming, notities, bron, suunto_id)
       VALUES
-        (${row.user_id}, ${row.datum}, ${row.sport}, ${row.duur_min}, ${row.kcal},
+        (${row.user_id}, ${row.datum}, ${row.sport}, ${row.duur_min}, ${row.km}, ${row.kcal},
          ${row.gem_hartslag}, ${row.max_hartslag}, ${row.zone2_min}, ${row.zone3_min},
          ${row.zone4_min}, ${row.stemming}, ${row.notities}, ${row.bron}, ${row.suunto_id})
       ON CONFLICT (user_id, suunto_id) WHERE suunto_id IS NOT NULL DO NOTHING
@@ -304,7 +304,7 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
         sport:        row.sport,
         titel:        row._titel,
         duur_min:     row.duur_min,
-        km:           row._km,
+        km:           row.km,
         kcal:         row.kcal,
         gem_hartslag: row.gem_hartslag,
         hoogte:       row._hoogte,

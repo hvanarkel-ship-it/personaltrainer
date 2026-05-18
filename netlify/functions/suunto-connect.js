@@ -23,7 +23,7 @@ export const handler = async (event) => {
     response_type: 'code',
     client_id:     process.env.SUUNTO_CLIENT_ID,
     redirect_uri:  REDIRECT_URI,
-    scope:         'workout',
+    scope:         'workout wellbeing',
     state,
   })
 

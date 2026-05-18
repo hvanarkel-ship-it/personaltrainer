@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS trainingen (
   datum DATE NOT NULL DEFAULT CURRENT_DATE,
   sport TEXT NOT NULL,
   duur_min INTEGER,
+  km NUMERIC(7,2),
   kcal INTEGER,
   gem_hartslag INTEGER,
   max_hartslag INTEGER,
@@ -143,6 +144,9 @@ ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_token_expiry  TIMESTAMP
 -- trainingen: RPE (1-10 inspanningsscore) en stemming (1-5 humeur)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS rpe SMALLINT;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS stemming SMALLINT;
+
+-- trainingen: afstand in km als gestructureerd veld (was alleen in notities-tekst)
+ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS km NUMERIC(7,2);
 
 -- gesprekken: upload type
 ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;
