@@ -10,6 +10,9 @@
   node_bundler = "esbuild"
   timeout = 26
 
+[functions."auto-sync"]
+  timeout = 900
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
