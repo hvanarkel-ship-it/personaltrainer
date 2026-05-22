@@ -179,6 +179,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const voornaam = (p.name || user.name)?.split(' ')[0]
 
   const extraWellness = [
+    { icon: '⚡', val: `${laatsteWellness?.hulpbronnen_pct}%`, lbl: 'hulpbronnen', show: !!(laatsteWellness?.hulpbronnen_pct) },
     { icon: '💗', val: `${laatsteWellness?.rust_hartslag} bpm`, lbl: 'rust-HR', show: !!(laatsteWellness?.rust_hartslag) },
     { icon: '👟', val: (laatsteWellness?.stappen || 0).toLocaleString('nl-NL'), lbl: 'stappen', show: !!(laatsteWellness?.stappen) },
     { icon: '🔥', val: `${laatsteWellness?.kcal_actief}`, lbl: 'actieve kcal', show: !!(laatsteWellness?.kcal_actief) },

@@ -411,10 +411,9 @@ function aggregateActivity(entries) {
   return out
 }
 
-// Recovery: balance + stress per dag
+// Recovery: balance + stress + HRV + hulpbronnen per dag
 // Vandaag → meest recente meting (hele dag); historisch → ochtend 04-09 gemiddelde
 function aggregateRecovery(entries, vandaag) {
-  // datum → { ochtend: {bal[], stress[]}, recent: {bal, ts, stress} }
   const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
@@ -422,39 +421,56 @@ function aggregateRecovery(entries, vandaag) {
     const datum = localDate(e.timestamp)
     const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
     const ts = new Date(e.timestamp).getTime()
-    const cur = perDag.get(datum) || { ochtend: { bal: [], stress: [] }, recent: { bal: null, ts: 0, stress: null } }
+    const cur = perDag.get(datum) || {
+      ochtend: { bal: [], stress: [], hrv: [], res: [] },
+      recent:  { bal: null, ts: 0, stress: null, hrv: null, res: null },
+    }
+
+    // HRV: Suunto gebruikt verschillende veldnamen afhankelijk van firmware
+    const hrv = d.HRV ?? d.Hrv ?? d.HrvValue ?? d.AverageHRV ?? d.DailyHRV ?? null
+    // Hulpbronnen (Body Resources / Body Battery equivalent)
+    const res = d.Resources ?? d.BodyResources ?? d.Resource ?? d.Vitality ?? null
 
     // Meest recente waarde altijd bijhouden (voor vandaag)
     if (ts > cur.recent.ts) {
       cur.recent.ts = ts
       if (typeof d.Balance === 'number') cur.recent.bal = d.Balance
       if (d.StressState >= 1 && d.StressState <= 4) cur.recent.stress = d.StressState
+      if (hrv != null && hrv > 0) cur.recent.hrv = Math.round(hrv)
+      if (res != null && res >= 0) cur.recent.res = Math.round(res)
     }
 
     // Ochtend aggregatie (04-09) voor historische dagen
     if (uur >= 4 && uur < 9) {
       if (typeof d.Balance === 'number') cur.ochtend.bal.push(d.Balance)
       if (d.StressState >= 1 && d.StressState <= 4) cur.ochtend.stress.push(d.StressState)
+      if (hrv != null && hrv > 0) cur.ochtend.hrv.push(Math.round(hrv))
+      if (res != null && res >= 0) cur.ochtend.res.push(Math.round(res))
     }
 
     perDag.set(datum, cur)
   }
 
+  const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length
   const out = new Map()
   for (const [datum, v] of perDag) {
-    let avgBal, avgStress
+    let avgBal, avgStress, avgHrv, avgRes
     if (datum === vandaag) {
-      // Vandaag: actuele stand (meest recente meting, ongeacht tijdstip)
       avgBal    = v.recent.bal
       avgStress = v.recent.stress
+      avgHrv    = v.recent.hrv
+      avgRes    = v.recent.res
     } else {
-      // Historisch: ochtenddoorsneede (fysiologisch meest betekenisvol)
-      avgBal    = v.ochtend.bal.length    > 0 ? v.ochtend.bal.reduce((a,b)=>a+b,0)    / v.ochtend.bal.length    : null
-      avgStress = v.ochtend.stress.length > 0 ? v.ochtend.stress.reduce((a,b)=>a+b,0) / v.ochtend.stress.length : null
+      avgBal    = v.ochtend.bal.length    > 0 ? avg(v.ochtend.bal)    : null
+      avgStress = v.ochtend.stress.length > 0 ? avg(v.ochtend.stress) : null
+      avgHrv    = v.ochtend.hrv.length    > 0 ? Math.round(avg(v.ochtend.hrv)) : null
+      avgRes    = v.ochtend.res.length    > 0 ? Math.round(avg(v.ochtend.res)) : null
     }
     out.set(datum, {
-      herstel_balans: avgBal    != null ? Number(avgBal.toFixed(2))                   : null,
-      stress_pct:     avgStress != null ? Math.round((avgStress - 1) / 3 * 100)       : null,
+      herstel_balans:  avgBal    != null ? Number(avgBal.toFixed(2))             : null,
+      stress_pct:      avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
+      hrv_ochtend:     avgHrv,
+      hulpbronnen_pct: avgRes,
     })
   }
   return out
@@ -466,7 +482,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   const to = Date.now()
   const from = to - dagenTerug * 86400_000
 
-  // Auto-migratie: zorg dat tabel bestaat
+  // Auto-migratie: zorg dat tabel en nieuwe kolommen bestaan
   await sql`
     CREATE TABLE IF NOT EXISTS dagelijkse_wellness (
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -482,11 +498,13 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       rust_hartslag INTEGER,
       stappen INTEGER,
       kcal_actief INTEGER,
+      hulpbronnen_pct INTEGER,
       bron TEXT DEFAULT 'suunto',
       updated_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (user_id, datum)
     )
   `
+  await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hulpbronnen_pct INTEGER`
 
   let sleep = [], activity = [], recovery = []
   try { sleep    = await fetch247(`/247samples/sleep?from=${from}&to=${to}`, accessToken) }
@@ -522,12 +540,14 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       diepe_slaap_min:  s.diepe_slaap_min  ?? null,
       rem_slaap_min:    s.rem_slaap_min    ?? null,
       lichte_slaap_min: s.lichte_slaap_min ?? null,
-      hrv_ochtend:      s.hrv_ochtend      ?? null,
+      // Slaap-HRV heeft voorrang; recovery-HRV als fallback (bevat dagelijks HRV-overzicht)
+      hrv_ochtend:      s.hrv_ochtend      ?? r.hrv_ochtend ?? null,
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
       rust_hartslag:    a.rust_hartslag    ?? null,
       stappen:          a.stappen          ?? null,
       kcal_actief:      a.kcal_actief      ?? null,
+      hulpbronnen_pct:  r.hulpbronnen_pct  ?? null,
       bron:             'suunto',
     })
   }
@@ -537,11 +557,11 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
     const res = await sql`
       INSERT INTO dagelijkse_wellness
         (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
-         hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, bron)
+         hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, hulpbronnen_pct, bron)
       VALUES
         (${row.user_id}, ${row.datum}, ${row.slaap_uur}, ${row.slaap_score}, ${row.diepe_slaap_min},
          ${row.rem_slaap_min}, ${row.lichte_slaap_min}, ${row.hrv_ochtend}, ${row.herstel_balans},
-         ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.bron})
+         ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.hulpbronnen_pct}, ${row.bron})
       ON CONFLICT (user_id, datum) DO UPDATE SET
         slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
         slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
@@ -554,6 +574,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
         stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
         kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
+        hulpbronnen_pct  = COALESCE(EXCLUDED.hulpbronnen_pct,  dagelijkse_wellness.hulpbronnen_pct),
         bron             = EXCLUDED.bron,
         updated_at       = NOW()
       RETURNING datum

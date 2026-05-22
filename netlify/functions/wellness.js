@@ -31,7 +31,7 @@ export const handler = async (event) => {
     // Tabel kan nog niet bestaan als migratie niet gedraaid is en geen sync gedaan
     const rows = await sql`
       SELECT datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
-             hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, bron
+             hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, hulpbronnen_pct, bron
       FROM dagelijkse_wellness
       WHERE user_id = ${userId}
         AND datum >= CURRENT_DATE - ${dagen}::int
