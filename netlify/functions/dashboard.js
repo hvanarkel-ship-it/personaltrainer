@@ -1,5 +1,6 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
+import { getValidToken, syncSuuntoWellnessForUser, syncSuuntoForUser } from './_suunto.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -11,6 +12,25 @@ export const handler = async (event) => {
   const sql = getDb()
   const userId = auth.user.userId
   const vandaag = new Date().toISOString().split('T')[0]
+
+  // Sync Suunto data before reading — same rate-limit as coach (max 1x per 5 min)
+  try {
+    const [laatste] = await sql`
+      SELECT updated_at FROM dagelijkse_wellness
+      WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
+    `
+    const ouderDan5Min = !laatste?.updated_at ||
+      (Date.now() - new Date(laatste.updated_at).getTime()) > 5 * 60 * 1000
+    if (ouderDan5Min) {
+      const token = await getValidToken(sql, userId).catch(() => null)
+      if (token) {
+        await Promise.all([
+          syncSuuntoWellnessForUser(sql, userId, token, 2),
+          syncSuuntoForUser(sql, userId, token),
+        ])
+      }
+    }
+  } catch { /* geen Suunto of sync mislukt — doorgaan met bestaande data */ }
 
   try {
     const [profiel] = await sql`
