@@ -48,6 +48,7 @@ const SPORT_MAP = {
   34:  'voetbal',    // Soccer
   35:  'tennis',     // Tennis
   37:  'overig',     // Badminton
+  148: 'padel',      // Padel
   53:  'hardlopen',  // Running (newer id)
   56:  'fitness',    // Strength training
   58:  'yoga',       // Yoga
@@ -66,7 +67,7 @@ const ACTIVITY_NAMES = {
   11: 'Mountainbiken', 12: 'Hiken', 18: 'Indoor training', 21: 'Outdoor gym',
   22: 'Zwemmen', 23: 'Trailrunning', 24: 'Gym', 25: 'Nordic walking',
   30: 'Klimmen', 33: 'Fitness class', 34: 'Voetbal', 35: 'Tennis',
-  53: 'Hardlopen', 56: 'Krachttraining', 58: 'Yoga', 75: 'Functional training',
+  53: 'Hardlopen', 56: 'Krachttraining', 58: 'Yoga', 75: 'Functional training', 148: 'Padel',
   82: 'Trailrun', 91: 'Trailrun', 108: 'Indoor fietsen', 109: 'Open water zwemmen',
   130: 'Pilates',
 }

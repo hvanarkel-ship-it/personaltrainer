@@ -64,7 +64,7 @@ export const handler = async (event) => {
       ORDER BY datum DESC LIMIT 1
     `
 
-    // Meest recente Suunto wellness data
+    // Meest recente Suunto wellness rij (voor stappen, herstelbalans etc.)
     const [recentWellness] = await sql`
       SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, stress_pct,
              rust_hartslag, stappen, kcal_actief, datum
@@ -72,34 +72,36 @@ export const handler = async (event) => {
       ORDER BY datum DESC LIMIT 1
     `.catch(() => [])
 
+    // Meest recente rij MET HRV — kan een andere datum zijn dan recentWellness
+    // (Suunto slaat slaap op onder de datum waarop je ging slapen, niet wakker werd)
+    const [recentWellnessHrv] = await sql`
+      SELECT hrv_ochtend, slaap_uur, slaap_score, datum
+      FROM dagelijkse_wellness WHERE user_id = ${userId}
+        AND hrv_ochtend IS NOT NULL
+      ORDER BY datum DESC LIMIT 1
+    `.catch(() => [])
+
     // Merge op datum: recentste bron wint. Bij gelijke datum heeft Suunto voorrang
-    // (automatisch gemeten > handmatig achteraf ingevuld)
-    const trainDatum   = recentTraining ? String(recentTraining.datum).slice(0, 10) : null
-    const wellnessDatum = recentWellness ? String(recentWellness.datum).slice(0, 10) : null
+    const trainDatum    = recentTraining    ? String(recentTraining.datum).slice(0, 10)    : null
+    const wellnessDatum = recentWellness    ? String(recentWellness.datum).slice(0, 10)    : null
+    const hrvDatum      = recentWellnessHrv ? String(recentWellnessHrv.datum).slice(0, 10) : null
     const gebruikHandmatig = trainDatum && (!wellnessDatum || trainDatum > wellnessDatum)
 
+    // Kies HRV/slaap-bron: meest recente van (handmatig, suunto-hrv)
+    const hrvBron = recentWellnessHrv && (!trainDatum || hrvDatum >= trainDatum)
+      ? recentWellnessHrv : recentTraining
+
     let herstelData = null
-    if (recentTraining || recentWellness) {
-      if (gebruikHandmatig) {
-        herstelData = {
-          hrv_ochtend:   recentTraining.hrv_ochtend   ?? recentWellness?.hrv_ochtend,
-          slaap_uur:     recentTraining.slaap_uur     ?? recentWellness?.slaap_uur,
-          slaapscore:    recentTraining.slaapscore    ?? recentWellness?.slaap_score,
-          herstelbalans: recentTraining.herstelbalans ?? (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : null),
-          datum: trainDatum,
-          bron: 'handmatig',
-        }
-      } else {
-        herstelData = {
-          hrv_ochtend:   recentWellness.hrv_ochtend   ?? recentTraining?.hrv_ochtend,
-          slaap_uur:     recentWellness.slaap_uur     ?? recentTraining?.slaap_uur,
-          slaapscore:    recentWellness.slaap_score   ?? recentTraining?.slaapscore,
-          herstelbalans: recentWellness.herstel_balans != null
-            ? recentWellness.herstel_balans * 100
-            : (recentTraining?.herstelbalans ?? null),
-          datum: wellnessDatum ?? trainDatum,
-          bron: 'suunto',
-        }
+    if (recentTraining || recentWellness || recentWellnessHrv) {
+      herstelData = {
+        hrv_ochtend:   hrvBron?.hrv_ochtend   ?? null,
+        slaap_uur:     hrvBron?.slaap_uur     ?? null,
+        slaapscore:    (hrvBron?.slaap_score  ?? hrvBron?.slaapscore) ?? null,
+        herstelbalans: gebruikHandmatig
+          ? (recentTraining?.herstelbalans ?? (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : null))
+          : (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : recentTraining?.herstelbalans ?? null),
+        datum: hrvBron ? (hrvBron === recentTraining ? trainDatum : hrvDatum) : (wellnessDatum ?? trainDatum),
+        bron: hrvBron === recentTraining ? 'handmatig' : 'suunto',
       }
     }
 
