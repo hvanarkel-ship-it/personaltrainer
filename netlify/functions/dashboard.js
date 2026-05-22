@@ -56,14 +56,52 @@ export const handler = async (event) => {
       ORDER BY datum DESC
     `
 
-    // Meest recente HRV/slaap uit handmatige logs
+    // Meest recente HRV/slaap uit handmatige logs (laatste 7 dagen)
     const [recentTraining] = await sql`
       SELECT hrv_ochtend, slaap_uur, slaapscore, herstelbalans, datum
       FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
+      AND datum >= CURRENT_DATE - INTERVAL '7 days'
       ORDER BY datum DESC LIMIT 1
     `
 
-    const herstelData = recentTraining || null
+    // Meest recente Suunto wellness data
+    const [recentWellness] = await sql`
+      SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, stress_pct,
+             rust_hartslag, stappen, kcal_actief, datum
+      FROM dagelijkse_wellness WHERE user_id = ${userId}
+      ORDER BY datum DESC LIMIT 1
+    `.catch(() => [])
+
+    // Merge op datum: recentste bron wint. Bij gelijke datum heeft Suunto voorrang
+    // (automatisch gemeten > handmatig achteraf ingevuld)
+    const trainDatum   = recentTraining ? String(recentTraining.datum).slice(0, 10) : null
+    const wellnessDatum = recentWellness ? String(recentWellness.datum).slice(0, 10) : null
+    const gebruikHandmatig = trainDatum && (!wellnessDatum || trainDatum > wellnessDatum)
+
+    let herstelData = null
+    if (recentTraining || recentWellness) {
+      if (gebruikHandmatig) {
+        herstelData = {
+          hrv_ochtend:   recentTraining.hrv_ochtend   ?? recentWellness?.hrv_ochtend,
+          slaap_uur:     recentTraining.slaap_uur     ?? recentWellness?.slaap_uur,
+          slaapscore:    recentTraining.slaapscore    ?? recentWellness?.slaap_score,
+          herstelbalans: recentTraining.herstelbalans ?? (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : null),
+          datum: trainDatum,
+          bron: 'handmatig',
+        }
+      } else {
+        herstelData = {
+          hrv_ochtend:   recentWellness.hrv_ochtend   ?? recentTraining?.hrv_ochtend,
+          slaap_uur:     recentWellness.slaap_uur     ?? recentTraining?.slaap_uur,
+          slaapscore:    recentWellness.slaap_score   ?? recentTraining?.slaapscore,
+          herstelbalans: recentWellness.herstel_balans != null
+            ? recentWellness.herstel_balans * 100
+            : (recentTraining?.herstelbalans ?? null),
+          datum: wellnessDatum ?? trainDatum,
+          bron: 'suunto',
+        }
+      }
+    }
 
     const actieveDoelen = await sql`
       SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE

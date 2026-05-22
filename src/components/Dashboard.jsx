@@ -123,16 +123,11 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   const p = data?.profiel || {}
   const v = data?.vandaag || {}
+  // herstel komt al gemergd terug van de backend (datum-aware: recentste bron wint)
+  // wellness[0] wordt alleen nog gebruikt voor extra Suunto-velden (rust_hartslag etc.)
   const hOrig = data?.herstel || {}
   const laatsteWellness = wellness[0] || null
-  const h = {
-    ...hOrig,
-    hrv_ochtend:   hOrig.hrv_ochtend   ?? laatsteWellness?.hrv_ochtend,
-    slaap_uur:     hOrig.slaap_uur     ?? laatsteWellness?.slaap_uur,
-    slaapscore:    hOrig.slaapscore    ?? laatsteWellness?.slaap_score,
-    herstelbalans: hOrig.herstelbalans ?? (laatsteWellness?.herstel_balans != null ? laatsteWellness.herstel_balans * 100 : null),
-    datum:         hOrig.datum         ?? laatsteWellness?.datum,
-  }
+  const h = { ...hOrig }
   const doelen = data?.doelen || []
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
