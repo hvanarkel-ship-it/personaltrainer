@@ -1,7 +1,6 @@
 import { requireAuth, cors } from './_auth.js'
 import { SUUNTO_AUTH_URL } from './_suunto.js'
-
-const REDIRECT_URI = `${process.env.URL || 'https://personaltrainerandcoach.netlify.app'}/api/suunto-callback`
+import { SUUNTO_REDIRECT_URI } from './_config.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -22,7 +21,7 @@ export const handler = async (event) => {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id:     process.env.SUUNTO_CLIENT_ID,
-    redirect_uri:  REDIRECT_URI,
+    redirect_uri:  SUUNTO_REDIRECT_URI,
     scope:         'workout wellbeing',
     state,
   })

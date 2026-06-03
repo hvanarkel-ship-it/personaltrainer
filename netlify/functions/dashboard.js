@@ -30,7 +30,7 @@ export const handler = async (event) => {
       ORDER BY created_at ASC`
 
     const weektrainingen = await sql`
-      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaapscore, herstelbalans, rpe
+      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, rpe
       FROM trainingen WHERE user_id = ${userId}
       AND datum >= (CURRENT_DATE - INTERVAL '7 days')
       ORDER BY datum DESC
@@ -38,7 +38,7 @@ export const handler = async (event) => {
 
     // Meest recente HRV/slaap uit handmatige logs
     const [recentTraining] = await sql`
-      SELECT hrv_ochtend, slaap_uur, slaapscore, herstelbalans, datum
+      SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, datum
       FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
       ORDER BY datum DESC LIMIT 1
     `

@@ -37,7 +37,7 @@ export const handler = async (event) => {
     // One wellness record per day — prefer record with highest HRV when multiple exist
     const wellness = await sql`
       SELECT DISTINCT ON (datum::date)
-        datum, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
+        datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans
       FROM trainingen
       WHERE user_id = ${userId}
         AND (hrv_ochtend IS NOT NULL OR slaap_uur IS NOT NULL)

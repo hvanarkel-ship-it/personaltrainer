@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS trainingen (
   max_hartslag INTEGER,
   hrv_ochtend INTEGER,
   slaap_uur NUMERIC(4,1),
-  slaapscore INTEGER,
-  herstelbalans NUMERIC(4,2),
+  slaap_score INTEGER,
+  herstel_balans NUMERIC(4,2),
   zone2_min INTEGER,
   zone3_min INTEGER,
   zone4_min INTEGER,
@@ -125,6 +125,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_intervals_id
   ON trainingen(user_id, intervals_id) WHERE intervals_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_runalyze_id
   ON trainingen(user_id, runalyze_id) WHERE runalyze_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trainingen_user_suunto_id
+  ON trainingen(user_id, suunto_id) WHERE suunto_id IS NOT NULL;
 
 -- Auto-update user_profile timestamp
 CREATE OR REPLACE FUNCTION update_profile_timestamp()

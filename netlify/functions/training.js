@@ -35,11 +35,11 @@ export const handler = async (event) => {
       if (!d.sport) return cors({ error: 'Sport is verplicht' }, 400)
       const [row] = await sql`
         INSERT INTO trainingen (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-          hrv_ochtend, slaap_uur, slaapscore, herstelbalans, zone2_min, zone3_min, zone4_min,
+          hrv_ochtend, slaap_uur, slaap_score, herstel_balans, zone2_min, zone3_min, zone4_min,
           notities, bron, rpe, stemming)
         VALUES (${userId}, ${d.datum||null}, ${d.sport}, ${d.duur_min||null}, ${d.kcal||null},
           ${d.gem_hartslag||null}, ${d.max_hartslag||null}, ${d.hrv_ochtend||null},
-          ${d.slaap_uur||null}, ${d.slaapscore||null}, ${d.herstelbalans||null},
+          ${d.slaap_uur||null}, ${d.slaap_score||null}, ${d.herstel_balans||null},
           ${d.zone2_min||null}, ${d.zone3_min||null}, ${d.zone4_min||null},
           ${d.notities||null}, ${d.bron||'handmatig'}, ${d.rpe||null}, ${d.stemming||null})
         RETURNING *
