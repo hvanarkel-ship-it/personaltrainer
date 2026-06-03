@@ -1,8 +1,6 @@
 import { getDb } from './_db.js'
 import { SUUNTO_TOKEN_URL } from './_suunto.js'
-
-const REDIRECT_URI = `${process.env.URL || 'https://personaltrainerandcoach.netlify.app'}/api/suunto-callback`
-const APP_URL = process.env.URL || 'https://personaltrainerandcoach.netlify.app'
+import { APP_URL, SUUNTO_REDIRECT_URI } from './_config.js'
 
 function redirect(url) {
   return { statusCode: 302, headers: { Location: url }, body: '' }
@@ -39,7 +37,7 @@ export const handler = async (event) => {
       body: new URLSearchParams({
         grant_type:    'authorization_code',
         code,
-        redirect_uri:  REDIRECT_URI,
+        redirect_uri:  SUUNTO_REDIRECT_URI,
         client_id:     process.env.SUUNTO_CLIENT_ID,
         client_secret: process.env.SUUNTO_CLIENT_SECRET,
       }),

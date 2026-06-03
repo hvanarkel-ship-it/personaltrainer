@@ -68,7 +68,7 @@ async function extractSuunto(sql, userId, bestanden) {
     { type: 'text', text: `Analyseer dit Suunto scherm. Dit kan een trainingsoverzicht ZIJN of een ochtend/herstel/gereedheid dashboard.
 
 Extraheer alle beschikbare data. Geef UITSLUITEND geldig JSON:
-{"datum":"YYYY-MM-DD of null","scherm_type":"training|ochtend|herstel","sport":"sport NL of herstel als ochtend/herstel scherm","duur_min":0,"kcal":0,"gem_hartslag":0,"max_hartslag":0,"hrv_ochtend":0,"slaap_uur":0,"slaapscore":0,"herstelbalans":0,"zone2_min":0,"zone3_min":0,"zone4_min":0,"notities":"samenvatting NL"}
+{"datum":"YYYY-MM-DD of null","scherm_type":"training|ochtend|herstel","sport":"sport NL of herstel als ochtend/herstel scherm","duur_min":0,"kcal":0,"gem_hartslag":0,"max_hartslag":0,"hrv_ochtend":0,"slaap_uur":0,"slaap_score":0,"herstel_balans":0,"zone2_min":0,"zone3_min":0,"zone4_min":0,"notities":"samenvatting NL"}
 
 Let op:
 - Body Battery, herstelstatus, gereedheid, nachtmeting = scherm_type "ochtend", sport = "herstel"
@@ -82,20 +82,20 @@ Let op:
 
   // Ochtend/herstel schermen altijd opslaan als sport='herstel'
   const isOchtend = d.scherm_type === 'ochtend' || d.scherm_type === 'herstel'
-    || (!d.duur_min && (d.hrv_ochtend || d.slaap_uur || d.slaapscore || d.herstelbalans))
+    || (!d.duur_min && (d.hrv_ochtend || d.slaap_uur || d.slaap_score || d.herstel_balans))
   const sport = isOchtend ? 'herstel' : (d.sport || 'training')
 
   const [row] = await sql`
     INSERT INTO trainingen (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-      hrv_ochtend, slaap_uur, slaapscore, herstelbalans, zone2_min, zone3_min, zone4_min, notities, bron)
+      hrv_ochtend, slaap_uur, slaap_score, herstel_balans, zone2_min, zone3_min, zone4_min, notities, bron)
     VALUES (${userId}, ${datum}, ${sport}, ${d.duur_min||null}, ${d.kcal||null},
       ${d.gem_hartslag||null}, ${d.max_hartslag||null}, ${d.hrv_ochtend||null},
-      ${d.slaap_uur||null}, ${d.slaapscore||null}, ${d.herstelbalans||null},
+      ${d.slaap_uur||null}, ${d.slaap_score||null}, ${d.herstel_balans||null},
       ${d.zone2_min||null}, ${d.zone3_min||null}, ${d.zone4_min||null}, ${d.notities||null}, 'coach_upload')
     RETURNING id`
   return {
     type: 'suunto', id: row.id, data: d, label: `${sport} ${datum}`,
-    samenvatting: `Sport: ${sport} | Duur: ${d.duur_min}min | Kcal: ${d.kcal} | HRV: ${d.hrv_ochtend}ms | Slaap: ${d.slaap_uur}u | Herstelbalans: ${d.herstelbalans}`
+    samenvatting: `Sport: ${sport} | Duur: ${d.duur_min}min | Kcal: ${d.kcal} | HRV: ${d.hrv_ochtend}ms | Slaap: ${d.slaap_uur}u | Herstelbalans: ${d.herstel_balans}`
   }
 }
 
@@ -250,7 +250,7 @@ export const handler = async (event) => {
         FROM users u LEFT JOIN user_profile p ON p.user_id = u.id WHERE u.id = ${userId}`,
       sql`SELECT datum, gewicht_kg, vetpercentage, spiermassa_kg, visceraal_vet, inbody_score, bmr_kcal
         FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 3`,
-      sql`SELECT datum, hrv_ochtend, slaap_uur, slaapscore, herstelbalans
+      sql`SELECT datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans
         FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
       sql`SELECT maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
@@ -260,7 +260,7 @@ export const handler = async (event) => {
       sql`SELECT titel, beschrijving, doel_waarde, huidige_waarde, eenheid, deadline, sport
         FROM doelen WHERE user_id = ${userId} AND actief = TRUE ORDER BY deadline ASC NULLS LAST LIMIT 8`,
       sql`SELECT datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-          hrv_ochtend, slaap_uur, slaapscore, herstelbalans,
+          hrv_ochtend, slaap_uur, slaap_score, herstel_balans,
           zone2_min, zone3_min, zone4_min, notities
         FROM trainingen WHERE user_id = ${userId}
         AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
@@ -380,8 +380,8 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
         datum,
         hrv:           t.hrv_ochtend   ?? w.hrv_ochtend   ?? null,
         slaap:         t.slaap_uur     ?? w.slaap_uur     ?? null,
-        slaapscore:    t.slaapscore    ?? w.slaap_score   ?? null,
-        herstelbalans: t.herstelbalans ?? (w.herstel_balans != null ? parseFloat(w.herstel_balans) * 100 : null),
+        slaap_score:    t.slaap_score    ?? w.slaap_score   ?? null,
+        herstel_balans: t.herstel_balans ?? (w.herstel_balans != null ? parseFloat(w.herstel_balans) * 100 : null),
         diepe_slaap:   w.diepe_slaap_min ?? null,
         rem_slaap:     w.rem_slaap_min   ?? null,
         rust_hartslag: w.rust_hartslag   ?? null,
@@ -396,8 +396,8 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
           const parts = [
             m.hrv          ? `HRV ${m.hrv}ms` : null,
             m.slaap        ? `slaap ${m.slaap}u` : null,
-            m.slaapscore   ? `score ${m.slaapscore}` : null,
-            m.herstelbalans != null ? `balans ${parseFloat(m.herstelbalans) > 0 ? '+' : ''}${Math.round(m.herstelbalans)}` : null,
+            m.slaap_score   ? `score ${m.slaap_score}` : null,
+            m.herstel_balans != null ? `balans ${parseFloat(m.herstel_balans) > 0 ? '+' : ''}${Math.round(m.herstel_balans)}` : null,
             m.diepe_slaap  ? `diepe slaap ${m.diepe_slaap}min` : null,
             m.rem_slaap    ? `REM ${m.rem_slaap}min` : null,
             m.rust_hartslag ? `rust-HR ${m.rust_hartslag}bpm` : null,
@@ -599,7 +599,7 @@ Actief herstel:
 
 ── TOEPASSING OP GEBRUIKERSDATA ──
 Gebruik altijd de actuele cijfers. Interpreteer zo:
-• Suunto herstelbalans negatief → accumulerende vermoeidheid; verlaag volume, geen nieuwe prikkel
+• Suunto herstel_balans negatief → accumulerende vermoeidheid; verlaag volume, geen nieuwe prikkel
 • Diepe slaap <60min → onvoldoende hormonaal herstel; reduceer trainingsintensiteit die dag
 • REM <90min → cognitief en motorisch herstel onvolledig; techniektraining minder effectief
 • Stappen >12.000 op "rustdag" → dit is actieve belasting; tel mee in wekelijks volume

@@ -1,20 +1,6 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
-
-const SPORT_MAP = {
-  Run: 'hardlopen', VirtualRun: 'hardlopen', TrailRun: 'hardlopen',
-  Ride: 'fietsen', VirtualRide: 'fietsen', GravelRide: 'fietsen',
-  EBikeRide: 'fietsen', MountainBikeRide: 'fietsen', EMountainBikeRide: 'fietsen',
-  WeightTraining: 'fitness', Workout: 'fitness', Crossfit: 'fitness',
-  Elliptical: 'fitness', StairStepper: 'fitness',
-  Tennis: 'tennis', Padel: 'padel', Squash: 'padel', TableTennis: 'tennis',
-  Walk: 'wandelen', Hike: 'wandelen',
-  Swim: 'zwemmen', Rowing: 'zwemmen', VirtualRow: 'zwemmen', Kayaking: 'zwemmen',
-  Yoga: 'yoga', Pilates: 'yoga',
-  Soccer: 'voetbal', Football: 'voetbal',
-  AlpineSki: 'overig', NordicSki: 'overig', Snowboard: 'overig',
-  RockClimbing: 'overig', IceSkate: 'overig', InlineSkate: 'overig',
-}
+import { intervalsSport } from './_sports.js'
 
 function toArray(data) {
   if (Array.isArray(data)) return data
@@ -96,25 +82,23 @@ export const handler = async (event) => {
         const intervalsId = String(act.id)
         if (bestaandeIds.has(intervalsId)) { overgeslagen++; continue }
 
-        const naamLower = (act.name || '').toLowerCase()
-        const sport = /hyrox|hyro x/.test(naamLower)
-          ? 'hyrox'
-          : (SPORT_MAP[act.type] || act.type?.toLowerCase() || 'overig')
+        const sport = intervalsSport(act.type, act.name)
 
         const duur_min = act.moving_time ? Math.round(act.moving_time / 60) : null
         const kcal = act.calories > 0 ? Math.round(act.calories) : null
         const gem_hr = (act.average_hr ?? act.average_heartrate) ? Math.round(act.average_hr ?? act.average_heartrate) : null
         const max_hr = (act.max_hr ?? act.max_heartrate) ? Math.round(act.max_hr ?? act.max_heartrate) : null
         const afstand_m = act.distance ? Math.round(act.distance) : null
+        const km = afstand_m > 0 ? Math.round(afstand_m / 100) / 10 : null
         const hoogte_m = act.total_elevation_gain ? Math.round(act.total_elevation_gain) : null
 
         const notitiesDelen = [act.name || sport]
-        if (afstand_m > 0) notitiesDelen.push(`${(afstand_m / 1000).toFixed(1)}km`)
+        if (km) notitiesDelen.push(`${km.toFixed(1)}km`)
         if (hoogte_m > 0) notitiesDelen.push(`↑${hoogte_m}m`)
         notitiesDelen.push(`[intervals:${act.id}]`)
 
         nieuweRijen.push({
-          user_id: userId, datum, sport, duur_min, kcal,
+          user_id: userId, datum, sport, duur_min, km, kcal,
           gem_hartslag: gem_hr, max_hartslag: max_hr,
           notities: notitiesDelen.join(' — '),
           bron: 'intervals',
@@ -128,8 +112,8 @@ export const handler = async (event) => {
         const batch = nieuweRijen.slice(i, i + BATCH)
         const result = await sql`
           INSERT INTO trainingen
-            (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, notities, bron, intervals_id)
-          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'notities', 'bron', 'intervals_id')}
+            (user_id, datum, sport, duur_min, km, kcal, gem_hartslag, max_hartslag, notities, bron, intervals_id)
+          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'duur_min', 'km', 'kcal', 'gem_hartslag', 'max_hartslag', 'notities', 'bron', 'intervals_id')}
           ON CONFLICT (user_id, intervals_id) WHERE intervals_id IS NOT NULL DO NOTHING
           RETURNING id
         `
@@ -160,8 +144,8 @@ export const handler = async (event) => {
 
         const hrv = w.hrv ?? w.hrvSdnn ?? null
         const slaap_uur = w.sleepSecs > 0 ? Math.round(w.sleepSecs / 360) / 10 : null
-        const slaapscore = w.sleepScore ?? null
-        const herstelbalans = w.form ?? null
+        const slaap_score = w.sleepScore ?? null
+        const herstel_balans = w.form ?? null
         const rusthartsslag = w.restingHR ?? null
 
         if (!hrv && !slaap_uur) continue
@@ -173,10 +157,10 @@ export const handler = async (event) => {
           sport: 'herstel',
           hrv_ochtend: hrv,
           slaap_uur,
-          slaapscore,
-          herstelbalans,
+          slaap_score,
+          herstel_balans,
           gem_hartslag: rusthartsslag,
-          notities: `Intervals.icu wellness — TSB: ${herstelbalans ?? '–'}`,
+          notities: `Intervals.icu wellness — TSB: ${herstel_balans ?? '–'}`,
           bron: 'intervals',
         })
       }
@@ -186,8 +170,8 @@ export const handler = async (event) => {
         const batch = nieuweWellness.slice(i, i + BATCH)
         await sql`
           INSERT INTO trainingen
-            (user_id, datum, sport, hrv_ochtend, slaap_uur, slaapscore, herstelbalans, gem_hartslag, notities, bron)
-          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'hrv_ochtend', 'slaap_uur', 'slaapscore', 'herstelbalans', 'gem_hartslag', 'notities', 'bron')}
+            (user_id, datum, sport, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, gem_hartslag, notities, bron)
+          VALUES ${sql(batch, 'user_id', 'datum', 'sport', 'hrv_ochtend', 'slaap_uur', 'slaap_score', 'herstel_balans', 'gem_hartslag', 'notities', 'bron')}
         `
         wellness_synced += batch.length
       }

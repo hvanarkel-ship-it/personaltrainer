@@ -1,19 +1,6 @@
 // Gedeelde Runalyze sync-logica — gebruikt door runalyze-sync (handmatig) en runalyze-cron (dagelijks)
 
-const SPORT_MAP = {
-  1: 'hardlopen', 2: 'fietsen', 3: 'zwemmen', 4: 'wandelen', 5: 'fitness',
-  6: 'yoga', 14: 'fietsen', 17: 'hardlopen', 24: 'fitness', 34: 'wandelen',
-  52: 'hardlopen', 61: 'fietsen',
-}
-
-function mapSport(typeId, name) {
-  const n = (name || '').toLowerCase()
-  if (/hyrox|hyro x/.test(n)) return 'hyrox'
-  if (/padel/.test(n)) return 'padel'
-  if (/tennis/.test(n)) return 'tennis'
-  if (/voetbal|soccer|football/.test(n)) return 'voetbal'
-  return SPORT_MAP[typeId] || 'overig'
-}
+import { runalyzeSport } from './_sports.js'
 
 async function fetchWithTimeout(url, options, ms = 20000) {
   const ctrl = new AbortController()
@@ -72,7 +59,7 @@ export async function syncRunalyzeForUser(sql, userId, token) {
       const gem_hr = act.pulse_avg ?? act.heartRateAvg ?? null
       const max_hr = act.pulse_max ?? act.heartRateMax ?? null
       const typeId = act.sport ?? act.sportId ?? act.typeId ?? null
-      const sport = mapSport(typeId, act.comment || act.title || '')
+      const sport = runalyzeSport(typeId, act.comment || act.title || '')
       const hrv = act.hrv ?? act.hrv_rmssd ?? null
 
       const titel = act.comment || act.title || sport
@@ -82,14 +69,15 @@ export async function syncRunalyzeForUser(sql, userId, token) {
 
       nieuweRijen.push({
         user_id: userId,
-        datum, sport, duur_min, kcal,
+        datum, sport, duur_min,
+        km: km > 0 ? km : null,
+        kcal,
         gem_hartslag: gem_hr ? Math.round(gem_hr) : null,
         max_hartslag: max_hr ? Math.round(max_hr) : null,
         hrv_ochtend: hrv ? Math.round(hrv) : null,
         notities: notitiesParts.join(' — '),
         bron: 'runalyze',
         runalyze_id: id,
-        _km: km > 0 ? km.toFixed(1) : null,
         _titel: titel,
       })
     }
@@ -103,11 +91,11 @@ export async function syncRunalyzeForUser(sql, userId, token) {
   const BATCH = 200
   for (let i = 0; i < nieuweRijen.length; i += BATCH) {
     const batch = nieuweRijen.slice(i, i + BATCH)
-    const insertRows = batch.map(({ _km, _titel, ...row }) => row)
+    const insertRows = batch.map(({ _titel, ...row }) => row)
     const result = await sql`
       INSERT INTO trainingen
-        (user_id, datum, sport, duur_min, kcal, gem_hartslag, max_hartslag, hrv_ochtend, notities, bron, runalyze_id)
-      VALUES ${sql(insertRows, 'user_id', 'datum', 'sport', 'duur_min', 'kcal', 'gem_hartslag', 'max_hartslag', 'hrv_ochtend', 'notities', 'bron', 'runalyze_id')}
+        (user_id, datum, sport, duur_min, km, kcal, gem_hartslag, max_hartslag, hrv_ochtend, notities, bron, runalyze_id)
+      VALUES ${sql(insertRows, 'user_id', 'datum', 'sport', 'duur_min', 'km', 'kcal', 'gem_hartslag', 'max_hartslag', 'hrv_ochtend', 'notities', 'bron', 'runalyze_id')}
       ON CONFLICT (user_id, runalyze_id) WHERE runalyze_id IS NOT NULL DO NOTHING
       RETURNING runalyze_id
     `
@@ -119,7 +107,7 @@ export async function syncRunalyzeForUser(sql, userId, token) {
           sport: row.sport,
           titel: row._titel,
           duur_min: row.duur_min,
-          km: row._km,
+          km: row.km,
           kcal: row.kcal,
           gem_hartslag: row.gem_hartslag,
         })

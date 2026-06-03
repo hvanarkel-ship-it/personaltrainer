@@ -1,5 +1,6 @@
 import { getDb } from './_db.js'
 import { cors } from './_auth.js'
+import { APP_URL } from './_config.js'
 import crypto from 'crypto'
 
 export const handler = async (event) => {
@@ -40,8 +41,7 @@ export const handler = async (event) => {
       VALUES (${user.id}, ${token}, ${expiresAt})
     `
 
-    const appUrl = process.env.APP_URL || 'https://personaltrainerandcoach.netlify.app'
-    const resetLink = `${appUrl}?reset=${token}`
+    const resetLink = `${APP_URL}?reset=${token}`
 
     const resendKey = process.env.RESEND_API_KEY
     if (!resendKey) {

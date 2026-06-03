@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS trainingen (
   max_hartslag INTEGER,
   hrv_ochtend INTEGER,
   slaap_uur NUMERIC(4,1),
-  slaapscore INTEGER,
-  herstelbalans NUMERIC(4,2),
+  slaap_score INTEGER,
+  herstel_balans NUMERIC(4,2),
   zone2_min INTEGER,
   zone3_min INTEGER,
   zone4_min INTEGER,
@@ -147,6 +147,16 @@ ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS stemming SMALLINT;
 
 -- trainingen: afstand in km als gestructureerd veld (was alleen in notities-tekst)
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS km NUMERIC(7,2);
+
+-- trainingen: consistente kolomnamen (underscore-stijl, gelijk aan dagelijkse_wellness)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trainingen' AND column_name='slaapscore') THEN
+    ALTER TABLE trainingen RENAME COLUMN slaapscore TO slaap_score;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trainingen' AND column_name='herstelbalans') THEN
+    ALTER TABLE trainingen RENAME COLUMN herstelbalans TO herstel_balans;
+  END IF;
+END $$;
 
 -- gesprekken: upload type
 ALTER TABLE gesprekken ADD COLUMN IF NOT EXISTS upload_type TEXT;

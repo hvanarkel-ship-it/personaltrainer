@@ -2,6 +2,8 @@
 // Docs: https://cloudapi.suunto.com
 // Response-structuur geverifieerd via /v2/workouts in mei 2026
 
+import { suuntoSport, suuntoActivityTitle } from './_sports.js'
+
 export const SUUNTO_AUTH_URL   = 'https://cloudapi-oauth.suunto.com/oauth/authorize'
 export const SUUNTO_TOKEN_URL  = 'https://cloudapi-oauth.suunto.com/oauth/token'
 export const SUUNTO_API_BASE   = 'https://cloudapi.suunto.com'
@@ -15,68 +17,6 @@ export function suuntoHeaders(accessToken) {
     headers['Ocp-Apim-Subscription-Key'] = process.env.SUUNTO_SUBSCRIPTION_KEY
   }
   return headers
-}
-
-// Suunto activityId → onze sport-namen
-// Bron: Suunto Sports API v2 activiteitenlijst
-const SPORT_MAP = {
-  0:   'overig',     // Other
-  1:   'wandelen',   // Walking
-  2:   'fietsen',    // Cycling
-  3:   'overig',     // Cross-country skiing
-  5:   'fitness',    // Other indoor
-  6:   'overig',     // Mountain biking (oude id)
-  10:  'overig',     // Triathlon
-  11:  'fietsen',    // Mountain biking
-  12:  'wandelen',   // Hiking
-  13:  'overig',     // Roller skating
-  14:  'overig',     // Downhill skiing
-  15:  'overig',     // Paddling
-  16:  'overig',     // Rowing
-  17:  'overig',     // Golf
-  18:  'fitness',    // Indoor
-  20:  'overig',     // Ball games
-  21:  'fitness',    // Outdoor gym
-  22:  'zwemmen',    // Swimming
-  23:  'hardlopen',  // Trail running
-  24:  'fitness',    // Gym
-  25:  'wandelen',   // Nordic walking
-  29:  'overig',     // Water sports
-  30:  'overig',     // Climbing
-  31:  'overig',     // Snowboarding
-  33:  'fitness',    // Fitness class
-  34:  'voetbal',    // Soccer
-  35:  'tennis',     // Tennis
-  37:  'overig',     // Badminton
-  53:  'hardlopen',  // Running (newer id)
-  56:  'fitness',    // Strength training
-  58:  'yoga',       // Yoga
-  75:  'fitness',    // Strength / functional training
-  82:  'hardlopen',  // Trail running (alt)
-  91:  'hardlopen',  // Trail running
-  108: 'fietsen',    // Indoor cycling
-  109: 'zwemmen',    // Open water swimming
-  112: 'fitness',
-  130: 'yoga',       // Pilates
-}
-
-// Naam van het activiteitstype voor de titel
-const ACTIVITY_NAMES = {
-  0: 'Activiteit', 1: 'Wandelen', 2: 'Fietsen', 3: 'Langlaufen',
-  11: 'Mountainbiken', 12: 'Hiken', 18: 'Indoor training', 21: 'Outdoor gym',
-  22: 'Zwemmen', 23: 'Trailrunning', 24: 'Gym', 25: 'Nordic walking',
-  30: 'Klimmen', 33: 'Fitness class', 34: 'Voetbal', 35: 'Tennis',
-  53: 'Hardlopen', 56: 'Krachttraining', 58: 'Yoga', 75: 'Functional training',
-  82: 'Trailrun', 91: 'Trailrun', 108: 'Indoor fietsen', 109: 'Open water zwemmen',
-  130: 'Pilates',
-}
-
-function mapSport(activityId) {
-  return SPORT_MAP[activityId] || 'overig'
-}
-
-function activityTitle(activityId) {
-  return ACTIVITY_NAMES[activityId] || `Suunto activiteit ${activityId}`
 }
 
 // Vind extensie op type binnen workout
@@ -186,8 +126,8 @@ function parseWorkout(w) {
 
   // Sport en titel
   const activityId = parseInt(w.activityId, 10)
-  const sport = mapSport(activityId)
-  const titel = activityTitle(activityId)
+  const sport = suuntoSport(activityId)
+  const titel = suuntoActivityTitle(activityId)
 
   // Pace voor hardlopen: totaalSec / 1000 / distM = sec per meter → omkeren naar min/km
   let pace = null
