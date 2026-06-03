@@ -8,7 +8,7 @@ const SUUNTO_SPORT_MAP = {
   16:  'overig',    17:  'overig',    18:  'fitness',    20:  'overig',
   21:  'fitness',   22:  'zwemmen',   23:  'hardlopen',  24:  'fitness',
   25:  'wandelen',  29:  'overig',    30:  'overig',     31:  'overig',
-  33:  'fitness',   34:  'voetbal',   35:  'tennis',     37:  'overig',
+  33:  'fitness',   34:  'voetbal',   35:  'tennis',     37:  'overig',   148: 'padel',
   53:  'hardlopen', 56:  'fitness',   58:  'yoga',       75:  'fitness',
   82:  'hardlopen', 91:  'hardlopen', 108: 'fietsen',    109: 'zwemmen',
   112: 'fitness',   130: 'yoga',
@@ -23,7 +23,7 @@ const SUUNTO_ACTIVITY_NAMES = {
   35: 'Tennis',          53: 'Hardlopen',         56: 'Krachttraining',
   58: 'Yoga',            75: 'Functional training', 82: 'Trailrun',
   91: 'Trailrun',        108: 'Indoor fietsen',   109: 'Open water zwemmen',
-  130: 'Pilates',
+  130: 'Pilates',          148: 'Padel',
 }
 
 export function suuntoSport(activityId) {

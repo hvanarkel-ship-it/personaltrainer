@@ -9,9 +9,9 @@ const UPLOAD_PROMPTS = {
 Geef je antwoord ALLEEN als JSON:
 {"beschrijving":"...", "kcal":0, "eiwit_g":0, "koolhydraten_g":0, "vetten_g":0, "foto_analyse":"...", "ai_notities":"kort advies in context van dagdoel"}`,
 
-  suunto: `Lees alle data van deze Suunto schermafbeelding. Extraheer: activiteitstype, duur (minuten), calorieën, gemiddelde hartslag, max hartslag, hartslagzones (zone 2/3/4 minuten), HRV, slaapscore, herstelbalans, slaap uren.
+  suunto: `Lees alle data van deze Suunto schermafbeelding. Extraheer: activiteitstype, duur (minuten), calorieën, gemiddelde hartslag, max hartslag, hartslagzones (zone 2/3/4 minuten), HRV, slaap_score, herstel_balans, slaap uren.
 Geef je antwoord ALLEEN als JSON:
-{"sport":"...", "duur_min":0, "kcal":0, "gem_hartslag":0, "max_hartslag":0, "hrv_ochtend":0, "slaap_uur":0, "slaapscore":0, "herstelbalans":0, "zone2_min":0, "zone3_min":0, "zone4_min":0, "notities":"samenvatting van de sessie in het Nederlands"}`,
+{"sport":"...", "duur_min":0, "kcal":0, "gem_hartslag":0, "max_hartslag":0, "hrv_ochtend":0, "slaap_uur":0, "slaap_score":0, "herstel_balans":0, "zone2_min":0, "zone3_min":0, "zone4_min":0, "notities":"samenvatting van de sessie in het Nederlands"}`,
 
   inbody: `Lees alle InBody meetwaarden van dit document. Extraheer: gewicht, vetmassa, vetpercentage, spiermassa, visceraal vet niveau, BMR, vochtbalans percentage, InBody score.
 Geef je antwoord ALLEEN als JSON:

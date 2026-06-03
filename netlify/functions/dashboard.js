@@ -1,5 +1,6 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
+import { getValidToken, syncSuuntoWellnessForUser, syncSuuntoForUser } from './_suunto.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -11,6 +12,25 @@ export const handler = async (event) => {
   const sql = getDb()
   const userId = auth.user.userId
   const vandaag = new Date().toISOString().split('T')[0]
+
+  // Sync Suunto data before reading — same rate-limit as coach (max 1x per 5 min)
+  try {
+    const [laatste] = await sql`
+      SELECT updated_at FROM dagelijkse_wellness
+      WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
+    `
+    const ouderDan5Min = !laatste?.updated_at ||
+      (Date.now() - new Date(laatste.updated_at).getTime()) > 5 * 60 * 1000
+    if (ouderDan5Min) {
+      const token = await getValidToken(sql, userId).catch(() => null)
+      if (token) {
+        await Promise.all([
+          syncSuuntoWellnessForUser(sql, userId, token, 2),
+          syncSuuntoForUser(sql, userId, token),
+        ])
+      }
+    }
+  } catch { /* geen Suunto of sync mislukt — doorgaan met bestaande data */ }
 
   try {
     const [profiel] = await sql`
@@ -36,14 +56,54 @@ export const handler = async (event) => {
       ORDER BY datum DESC
     `
 
-    // Meest recente HRV/slaap uit handmatige logs
+    // Meest recente HRV/slaap uit handmatige logs (laatste 7 dagen)
     const [recentTraining] = await sql`
       SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, datum
       FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
+      AND datum >= CURRENT_DATE - INTERVAL '7 days'
       ORDER BY datum DESC LIMIT 1
     `
 
-    const herstelData = recentTraining || null
+    // Meest recente Suunto wellness rij (voor stappen, herstelbalans etc.)
+    const [recentWellness] = await sql`
+      SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, stress_pct,
+             rust_hartslag, stappen, kcal_actief, datum
+      FROM dagelijkse_wellness WHERE user_id = ${userId}
+      ORDER BY datum DESC LIMIT 1
+    `.catch(() => [])
+
+    // Meest recente rij MET HRV — kan een andere datum zijn dan recentWellness
+    // (Suunto slaat slaap op onder de datum waarop je ging slapen, niet wakker werd)
+    const [recentWellnessHrv] = await sql`
+      SELECT hrv_ochtend, slaap_uur, slaap_score, datum
+      FROM dagelijkse_wellness WHERE user_id = ${userId}
+        AND hrv_ochtend IS NOT NULL
+      ORDER BY datum DESC LIMIT 1
+    `.catch(() => [])
+
+    // Merge op datum: recentste bron wint. Bij gelijke datum heeft Suunto voorrang
+    const trainDatum    = recentTraining    ? String(recentTraining.datum).slice(0, 10)    : null
+    const wellnessDatum = recentWellness    ? String(recentWellness.datum).slice(0, 10)    : null
+    const hrvDatum      = recentWellnessHrv ? String(recentWellnessHrv.datum).slice(0, 10) : null
+    const gebruikHandmatig = trainDatum && (!wellnessDatum || trainDatum > wellnessDatum)
+
+    // Kies HRV/slaap-bron: meest recente van (handmatig, suunto-hrv)
+    const hrvBron = recentWellnessHrv && (!trainDatum || hrvDatum >= trainDatum)
+      ? recentWellnessHrv : recentTraining
+
+    let herstelData = null
+    if (recentTraining || recentWellness || recentWellnessHrv) {
+      herstelData = {
+        hrv_ochtend:   hrvBron?.hrv_ochtend   ?? null,
+        slaap_uur:     hrvBron?.slaap_uur     ?? null,
+        slaap_score:   hrvBron?.slaap_score ?? null,
+        herstel_balans: gebruikHandmatig
+          ? (recentTraining?.herstel_balans ?? (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : null))
+          : (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : recentTraining?.herstel_balans ?? null),
+        datum: hrvBron ? (hrvBron === recentTraining ? trainDatum : hrvDatum) : (wellnessDatum ?? trainDatum),
+        bron: hrvBron === recentTraining ? 'handmatig' : 'suunto',
+      }
+    }
 
     const actieveDoelen = await sql`
       SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE

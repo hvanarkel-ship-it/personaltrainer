@@ -131,7 +131,7 @@ export default function Training({ onNavigeer, user }) {
   const [form, setForm] = useState({
     datum: vandaagStr(), sport: 'fitness', duur_min: '', kcal: '',
     gem_hartslag: '', max_hartslag: '', hrv_ochtend: '', slaap_uur: '',
-    slaapscore: '', herstelbalans: '', zone2_min: '', zone3_min: '', zone4_min: '',
+    slaap_score: '', herstel_balans: '', zone2_min: '', zone3_min: '', zone4_min: '',
     rpe: '', notities: ''
   })
   const [opslaan, setOpslaan] = useState(false)
@@ -156,7 +156,7 @@ export default function Training({ onNavigeer, user }) {
       setForm({
         datum: vandaagStr(), sport: 'fitness', duur_min: '', kcal: '',
         gem_hartslag: '', max_hartslag: '', hrv_ochtend: '', slaap_uur: '',
-        slaapscore: '', herstelbalans: '', zone2_min: '', zone3_min: '', zone4_min: '',
+        slaap_score: '', herstel_balans: '', zone2_min: '', zone3_min: '', zone4_min: '',
         rpe: '', notities: ''
       })
     } catch (err) { setFout(err.message) }
@@ -298,8 +298,8 @@ export default function Training({ onNavigeer, user }) {
               <div className="form-rij" style={{ marginTop: 10 }}>
                 <div className="form-group"><label>HRV ochtend</label><input type="number" value={form.hrv_ochtend} onChange={upd('hrv_ochtend')} placeholder="65" /></div>
                 <div className="form-group"><label>Slaap (uur)</label><input type="number" step="0.1" value={form.slaap_uur} onChange={upd('slaap_uur')} placeholder="7.5" /></div>
-                <div className="form-group"><label>Slaapscore</label><input type="number" value={form.slaapscore} onChange={upd('slaapscore')} placeholder="78" /></div>
-                <div className="form-group"><label>Herstelbalans</label><input type="number" step="0.1" value={form.herstelbalans} onChange={upd('herstelbalans')} placeholder="+5.2" /></div>
+                <div className="form-group"><label>Slaapscore</label><input type="number" value={form.slaap_score} onChange={upd('slaap_score')} placeholder="78" /></div>
+                <div className="form-group"><label>Herstelbalans</label><input type="number" step="0.1" value={form.herstel_balans} onChange={upd('herstel_balans')} placeholder="+5.2" /></div>
               </div>
             </details>
 

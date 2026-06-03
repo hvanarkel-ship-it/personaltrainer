@@ -13,8 +13,8 @@ function berekenGereedheid(h) {
     const v = parseFloat(h.slaap_uur)
     scores.push({ w: 30, v: v >= 8 ? 100 : v >= 7 ? 85 : v >= 6 ? 62 : v >= 5 ? 38 : 18 })
   }
-  if (h.herstelbalans != null) {
-    const v = parseFloat(h.herstelbalans)
+  if (h.herstel_balans != null) {
+    const v = parseFloat(h.herstel_balans)
     const isPct = Math.abs(v) > 20
     const score = isPct
       ? (v >= 90 ? 100 : v >= 75 ? 80 : v >= 60 ? 60 : v >= 45 ? 40 : 20)
@@ -86,7 +86,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
   const [toonOchtendForm, setToonOchtendForm] = useState(false)
-  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '', stemming: '' })
+  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       const nieuw = await api.get('/dashboard')
       setData(nieuw)
       setToonOchtendForm(false)
-      setOForm({ hrv_ochtend: '', slaap_uur: '', slaapscore: '', herstelbalans: '', stemming: '' })
+      setOForm({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
     } catch (err) { console.error(err) }
     finally { setOOpslaan(false) }
   }
@@ -123,16 +123,11 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   const p = data?.profiel || {}
   const v = data?.vandaag || {}
+  // herstel komt al gemergd terug van de backend (datum-aware: recentste bron wint)
+  // wellness[0] wordt alleen nog gebruikt voor extra Suunto-velden (rust_hartslag etc.)
   const hOrig = data?.herstel || {}
   const laatsteWellness = wellness[0] || null
-  const h = {
-    ...hOrig,
-    hrv_ochtend:   hOrig.hrv_ochtend   ?? laatsteWellness?.hrv_ochtend,
-    slaap_uur:     hOrig.slaap_uur     ?? laatsteWellness?.slaap_uur,
-    slaapscore:    hOrig.slaapscore    ?? laatsteWellness?.slaap_score,
-    herstelbalans: hOrig.herstelbalans ?? (laatsteWellness?.herstel_balans != null ? laatsteWellness.herstel_balans * 100 : null),
-    datum:         hOrig.datum         ?? laatsteWellness?.datum,
-  }
+  const h = { ...hOrig }
   const doelen = data?.doelen || []
   const trend = data?.gewicht_trend || []
   const weekTrainingen = data?.week_trainingen || []
@@ -184,6 +179,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const voornaam = (p.name || user.name)?.split(' ')[0]
 
   const extraWellness = [
+    { icon: '⚡', val: `${laatsteWellness?.hulpbronnen_pct}%`, lbl: 'hulpbronnen', show: !!(laatsteWellness?.hulpbronnen_pct) },
     { icon: '💗', val: `${laatsteWellness?.rust_hartslag} bpm`, lbl: 'rust-HR', show: !!(laatsteWellness?.rust_hartslag) },
     { icon: '👟', val: (laatsteWellness?.stappen || 0).toLocaleString('nl-NL'), lbl: 'stappen', show: !!(laatsteWellness?.stappen) },
     { icon: '🔥', val: `${laatsteWellness?.kcal_actief}`, lbl: 'actieve kcal', show: !!(laatsteWellness?.kcal_actief) },
@@ -236,11 +232,11 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               </div>
               <div className="form-group">
                 <label>Slaapscore</label>
-                <input type="number" value={oForm.slaapscore} onChange={e => setOForm(f => ({ ...f, slaapscore: e.target.value }))} placeholder="78" />
+                <input type="number" value={oForm.slaap_score} onChange={e => setOForm(f => ({ ...f, slaap_score: e.target.value }))} placeholder="78" />
               </div>
               <div className="form-group">
                 <label>Herstelbalans</label>
-                <input type="number" step="0.1" value={oForm.herstelbalans} onChange={e => setOForm(f => ({ ...f, herstelbalans: e.target.value }))} placeholder="+5.2" />
+                <input type="number" step="0.1" value={oForm.herstel_balans} onChange={e => setOForm(f => ({ ...f, herstel_balans: e.target.value }))} placeholder="+5.2" />
               </div>
             </div>
             <div className="form-group">
@@ -307,12 +303,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                     </div>
                   </div>
                 )}
-                {h.herstelbalans != null && (
+                {h.herstel_balans != null && (
                   <div className="dash-metric-pill">
                     <span className="dash-metric-icon">🔋</span>
                     <div>
                       <span className="dash-metric-val">
-                        {`${Math.round(h.herstelbalans)}${Math.abs(parseFloat(h.herstelbalans)) > 20 ? '%' : ''}`}
+                        {`${Math.round(h.herstel_balans)}${Math.abs(parseFloat(h.herstel_balans)) > 20 ? '%' : ''}`}
                       </span>
                       <span className="dash-metric-unit">reserves</span>
                     </div>
