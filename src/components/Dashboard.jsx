@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
-import { api, datumStr, datumNl } from '../api.js'
+import { api, datumStr, datumNl as datumNlApi } from '../api.js'
 import SportIcoon, { normMin } from '../sportIcoon.jsx'
+import Ring from './ui/Ring.jsx'
+import Card from './ui/Card.jsx'
+import Sheet from './ui/Sheet.jsx'
+import Chip from './ui/Chip.jsx'
+import MetricHero from './ui/MetricHero.jsx'
+
+// ── Readiness score ─────────────────────────────────────────────────────────
 
 function berekenGereedheid(h) {
   if (!h) return null
@@ -26,67 +33,46 @@ function berekenGereedheid(h) {
   return Math.round(scores.reduce((s, x) => s + x.v * x.w, 0) / totW)
 }
 
-function gereedheidsInfo(score) {
-  if (score >= 75) return {
-    kleur: '#16a34a', bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-    border: '#bbf7d0', ringFrom: '#22c55e', ringTo: '#16a34a',
-    label: 'Klaar voor intensief',
-    advies: 'Je lichaam is goed hersteld. Ideaal voor een zware training of nieuwe prikkel.',
-    aangeraden: 'Interval, krachttraining of hoge intensiteit',
-    badge: 'GO',
+function zoneInfo(score) {
+  if (score >= 67) return {
+    chip: 'green', label: 'Klaar voor intensief',
+    advies: 'Ideaal voor interval, krachttraining of hoge intensiteit.',
   }
-  if (score >= 50) return {
-    kleur: '#b45309', bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-    border: '#fcd34d', ringFrom: '#fbbf24', ringTo: '#d97706',
-    label: 'Matige intensiteit',
-    advies: 'Zone 2 duurtraining of techniekwerk aanbevolen.',
-    aangeraden: 'Zone 2 duurtraining of mobiliteit (45–60 min)',
-    badge: 'OK',
+  if (score >= 34) return {
+    chip: 'amber', label: 'Matige intensiteit',
+    advies: 'Zone 2 duurtraining of techniekwerk aanbevolen (45–60 min).',
   }
   return {
-    kleur: '#dc2626', bg: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-    border: '#fca5a5', ringFrom: '#f87171', ringTo: '#dc2626',
-    label: 'Herstel aanbevolen',
-    advies: 'Intensief trainen vertraagt je herstel. Prioriteer slaap en voeding.',
-    aangeraden: 'Actief herstel: wandelen, yoga of volledige rust',
-    badge: 'REST',
+    chip: 'red', label: 'Herstel aanbevolen',
+    advies: 'Intensief trainen vertraagt herstel. Prioriteer slaap en voeding.',
   }
 }
 
-function GereedheidsRing({ score, gInfo }) {
-  const size = 120
-  const stroke = 10
-  const r = (size - stroke) / 2
-  const circ = 2 * Math.PI * r
-  const dash = (score / 100) * circ
+// ── Sport colour (dark theme) ──────────────────────────────────────────────
 
-  return (
-    <div className="gereedheid-ring-wrap">
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
-        <circle
-          cx={size/2} cy={size/2} r={r} fill="none"
-          stroke={gInfo.ringFrom} strokeWidth={stroke}
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(0.4,0,0.2,1)' }}
-        />
-      </svg>
-      <div className="gereedheid-ring-inner">
-        <span className="gereedheid-ring-pct">{score}</span>
-        <span className="gereedheid-ring-sym">%</span>
-      </div>
-    </div>
-  )
+const SPORT_COLOR = {
+  hardlopen: 'var(--blue)',   fietsen: 'var(--amber)',
+  fitness: 'var(--green)',    zwemmen: '#5eb8ff',
+  padel: '#c084fc',           tennis: '#c084fc',
+  wandelen: 'var(--green)',   yoga: '#f472b6',
+  voetbal: 'var(--blue)',     hyrox: 'var(--red)',
+  overig: 'var(--text-3)',
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const pad2 = n => String(n).padStart(2, '0')
+const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export default function Dashboard({ user, onNavigeer, onUitloggen }) {
-  const [data, setData] = useState(null)
+  const [data, setData]         = useState(null)
   const [wellness, setWellness] = useState([])
-  const [laden, setLaden] = useState(true)
-  const [fout, setFout] = useState('')
-  const [toonOchtendForm, setToonOchtendForm] = useState(false)
-  const [oForm, setOForm] = useState({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
+  const [laden, setLaden]       = useState(true)
+  const [fout, setFout]         = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [oForm, setOForm]       = useState({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
 
   useEffect(() => {
@@ -99,8 +85,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     }).finally(() => setLaden(false))
   }, [])
 
-  const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-
   async function logOchtend() {
     if (!oForm.hrv_ochtend && !oForm.slaap_uur) return
     setOOpslaan(true)
@@ -108,435 +92,516 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       await api.post('/training', {
         sport: 'herstel',
         datum: new Date().toISOString().split('T')[0],
-        ...Object.fromEntries(Object.entries(oForm).filter(([, v]) => v !== ''))
+        ...Object.fromEntries(Object.entries(oForm).filter(([, v]) => v !== '')),
       })
       const nieuw = await api.get('/dashboard')
       setData(nieuw)
-      setToonOchtendForm(false)
+      setSheetOpen(false)
       setOForm({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
     } catch (err) { console.error(err) }
     finally { setOOpslaan(false) }
   }
 
-  if (laden) return <div className="page page-loading"><div className="spinner" /></div>
-  if (fout) return <div className="page"><div className="alert alert-error" style={{ margin: 20 }}>Dashboard kon niet laden: {fout}</div></div>
+  if (laden) return <div className="page" style={{ alignItems: 'center', justifyContent: 'center' }}><div className="skeleton" style={{ width: 200, height: 200, borderRadius: '50%' }} /></div>
+  if (fout)  return <div className="page"><Card><p className="t-sm t-red">Dashboard kon niet laden: {fout}</p></Card></div>
 
-  const p = data?.profiel || {}
-  const v = data?.vandaag || {}
-  // herstel komt al gemergd terug van de backend (datum-aware: recentste bron wint)
-  // wellness[0] wordt alleen nog gebruikt voor extra Suunto-velden (rust_hartslag etc.)
-  const hOrig = data?.herstel || {}
-  const laatsteWellness = wellness[0] || null
-  const h = { ...hOrig }
-  const doelen = data?.doelen || []
-  const trend = data?.gewicht_trend || []
+  // ── Derived data ──────────────────────────────────────────────────────────
+
+  const p             = data?.profiel          || {}
+  const v             = data?.vandaag          || {}
+  const h             = data?.herstel          || {}
+  const doelen        = data?.doelen           || []
+  const trend         = data?.gewicht_trend    || []
   const weekTrainingen = data?.week_trainingen || []
-  const streak = data?.streak || 0
+  const streak        = data?.streak           || 0
 
-  const training_kcal_vandaag = v.training_kcal || 0
-  const basis_kcal = p.doel_kcal || 2400
-  const doel_kcal_aangepast = basis_kcal + training_kcal_vandaag
+  const vandaag = dagStr(new Date())
+  const dag = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+  const voornaam = (p.name || user?.name)?.split(' ')[0] || 'Atleet'
 
-  const kcalPct = Math.min(100, Math.round(((v.kcal||0) / doel_kcal_aangepast) * 100))
-  const eiwitPct = p.doel_eiwit_g ? Math.min(100, Math.round(((v.eiwit||0) / p.doel_eiwit_g) * 100)) : 0
-  const khPct = p.doel_koolhydraten_g ? Math.min(100, Math.round(((v.koolhydraten||0) / p.doel_koolhydraten_g) * 100)) : 0
-  const vetPct = p.doel_vetten_g ? Math.min(100, Math.round(((v.vetten||0) / p.doel_vetten_g) * 100)) : 0
+  const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
+  const heeftTrainingVandaag = echteTrainingen.some(t => datumStr(t.datum) === vandaag)
+  const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
+  const weekKcal    = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
 
+  // Nutrition
+  const training_kcal = v.training_kcal || 0
+  const doel_kcal     = (p.doel_kcal || 2400) + training_kcal
+  const kcalPct  = Math.min(100, Math.round(((v.kcal || 0) / doel_kcal) * 100))
+  const eiwitPct = p.doel_eiwit_g       ? Math.min(100, Math.round(((v.eiwit||0)        / p.doel_eiwit_g)       * 100)) : 0
+  const khPct    = p.doel_koolhydraten_g ? Math.min(100, Math.round(((v.koolhydraten||0) / p.doel_koolhydraten_g) * 100)) : 0
+  const vetPct   = p.doel_vetten_g       ? Math.min(100, Math.round(((v.vetten||0)       / p.doel_vetten_g)       * 100)) : 0
+
+  // Readiness
   const gereedheid = berekenGereedheid(h)
-  const gInfo = gereedheid !== null ? gereedheidsInfo(gereedheid) : null
-  const heeftHerstelData = !!(h.hrv_ochtend || h.slaap_uur)
+  const zone       = gereedheid !== null ? zoneInfo(gereedheid) : null
+  const heeftData  = !!(h.hrv_ochtend || h.slaap_uur)
 
   const herstelDagen = h?.datum
-    ? Math.floor((Date.now() - new Date(datumStr(h.datum) + 'T12:00:00').getTime()) / 86400000)
+    ? Math.floor((Date.now() - new Date((datumStr(h.datum) || '') + 'T12:00:00').getTime()) / 86400000)
     : null
 
-  const pad2 = n => String(n).padStart(2, '0')
-  const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
-  const vandaag = dagStr(new Date())
+  // 7-day HRV/sleep trend
   const wellnessByDatum = new Map(wellness.map(w => [datumStr(w.datum), w]))
-  const hrv7Dagen = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+  const hrv7 = Array.from({ length: 7 }, (_, i) => {
+    const d  = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = dagStr(d)
-    const rec = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend).sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
-    const w = wellnessByDatum.get(ds)
+    const tr = weekTrainingen.filter(t => datumStr(t.datum) === ds && t.hrv_ochtend)
+      .sort((a, b) => b.hrv_ochtend - a.hrv_ochtend)[0]
+    const wl = wellnessByDatum.get(ds)
     return {
       datum: ds,
-      label: d.toLocaleDateString('nl-NL', { weekday: 'short' }),
-      hrv: rec?.hrv_ochtend || w?.hrv_ochtend || null,
-      slaap: w?.slaap_uur ? parseFloat(w.slaap_uur) : null,
+      label: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+      hrv:   tr?.hrv_ochtend || wl?.hrv_ochtend || null,
+      slaap: wl?.slaap_uur ? parseFloat(wl.slaap_uur) : null,
       isVandaag: ds === vandaag,
     }
   })
-  const heeftTrendData = hrv7Dagen.some(d => d.hrv !== null || d.slaap !== null)
-  const recenteHrv = hrv7Dagen.filter(d => d.hrv !== null)
-  const hrvTrendLaag = recenteHrv.length >= 3 && recenteHrv.slice(-3).every(d => d.hrv < 45)
+  const heeftTrend = hrv7.some(d => d.hrv !== null || d.slaap !== null)
 
-  const echteTrainingen = weekTrainingen.filter(t => t.sport !== 'herstel')
-  const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
-  const weekKcal = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
-  const heeftTrainingVandaag = echteTrainingen.some(t => datumStr(t.datum) === vandaag)
+  // 7-day baseline for Ring (mean gereedheid of days with hrv or slaap)
+  const baselineScores = hrv7.slice(0, 6)
+    .map(d => berekenGereedheid({ hrv_ochtend: d.hrv, slaap_uur: d.slaap }))
+    .filter(s => s !== null)
+  const baseline7d = baselineScores.length
+    ? Math.round(baselineScores.reduce((a, b) => a + b, 0) / baselineScores.length)
+    : null
 
-  const voornaam = (p.name || user.name)?.split(' ')[0]
-
-  const extraWellness = [
-    { icon: '⚡', val: `${laatsteWellness?.hulpbronnen_pct}%`, lbl: 'hulpbronnen', show: !!(laatsteWellness?.hulpbronnen_pct) },
-    { icon: '💗', val: `${laatsteWellness?.rust_hartslag} bpm`, lbl: 'rust-HR', show: !!(laatsteWellness?.rust_hartslag) },
-    { icon: '👟', val: (laatsteWellness?.stappen || 0).toLocaleString('nl-NL'), lbl: 'stappen', show: !!(laatsteWellness?.stappen) },
-    { icon: '🔥', val: `${laatsteWellness?.kcal_actief}`, lbl: 'actieve kcal', show: !!(laatsteWellness?.kcal_actief) },
-  ].filter(x => x.show)
+  // Extra Suunto metrics (steps, rest HR etc.)
+  const laatste = wellness[0] || null
+  const extraMetrics = [
+    { val: laatste?.rust_hartslag, unit: 'bpm', label: 'Rust-HR' },
+    { val: laatste?.stappen ? (laatste.stappen).toLocaleString('nl-NL') : null, unit: '', label: 'Stappen' },
+    { val: laatste?.kcal_actief, unit: 'kcal', label: 'Actief' },
+  ].filter(x => x.val)
 
   return (
-    <div className="page dash-page">
+    <div className="page">
 
-      {/* ── HERO ── */}
-      <div className="dash-hero">
-        <div className="dash-hero-text">
-          <h1 className="dash-hero-name">Hey, {voornaam}</h1>
-          <p className="dash-hero-dag">{dag}</p>
-          {streak >= 2 && (
-            <span className="dash-streak-pill">🔥 {streak} dagen streak</span>
-          )}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="page-header">
+        <div>
+          <h1 className="t-xl">Hey, {voornaam}</h1>
+          <p className="t-sm t-muted" style={{ marginTop: 2 }}>{dag}</p>
         </div>
-        <button className="icon-btn dash-logout-btn" onClick={onUitloggen} title="Uitloggen">
-          <span>⎋</span>
-        </button>
-      </div>
-
-      {/* ── GEREEDHEID & HERSTEL ── */}
-      <div className="card dash-gereedheid-card" style={gInfo ? { background: gInfo.bg, borderColor: gInfo.border } : {}}>
-        <div className="dash-gereedheid-header">
-          <div>
-            <h3 className="dash-gereedheid-titel">Gereedheid vandaag</h3>
-            {gInfo && <span className="dash-gereedheid-label" style={{ color: gInfo.kleur }}>{gInfo.label}</span>}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {streak >= 2 && <Chip label={`🔥 ${streak}`} color="amber" />}
           <button
-            className={`btn btn-sm ${toonOchtendForm ? 'btn-ghost' : 'btn-primary'}`}
-            onClick={() => setToonOchtendForm(f => !f)}
+            className="btn btn-ghost btn-sm"
+            onClick={onUitloggen}
+            style={{ padding: '8px', minWidth: 36 }}
+            title="Uitloggen"
           >
-            {toonOchtendForm ? 'Annuleer' : '+ Ochtend'}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
           </button>
         </div>
-
-        {/* Ochtend log form */}
-        {toonOchtendForm && (
-          <div className="ochtend-form">
-            <p className="ochtend-form-intro">Log je ochtendmetingen voor trainingsadvies op maat:</p>
-            <div className="ochtend-form-grid">
-              <div className="form-group">
-                <label>HRV (ms)</label>
-                <input type="number" value={oForm.hrv_ochtend} onChange={e => setOForm(f => ({ ...f, hrv_ochtend: e.target.value }))} placeholder="65" autoFocus />
-              </div>
-              <div className="form-group">
-                <label>Slaap (uur)</label>
-                <input type="number" step="0.1" value={oForm.slaap_uur} onChange={e => setOForm(f => ({ ...f, slaap_uur: e.target.value }))} placeholder="7.5" />
-              </div>
-              <div className="form-group">
-                <label>Slaapscore</label>
-                <input type="number" value={oForm.slaap_score} onChange={e => setOForm(f => ({ ...f, slaap_score: e.target.value }))} placeholder="78" />
-              </div>
-              <div className="form-group">
-                <label>Herstelbalans</label>
-                <input type="number" step="0.1" value={oForm.herstel_balans} onChange={e => setOForm(f => ({ ...f, herstel_balans: e.target.value }))} placeholder="+5.2" />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Stemming</label>
-              <div className="stemming-keuze">
-                {[['😔','Slecht'],['😕','Matig'],['😐','Neutraal'],['🙂','Goed'],['😊','Top']].map(([emoji, lbl], i) => (
-                  <button key={i} type="button"
-                    className={`stemming-btn ${oForm.stemming == i+1 ? 'active' : ''}`}
-                    onClick={() => setOForm(f => ({ ...f, stemming: f.stemming == i+1 ? '' : String(i+1) }))}>
-                    <span>{emoji}</span>
-                    <span>{lbl}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button className="btn btn-primary btn-full" onClick={logOchtend} disabled={oOpslaan || (!oForm.hrv_ochtend && !oForm.slaap_uur)}>
-              {oOpslaan ? 'Opslaan...' : 'Opslaan & ververs gereedheid'}
-            </button>
-          </div>
-        )}
-
-        {/* Lege staat */}
-        {!heeftHerstelData && !toonOchtendForm && (
-          <div className="dash-gereedheid-leeg">
-            <div className="dash-gereedheid-leeg-icon">📊</div>
-            <div>
-              <strong>Log je ochtenddata</strong>
-              <p>HRV en slaap vormen de basis van je trainingsplanning.</p>
-            </div>
-            <button className="btn btn-primary" onClick={() => setToonOchtendForm(true)}>
-              Start logging
-            </button>
-          </div>
-        )}
-
-        {/* Data aanwezig */}
-        {heeftHerstelData && !toonOchtendForm && (
-          <div className="dash-gereedheid-content">
-            {herstelDagen > 1 && (
-              <p className="stale-warning">⚠️ Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden</p>
-            )}
-
-            {/* Ring + primaire metrics */}
-            <div className="dash-gereedheid-body">
-              {gInfo && gereedheid !== null && (
-                <GereedheidsRing score={gereedheid} gInfo={gInfo} />
-              )}
-              <div className="dash-gereedheid-metrics">
-                {h.hrv_ochtend && (
-                  <div className="dash-metric-pill">
-                    <span className="dash-metric-icon">💓</span>
-                    <div>
-                      <span className="dash-metric-val">{h.hrv_ochtend}</span>
-                      <span className="dash-metric-unit">ms HRV</span>
-                    </div>
-                  </div>
-                )}
-                {h.slaap_uur && (
-                  <div className="dash-metric-pill">
-                    <span className="dash-metric-icon">😴</span>
-                    <div>
-                      <span className="dash-metric-val">{h.slaap_uur}</span>
-                      <span className="dash-metric-unit">uur slaap</span>
-                    </div>
-                  </div>
-                )}
-                {h.herstel_balans != null && (
-                  <div className="dash-metric-pill">
-                    <span className="dash-metric-icon">🔋</span>
-                    <div>
-                      <span className="dash-metric-val">
-                        {`${Math.round(h.herstel_balans)}${Math.abs(parseFloat(h.herstel_balans)) > 20 ? '%' : ''}`}
-                      </span>
-                      <span className="dash-metric-unit">reserves</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Suunto extra metrics (rust-HR, stappen, actieve kcal) */}
-            {extraWellness.length > 0 && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {extraWellness.map(x => (
-                  <div key={x.lbl} style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(0,0,0,0.06)',
-                    borderRadius: 8, padding: '5px 10px', fontSize: '0.78rem',
-                  }}>
-                    <span>{x.icon}</span>
-                    <span style={{ fontWeight: 700 }}>{x.val}</span>
-                    <span style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{x.lbl}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Advies */}
-            {gInfo && (
-              <div className="dash-gereedheid-advies">
-                <span className="dash-advies-arrow">→</span>
-                <span>{gInfo.aangeraden}</span>
-              </div>
-            )}
-
-            {/* 7-daagse gecombineerde grafiek: slaapbalken + HRV-labels */}
-            {heeftTrendData && (
-              <div className="dash-hrv-trend-wrap">
-                {hrvTrendLaag && (
-                  <p className="hrv-waarschuwing">⚠️ HRV laag — herstel heeft voorrang</p>
-                )}
-                <div style={{ display: 'flex', gap: 4, height: 88, alignItems: 'flex-end', marginBottom: 4 }}>
-                  {hrv7Dagen.map(d => {
-                    const slaapHoogte = d.slaap ? Math.min(100, (d.slaap / 9) * 100) : 4
-                    const slaapKleur = !d.slaap ? 'var(--border)'
-                      : d.slaap >= 7.5 ? '#22c55e'
-                      : d.slaap >= 6.5 ? '#eab308'
-                      : '#ef4444'
-                    const hrvKleur = !d.hrv ? 'transparent'
-                      : d.hrv >= 60 ? '#16a34a'
-                      : d.hrv >= 45 ? '#b45309'
-                      : '#dc2626'
-                    return (
-                      <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                        <span style={{ fontSize: '0.58rem', fontWeight: 700, color: hrvKleur, lineHeight: 1, minHeight: 10 }}>
-                          {d.hrv || ''}
-                        </span>
-                        <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                          <div
-                            style={{ width: '100%', height: `${slaapHoogte}%`, background: slaapKleur, borderRadius: 4, minHeight: 4, transition: 'height 0.4s' }}
-                            title={[d.slaap ? `${d.slaap}u slaap` : null, d.hrv ? `HRV ${d.hrv}ms` : null].filter(Boolean).join(' · ') || d.label}
-                          />
-                        </div>
-                        <span style={{ fontSize: '0.65rem', fontWeight: d.isVandaag ? 700 : 400, color: d.isVandaag ? 'var(--accent)' : '#64748b' }}>
-                          {d.label.slice(0, 2)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <span>Balk: slaap&nbsp;<span style={{ color: '#22c55e' }}>●</span>≥7,5u&nbsp;<span style={{ color: '#eab308' }}>●</span>6,5–7,5u&nbsp;<span style={{ color: '#ef4444' }}>●</span>&lt;6,5u</span>
-                  <span>Getal: HRV (ms)</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <button className="dash-coach-link" onClick={() => onNavigeer('coach')}>
-          💬 Vraag coach om analyse →
-        </button>
       </div>
 
-      {/* ── WEEK TRAINING ── */}
-      {echteTrainingen.length > 0 && (
-        <div className="card dash-week-card">
-          <div className="card-header">
-            <h3>Training deze week</h3>
-            <button className="link-btn small" onClick={() => onNavigeer('training')}>Bekijk →</button>
-          </div>
-          <div className="dash-week-stats">
-            <div className="dash-week-stat">
-              <span className="dash-week-stat-val">{echteTrainingen.length}</span>
-              <span className="dash-week-stat-lbl">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</span>
+      {/* ── Readiness card ─────────────────────────────────────────────── */}
+      <Card>
+
+        {/* Ring */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', paddingTop: 'var(--space-2)' }}>
+          {heeftData && gereedheid !== null ? (
+            <Ring score={gereedheid} baseline={baseline7d} size={200} />
+          ) : (
+            <div style={{ width: 200, height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+              <svg width="200" height="200" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="100" cy="100" r="87" fill="none" stroke="var(--bg-surface)" strokeWidth="13" />
+              </svg>
+              <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <span className="t-xl t-muted">—</span>
+                <span className="t-label">Gereedheid</span>
+              </div>
             </div>
-            <div className="dash-week-stat-divider" />
-            <div className="dash-week-stat">
-              <span className="dash-week-stat-val">
-                {weekMinuten >= 60
-                  ? `${Math.floor(weekMinuten / 60)}u${weekMinuten % 60 ? weekMinuten % 60 + 'm' : ''}`
-                  : `${weekMinuten}m`}
-              </span>
-              <span className="dash-week-stat-lbl">trainingstijd</span>
+          )}
+
+          {/* Zone chip */}
+          {zone && <Chip label={zone.label} color={zone.chip} dot />}
+        </div>
+
+        {/* Metrics row */}
+        {heeftData && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <MetricHero
+                value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : null}
+                unit={h.hrv_ochtend ? 'ms' : ''}
+                label="HRV"
+                color={h.hrv_ochtend >= 60 ? 'var(--green)' : h.hrv_ochtend >= 45 ? 'var(--amber)' : h.hrv_ochtend ? 'var(--red)' : undefined}
+              />
+            </div>
+            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-3)', paddingRight: 'var(--space-3)' }}>
+              <MetricHero
+                value={h.slaap_uur ? parseFloat(h.slaap_uur).toFixed(1) : null}
+                unit={h.slaap_uur ? 'u' : ''}
+                label="Slaap"
+                color={h.slaap_uur >= 7.5 ? 'var(--green)' : h.slaap_uur >= 6 ? 'var(--amber)' : h.slaap_uur ? 'var(--red)' : undefined}
+              />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <MetricHero
+                value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : null}
+                label="Balans"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Staleness warning */}
+        {herstelDagen > 1 && (
+          <p className="t-sm t-muted" style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
+            Data van {herstelDagen} dag{herstelDagen !== 1 ? 'en' : ''} geleden
+          </p>
+        )}
+
+        {/* Advisory text */}
+        {zone && (
+          <p className="t-sm t-muted" style={{ marginTop: 'var(--space-3)', textAlign: 'center' }}>
+            {zone.advies}
+          </p>
+        )}
+
+        {/* Extra Suunto stats */}
+        {extraMetrics.length > 0 && (
+          <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'center', flexWrap: 'wrap', marginTop: 'var(--space-3)' }}>
+            {extraMetrics.map(m => (
+              <div key={m.label} className="card-inset" style={{ textAlign: 'center', minWidth: 72 }}>
+                <div className="t-sm" style={{ fontWeight: 600 }}>{m.val}{m.unit && <span className="t-xs t-muted"> {m.unit}</span>}</div>
+                <div className="t-xs t-muted" style={{ marginTop: 1 }}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 7-day HRV/sleep chart */}
+        {heeftTrend && <TrendChart days={hrv7} />}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setSheetOpen(true)}>
+            {heeftData ? 'Bijwerken' : '+ Ochtend loggen'}
+          </button>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => onNavigeer('coach')}>
+            Vraag coach →
+          </button>
+        </div>
+      </Card>
+
+      {/* ── Training week ───────────────────────────────────────────────── */}
+      {echteTrainingen.length > 0 && (
+        <Card>
+          <div className="card-header">
+            <span className="t-lg">Training week</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('training')}>Bekijk →</button>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-5)', marginBottom: 'var(--space-4)' }}>
+            <div>
+              <div className="metric-row">
+                <span className="metric-value" style={{ fontSize: 'var(--t-xl)' }}>{echteTrainingen.length}</span>
+              </div>
+              <div className="metric-label">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</div>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <div>
+              <div className="metric-row">
+                <span className="metric-value" style={{ fontSize: 'var(--t-xl)' }}>
+                  {weekMinuten >= 60
+                    ? `${Math.floor(weekMinuten/60)}u${weekMinuten%60 ? weekMinuten%60+'m' : ''}`
+                    : `${weekMinuten}m`}
+                </span>
+              </div>
+              <div className="metric-label">trainingstijd</div>
             </div>
             {weekKcal > 0 && (
               <>
-                <div className="dash-week-stat-divider" />
-                <div className="dash-week-stat">
-                  <span className="dash-week-stat-val">{weekKcal}</span>
-                  <span className="dash-week-stat-lbl">kcal</span>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+                <div>
+                  <div className="metric-row">
+                    <span className="metric-value" style={{ fontSize: 'var(--t-xl)' }}>{weekKcal}</span>
+                  </div>
+                  <div className="metric-label">kcal</div>
                 </div>
               </>
             )}
           </div>
-          <div className="dash-week-sports">
-            {echteTrainingen.slice(0, 7).map((t, i) => (
-              <div key={t.id || i} className="dash-sport-chip" title={`${t.sport}${t.duur_min ? ' — ' + normMin(t.duur_min) + 'min' : ''}`}>
-                <SportIcoon sport={t.sport} size={16} />
-                {t.duur_min && <span className="dash-sport-duur">{normMin(t.duur_min) >= 60 ? `${Math.floor(normMin(t.duur_min)/60)}u` : `${normMin(t.duur_min)}m`}</span>}
-              </div>
-            ))}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            {echteTrainingen.slice(0, 7).map((t, i) => {
+              const min = normMin(t.duur_min)
+              const color = SPORT_COLOR[t.sport] || 'var(--text-3)'
+              const isToday = datumStr(t.datum) === vandaag
+              return (
+                <div key={t.id || i} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'var(--bg-surface)',
+                  border: isToday ? `1px solid ${color}` : '1px solid transparent',
+                  borderRadius: 'var(--r-xs)',
+                  padding: '6px 10px',
+                  color,
+                }}>
+                  <SportIcoon sport={t.sport} size={14} />
+                  {min > 0 && (
+                    <span style={{ fontSize: 'var(--t-xs)', fontWeight: 600 }}>
+                      {min >= 60 ? `${Math.floor(min/60)}u${min%60 ? min%60+'m' : ''}` : `${min}m`}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* ── VOEDING VANDAAG ── */}
-      <div className="card">
+      {/* ── Nutrition today ─────────────────────────────────────────────── */}
+      <Card>
         <div className="card-header">
-          <h3>Voeding vandaag</h3>
-          <button className="link-btn small" onClick={() => onNavigeer('voeding')}>Log →</button>
-        </div>
-        <div className={`dash-dag-badge ${heeftTrainingVandaag ? 'dash-dag-badge--training' : 'dash-dag-badge--rust'}`}>
-          {heeftTrainingVandaag ? '⚡ Trainingsdag — prioriteer koolhydraten' : '💤 Rustdag — focus op eiwit (1.6–2 g/kg)'}
+          <span className="t-lg">Voeding vandaag</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('voeding')}>Log →</button>
         </div>
 
-        <div className="dash-macro-grid">
-          <div className="dash-macro-main">
-            <span className="dash-macro-main-val">{v.kcal || 0}</span>
-            <span className="dash-macro-main-sub">/ {doel_kcal_aangepast} kcal{training_kcal_vandaag > 0 && <span className="dash-training-kcal"> +{training_kcal_vandaag}🔥</span>}</span>
-            <div className="dash-macro-bar-wrap">
-              <div className="dash-macro-bar dash-macro-bar--primary" style={{ width: kcalPct + '%' }} />
-            </div>
+        <Chip
+          label={heeftTrainingVandaag ? 'Trainingsdag — prioriteer koolhydraten' : 'Rustdag — focus op eiwit'}
+          color={heeftTrainingVandaag ? 'blue' : 'muted'}
+        />
+
+        {/* Kcal main bar */}
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          <div className="row-between" style={{ marginBottom: 'var(--space-2)' }}>
+            <span className="t-sm t-muted">Energie</span>
+            <span className="t-sm">
+              <span style={{ fontWeight: 700 }}>{v.kcal || 0}</span>
+              <span className="t-muted"> / {doel_kcal} kcal</span>
+              {training_kcal > 0 && <span className="t-muted"> (+{training_kcal})</span>}
+            </span>
           </div>
-          <div className="dash-macro-trio">
-            <MacroMini label="Eiwit" val={Math.round(v.eiwit||0)} doel={p.doel_eiwit_g||160} pct={eiwitPct} kleur="green" />
-            <MacroMini label="Koolh." val={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} pct={khPct} kleur="blue" />
-            <MacroMini label="Vet" val={Math.round(v.vetten||0)} doel={p.doel_vetten_g||80} pct={vetPct} kleur="orange" />
+          <div className="progress-bar" style={{ height: 6 }}>
+            <div className="progress-fill" style={{ width: `${kcalPct}%`, background: kcalPct >= 100 ? 'var(--amber)' : 'var(--green)' }} />
           </div>
         </div>
 
+        {/* Macro trio */}
+        <div className="form-grid-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', gap: 'var(--space-2)' }}>
+          <MacroBar label="Eiwit"  val={Math.round(v.eiwit||0)}        doel={p.doel_eiwit_g||160}        pct={eiwitPct} color="var(--green)" />
+          <MacroBar label="Koolh." val={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} pct={khPct}    color="var(--blue)" />
+          <MacroBar label="Vet"    val={Math.round(v.vetten||0)}       doel={p.doel_vetten_g||80}        pct={vetPct}   color="var(--amber)" />
+        </div>
+
+        {/* Meal list */}
         {v.maaltijden_lijst?.length > 0 && (
-          <div className="dash-maaltijd-lijst">
+          <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 'var(--space-3)' }}>
             {v.maaltijden_lijst.map((m, i) => (
-              <div key={i} className="dash-maaltijd-rij">
-                <div className="dash-maaltijd-naam">
-                  <span className="dash-maaltijd-type">{m.maaltijd_type || 'maaltijd'}</span>
-                  {m.beschrijving || 'Maaltijd'}
+              <div key={i} className="list-item">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="t-label" style={{ marginRight: 6 }}>{m.maaltijd_type || 'maaltijd'}</span>
+                  <span className="t-sm">{m.beschrijving || 'Maaltijd'}</span>
                 </div>
-                <div className="dash-maaltijd-macros">
-                  {m.kcal != null && <span>{m.kcal} kcal</span>}
-                  {m.eiwit_g != null && <span className="eiwit-tag">{parseFloat(m.eiwit_g).toFixed(0)}g</span>}
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
+                  {m.kcal != null && <span className="t-sm t-muted">{m.kcal}</span>}
+                  {m.eiwit_g != null && <Chip label={`${parseFloat(m.eiwit_g).toFixed(0)}g`} color="green" />}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* ── GEWICHT TREND ── */}
-      {trend.length > 1 && (
-        <div className="card">
-          <h3>Gewicht trend</h3>
-          <div className="mini-chart">
-            {trend.map((m, i) => {
-              const vals = trend.map(x => x.gewicht_kg)
-              const min = Math.min(...vals), max = Math.max(...vals)
-              const barH = 40 + ((m.gewicht_kg - min) / (max - min || 1)) * 40
+      {/* ── Goals ───────────────────────────────────────────────────────── */}
+      {doelen.length > 0 && (
+        <Card>
+          <div className="card-header">
+            <span className="t-lg">Actieve doelen</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('doelen')}>Bekijk →</button>
+          </div>
+          <div className="section-gap">
+            {doelen.slice(0, 3).map(d => {
+              const pct = d.doel_waarde && d.huidige_waarde
+                ? Math.min(100, Math.round((d.huidige_waarde / d.doel_waarde) * 100)) : 0
               return (
-                <div key={i} className="chart-col">
-                  <div className="chart-val">{m.gewicht_kg}</div>
-                  <div className="chart-bar" style={{ height: barH + 'px' }} />
-                  <div className="chart-date">{datumNl(m.datum, { day: 'numeric', month: 'short' })}</div>
+                <div key={d.id}>
+                  <div className="row-between" style={{ marginBottom: 'var(--space-2)' }}>
+                    <span className="t-sm">{d.titel}</span>
+                    <span className="t-sm t-muted">{d.huidige_waarde||0} / {d.doel_waarde} {d.eenheid||''}</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--green)' : 'var(--blue)' }} />
+                  </div>
                 </div>
               )
             })}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* ── DOELEN ── */}
-      {doelen.length > 0 && (
-        <div className="card">
+      {/* ── Weight trend ────────────────────────────────────────────────── */}
+      {trend.length > 1 && (
+        <Card>
           <div className="card-header">
-            <h3>Actieve doelen</h3>
-            <button className="link-btn" onClick={() => onNavigeer('doelen')}>Bekijk →</button>
+            <span className="t-lg">Gewicht</span>
+            <span className="t-sm t-muted">
+              {trend[trend.length-1]?.gewicht_kg} kg
+            </span>
           </div>
-          {doelen.slice(0, 3).map(d => {
-            const pct = d.doel_waarde && d.huidige_waarde
-              ? Math.min(100, Math.round((d.huidige_waarde / d.doel_waarde) * 100)) : 0
-            return (
-              <div key={d.id} className="doel-row">
-                <div className="doel-info">
-                  <span className="doel-titel">{d.titel}</span>
-                  <span className="doel-waarden">{d.huidige_waarde||0} / {d.doel_waarde} {d.eenheid||''}</span>
-                </div>
-                <div className="voortgang-balk">
-                  <div className="voortgang-fill" style={{ width: pct + '%' }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+          <WeightChart trend={trend} />
+        </Card>
       )}
 
+      {/* ── Morning log sheet ────────────────────────────────────────────── */}
+      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Ochtend log">
+        <div className="section-gap">
+          <p className="t-sm t-muted">Log je ochtendmetingen voor trainingsadvies op maat.</p>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label>HRV (ms)</label>
+              <input className="input" type="number" value={oForm.hrv_ochtend}
+                onChange={e => setOForm(f => ({ ...f, hrv_ochtend: e.target.value }))}
+                placeholder="65" autoFocus />
+            </div>
+            <div className="form-group">
+              <label>Slaap (uur)</label>
+              <input className="input" type="number" step="0.1" value={oForm.slaap_uur}
+                onChange={e => setOForm(f => ({ ...f, slaap_uur: e.target.value }))}
+                placeholder="7.5" />
+            </div>
+            <div className="form-group">
+              <label>Slaapscore</label>
+              <input className="input" type="number" value={oForm.slaap_score}
+                onChange={e => setOForm(f => ({ ...f, slaap_score: e.target.value }))}
+                placeholder="78" />
+            </div>
+            <div className="form-group">
+              <label>Herstelbalans</label>
+              <input className="input" type="number" step="0.1" value={oForm.herstel_balans}
+                onChange={e => setOForm(f => ({ ...f, herstel_balans: e.target.value }))}
+                placeholder="+5.2" />
+            </div>
+          </div>
+
+          {/* Mood picker */}
+          <div className="form-group">
+            <label>Stemming</label>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              {[['😔','Slecht'],['😕','Matig'],['😐','Neutraal'],['🙂','Goed'],['😊','Top']].map(([emoji, lbl], i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setOForm(f => ({ ...f, stemming: f.stemming == i+1 ? '' : String(i+1) }))}
+                  style={{
+                    flex: 1,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    padding: '10px 4px',
+                    background: oForm.stemming == i+1 ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                    border: oForm.stemming == i+1 ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                    borderRadius: 'var(--r-sm)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--dur-fast)',
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>{emoji}</span>
+                  <span className="t-xs t-muted">{lbl}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            className="btn btn-primary btn-full"
+            onClick={logOchtend}
+            disabled={oOpslaan || (!oForm.hrv_ochtend && !oForm.slaap_uur)}
+          >
+            {oOpslaan ? 'Opslaan...' : 'Opslaan'}
+          </button>
+        </div>
+      </Sheet>
+
     </div>
   )
 }
 
-function MacroMini({ label, val, doel, pct, kleur }) {
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function MacroBar({ label, val, doel, pct, color }) {
   return (
-    <div className="dash-macro-mini">
-      <div className="dash-macro-mini-header">
-        <span className="dash-macro-mini-lbl">{label}</span>
-        <span className="dash-macro-mini-val">{val}g</span>
+    <div>
+      <div className="row-between" style={{ marginBottom: 'var(--space-1)' }}>
+        <span className="t-xs t-muted">{label}</span>
+        <span className="t-xs" style={{ color }}>{val}g</span>
       </div>
-      <div className="dash-macro-mini-bar">
-        <div className={`dash-macro-mini-fill dash-macro-fill--${kleur}`} style={{ width: pct + '%' }} />
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <span className="dash-macro-mini-doel">/ {doel}g</span>
+      <div className="t-xs t-muted" style={{ marginTop: 2, textAlign: 'right' }}>/ {doel}g</div>
     </div>
   )
 }
+
+function TrendChart({ days }) {
+  const maxSlaap = 9
+  return (
+    <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <span className="t-label" style={{ marginBottom: 'var(--space-3)', display: 'block' }}>7 dagen HRV & slaap</span>
+      <div style={{ display: 'flex', gap: 4, height: 80, alignItems: 'flex-end' }}>
+        {days.map(d => {
+          const slaapH = d.slaap ? Math.max(8, Math.round((d.slaap / maxSlaap) * 100)) : 8
+          const slaapColor = !d.slaap ? 'var(--bg-surface)'
+            : d.slaap >= 7.5 ? 'var(--green)'
+            : d.slaap >= 6.5 ? 'var(--amber)'
+            : 'var(--red)'
+          const hrvColor = !d.hrv ? 'var(--text-3)'
+            : d.hrv >= 60 ? 'var(--green)'
+            : d.hrv >= 45 ? 'var(--amber)'
+            : 'var(--red)'
+          return (
+            <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: hrvColor, lineHeight: 1 }}>
+                {d.hrv || ''}
+              </span>
+              <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{
+                  width: '100%', height: `${slaapH}%`,
+                  background: slaapColor, borderRadius: 3, minHeight: 4,
+                }} />
+              </div>
+              <span style={{
+                fontSize: 9, fontWeight: d.isVandaag ? 700 : 400,
+                color: d.isVandaag ? 'var(--text)' : 'var(--text-3)',
+              }}>
+                {d.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function WeightChart({ trend }) {
+  const vals = trend.map(x => x.gewicht_kg)
+  const min  = Math.min(...vals)
+  const max  = Math.max(...vals)
+  return (
+    <div style={{ display: 'flex', gap: 4, height: 64, alignItems: 'flex-end' }}>
+      {trend.map((m, i) => {
+        const h = 16 + ((m.gewicht_kg - min) / (max - min || 1)) * 48
+        const isLast = i === trend.length - 1
+        return (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <div style={{
+              width: '100%', height: h,
+              background: isLast ? 'var(--blue)' : 'var(--bg-surface)',
+              borderRadius: 3,
+            }} />
+            {isLast && (
+              <span style={{ fontSize: 9, color: 'var(--text-2)', fontWeight: 600 }}>
+                {datumNlApi(m.datum, { day: 'numeric', month: 'short' })}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
