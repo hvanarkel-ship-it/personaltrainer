@@ -35,7 +35,7 @@ export default function Statistieken({ onNavigeer }) {
       .finally(() => setLaden(false))
   }, [periode])
 
-  if (laden) return <div className="page page-loading"><div className="spinner" /></div>
+  if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return null
 
   const { activiteiten = [], wellness = [] } = data
@@ -107,8 +107,8 @@ export default function Statistieken({ onNavigeer }) {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Statistieken</h1>
-          <p className="subtitle">Gebaseerd op Intervals.icu data</p>
+          <h1 className="t-xl">Statistieken</h1>
+          <p className="t-sm t-muted" style={{ marginTop: 2 }}>Trainingsoverzicht</p>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('training')}>← Terug</button>
       </div>
@@ -147,9 +147,9 @@ export default function Statistieken({ onNavigeer }) {
       {/* Volume chart */}
       <div className="card">
         <div className="card-header">
-          <h3>Volume per week</h3>
+          <span className="t-label">Volume per week</span>
           {geselecteerdeWeek !== null && (
-            <button className="link-btn small" onClick={() => setGeselecteerdeWeek(null)}>Alles tonen</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setGeselecteerdeWeek(null)}>Alles</button>
           )}
         </div>
         {totSessies === 0
@@ -194,7 +194,7 @@ export default function Statistieken({ onNavigeer }) {
       {/* Sport breakdown */}
       {sportLijst.length > 0 && (
         <div className="card">
-          <h3>Sportverdeling</h3>
+          <span className="t-label">Sportverdeling</span>
           <div className="sport-verd-lijst">
             {sportLijst.slice(0, 6).map(([sport, v]) => {
               const pct = totaalMinuten > 0 ? Math.round((v.minuten / totaalMinuten) * 100) : 0
@@ -224,7 +224,7 @@ export default function Statistieken({ onNavigeer }) {
       {zTotaal > 0 && (
         <div className="card">
           <div className="card-header">
-            <h3>Hartslagzones</h3>
+            <span className="t-label">Hartslagzones</span>
             {zone2Ratio !== null && (
               <span className={`zone-ratio-badge ${zone2Ratio >= 75 ? 'zone-ratio--goed' : zone2Ratio >= 55 ? 'zone-ratio--matig' : 'zone-ratio--laag'}`}>
                 Z2: {zone2Ratio}%
@@ -250,18 +250,18 @@ export default function Statistieken({ onNavigeer }) {
       {/* HRV sparkline */}
       {wellness.length > 0 && (
         <div className="card">
-          <h3>HRV & Slaap — 30 dagen</h3>
+          <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>HRV & Slaap — 30 dagen</span>
           <HrvSparkline wellness={wellness} />
         </div>
       )}
 
       {/* Activity feed */}
       <div className="card">
-        <h3>
+        <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>
           {geselecteerdeWeek !== null
             ? `Week van ${weken[geselecteerdeWeek].label}`
             : 'Recente activiteiten'}
-        </h3>
+        </span>
         {gekozenWeekActs.length === 0
           ? <p className="stat-leeg">Geen activiteiten{geselecteerdeWeek !== null ? ' in deze week' : ''}.</p>
           : gekozenWeekActs.map((a, i) => <ActiviteitRij key={i} a={a} />)
