@@ -29,6 +29,7 @@ import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
 import Statistieken from './components/Statistieken.jsx'
 import DbStatus from './components/DbStatus.jsx'
+import Styleguide from './components/Styleguide.jsx'
 
 const APP_VERSION = 'v2026.04-2'
 
@@ -83,6 +84,7 @@ export default function App() {
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
   const [suuntoStatus, setSuuntoStatus] = useState(() => new URLSearchParams(window.location.search).get('suunto'))
+  const [isStyleguide] = useState(() => window.location.pathname === '/styleguide' || new URLSearchParams(window.location.search).has('styleguide'))
 
   useEffect(() => {
     // Auth
@@ -168,6 +170,7 @@ export default function App() {
     }
   }, [suuntoStatus, user])
 
+  if (isStyleguide) return <ErrorBoundary><Styleguide /></ErrorBoundary>
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (resetToken) return (
     <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {
