@@ -241,7 +241,8 @@ export const handler = async (event) => {
       actieveDoelen,
       weektraining,
       wellnessTrend,
-      history
+      history,
+      voedingWeekgemiddelden,
     ] = await Promise.all([
       extractiePromise ? extractiePromise.catch(err => { console.error('Extractie fout:', err); return null }) : Promise.resolve(null),
       sql`SELECT u.name, p.geboortejaar, p.geslacht, p.lengte_cm, p.gewicht_kg,
@@ -249,10 +250,10 @@ export const handler = async (event) => {
         p.sporten, p.coach_context, p.coach_naam, p.coach_stijl
         FROM users u LEFT JOIN user_profile p ON p.user_id = u.id WHERE u.id = ${userId}`,
       sql`SELECT datum, gewicht_kg, vetpercentage, spiermassa_kg, visceraal_vet, inbody_score, bmr_kcal
-        FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 3`,
+        FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 10`,
       sql`SELECT datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans
         FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
-        AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
+        AND datum >= (CURRENT_DATE - INTERVAL '14 days') ORDER BY datum DESC`,
       sql`SELECT maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
         FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag} ORDER BY created_at ASC`,
       sql`SELECT kcal, eiwit_g, koolhydraten_g, vetten_g
@@ -263,12 +264,22 @@ export const handler = async (event) => {
           hrv_ochtend, slaap_uur, slaap_score, herstel_balans,
           zone2_min, zone3_min, zone4_min, notities
         FROM trainingen WHERE user_id = ${userId}
-        AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
+        AND datum >= (CURRENT_DATE - INTERVAL '30 days') ORDER BY datum DESC`,
       sql`SELECT datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
           hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief
         FROM dagelijkse_wellness WHERE user_id = ${userId}
-        AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`.catch(() => []),
-      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 100`
+        AND datum >= (CURRENT_DATE - INTERVAL '14 days') ORDER BY datum DESC`.catch(() => []),
+      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 100`,
+      sql`SELECT
+          DATE_TRUNC('week', datum)::date AS week,
+          COUNT(DISTINCT datum) AS dagen,
+          ROUND(SUM(kcal)::numeric / NULLIF(COUNT(DISTINCT datum), 0)) AS gem_kcal,
+          ROUND(SUM(eiwit_g)::numeric / NULLIF(COUNT(DISTINCT datum), 0)) AS gem_eiwit,
+          ROUND(SUM(koolhydraten_g)::numeric / NULLIF(COUNT(DISTINCT datum), 0)) AS gem_kh,
+          ROUND(SUM(vetten_g)::numeric / NULLIF(COUNT(DISTINCT datum), 0)) AS gem_vet
+        FROM maaltijden WHERE user_id = ${userId}
+        AND datum >= (CURRENT_DATE - INTERVAL '28 days')
+        GROUP BY week ORDER BY week DESC`.catch(() => [])
     ])
     opgeslagen = _opgeslagen
 
@@ -426,6 +437,31 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
         }).join('\n')
       : '  Geen trainingen deze week'
 
+    // ── Voeding weekgemiddelden opbouwen ──
+    const voedingWekelijkRegels = voedingWeekgemiddelden.length > 0
+      ? voedingWeekgemiddelden.map(w => {
+          const weekStart = String(w.week).slice(0, 10)
+          return `  • Week van ${weekStart} (${w.dagen} daag/week): gem ${w.gem_kcal}kcal | ${w.gem_eiwit}g eiwit | ${w.gem_kh}g kh | ${w.gem_vet}g vet`
+        }).join('\n')
+      : '  Geen historische voedingsdata'
+
+    // ── 30-daagse training samenvatting per week ──
+    const trainWeekMap = new Map()
+    for (const t of weektraining) {
+      if (t.sport === 'herstel') continue
+      const d = new Date(t.datum)
+      const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+      const key = mon.toISOString().slice(0, 10)
+      if (!trainWeekMap.has(key)) trainWeekMap.set(key, [])
+      trainWeekMap.get(key).push(t)
+    }
+    const trainWeekRegels = [...trainWeekMap.entries()].slice(0, 4).map(([weekStart, sessies]) => {
+      const totMin = sessies.reduce((s, t) => s + (t.duur_min || 0), 0)
+      const z2    = sessies.reduce((s, t) => s + (t.zone2_min || 0), 0)
+      const sporten = [...new Set(sessies.map(t => t.sport))].join(', ')
+      return `  • Week ${weekStart}: ${sessies.length} sessies | ${totMin}min totaal | Z2: ${z2}min | sporten: ${sporten}`
+    }).join('\n') || '  Geen trainingsdata'
+
     // ── Doelen opbouwen ──
     const doelenRegels = actieveDoelen.length > 0
       ? actieveDoelen.map(d => {
@@ -438,6 +474,7 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
       : '  Geen actieve doelen'
 
     // Eiwit-aanbeveling schalen naar sport + volume (i.p.v. blind 1.6 g/kg)
+    // weektraining bevat nu 30 dagen; echteTrainingenW = alleen echte trainingen
     const echteTrainingenW = weektraining.filter(t => t.sport !== 'herstel')
     const totaalMinWeek = echteTrainingenW.reduce((s, t) => s + (t.duur_min || 0), 0)
     const sporten = profiel?.sporten || []
@@ -642,14 +679,22 @@ Alle wellness-data komt van de Suunto smartwatch. Interpreteer de cijfers ALTIJD
 • Stress %: Gebaseerd op HRV-variabiliteit overdag; 0% = ontspannen, 100% = gestrest.
 • Bron [suunto] = automatisch gemeten; [handmatig] = door gebruiker ingevoerd via het ochtendformulier.
 
-═══ HERSTEL & HRV (afgelopen 7 dagen) ═══
+═══ HERSTEL & HRV (afgelopen 14 dagen) ═══
 ${herstelRegels}
 
-═══ TRAININGEN DEZE WEEK ═══
-Aantal sessies: ${echteTrainingenW.length} | Zone2 totaal: ${echteTrainingenW.reduce((s, t) => s + (t.zone2_min || 0), 0)}min | Meest recente HRV: ${recentHrv ? `${recentHrv}ms` : 'geen'} | Slaap: ${recentSlaap ? `${recentSlaap}u` : 'geen'}
+═══ TRAININGEN AFGELOPEN 30 DAGEN ═══
+Meest recente HRV: ${recentHrv ? `${recentHrv}ms` : 'geen'} | Slaap: ${recentSlaap ? `${recentSlaap}u` : 'geen'}
+
+Weekoverzicht (laatste 4 weken):
+${trainWeekRegels}
+
+Recente sessies:
 ${trainingRegels}
 
-═══ LICHAAM / INBODY TREND ═══
+═══ VOEDING WEEKGEMIDDELDEN (afgelopen 4 weken) ═══
+${voedingWekelijkRegels}
+
+═══ LICHAAM / INBODY TREND (alle metingen) ═══
 ${inbodyRegels}
 
 ═══ ACTIEVE DOELEN ═══

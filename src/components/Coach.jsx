@@ -2,93 +2,68 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../api.js'
 
 const UPLOAD_TYPES = [
-  { id: 'maaltijd', label: 'Maaltijdfoto', icon: '🍽️' },
-  { id: 'garmin', label: 'Garmin screenshot', icon: '⌚' },
-  { id: 'suunto', label: 'Suunto screenshot', icon: '⌚' },
-  { id: 'inbody', label: 'InBody scan', icon: '📊' },
+  { id: 'maaltijd',     label: 'Maaltijd',     icon: '🍽️' },
+  { id: 'inbody',       label: 'InBody',       icon: '📊' },
+  { id: 'suunto',       label: 'Suunto',       icon: '⌚' },
   { id: 'apple_health', label: 'Apple Health', icon: '❤️' },
-  { id: 'lab', label: 'Bloedtest / lab', icon: '🔬' },
-  { id: 'overig', label: 'Andere app', icon: '📱' },
+  { id: 'lab',          label: 'Bloedtest',    icon: '🔬' },
+  { id: 'garmin',       label: 'Garmin',       icon: '⌚' },
+  { id: 'overig',       label: 'Overig',       icon: '📱' },
 ]
 
 const SNELLE_VRAGEN = [
   'Analyseer mijn herstel van de afgelopen 7 dagen',
-  'Wat moet ik eten voor mijn training?',
-  'Maak een weekschema op basis van mijn doelen',
-  'Wat zijn mijn zwakste macro\'s vandaag?',
+  'Wat moet ik eten voor mijn training vandaag?',
+  'Maak een weekplan op basis van mijn doelen',
+  'Hoe staat mijn voeding ervoor deze week?',
 ]
 
+const SAVED_CFG = {
+  inbody:   { kleur: 'var(--green)', label: 'InBody opgeslagen' },
+  suunto:   { kleur: 'var(--blue)',  label: 'Workout opgeslagen' },
+  maaltijd: { kleur: 'var(--amber)', label: 'Maaltijd opgeslagen' },
+}
 
 export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
-  const [berichten, setBerichten] = useState([])
-  const [input, setInput] = useState('')
-  const [laden, setLaden] = useState(false)
-  const [histLaden, setHistLaden] = useState(true)
+  const [berichten, setBerichten]       = useState([])
+  const [input, setInput]               = useState('')
+  const [laden, setLaden]               = useState(false)
+  const [histLaden, setHistLaden]       = useState(true)
   const [toonUploadMenu, setToonUploadMenu] = useState(false)
-  const [uploads, setUploads] = useState([])
-  const [uploadType, setUploadType] = useState(null)
-  const [opname, setOpname] = useState(false)
-  const [nieuweMsg, setNieuweMsg] = useState(false)
+  const [uploads, setUploads]           = useState([])
+  const [uploadType, setUploadType]     = useState(null)
+  const [opname, setOpname]             = useState(false)
+  const [nieuweMsg, setNieuweMsg]       = useState(false)
   const [toonScrollBtn, setToonScrollBtn] = useState(false)
-  const bottomRef = useRef(null)
-  const chatRef = useRef(null)
-  const inputRef = useRef(null)
-  const fileRef = useRef(null)
+
+  const bottomRef     = useRef(null)
+  const chatRef       = useRef(null)
+  const inputRef      = useRef(null)
+  const fileRef       = useRef(null)
   const recognitionRef = useRef(null)
   const scrollInstantRef = useRef(false)
 
   const heeftStem = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
-  function toggleOpname() {
-    if (opname) {
-      recognitionRef.current?.stop()
-      return
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) return
-    try {
-      const rec = new SR()
-      rec.lang = 'nl-NL'
-      rec.continuous = false
-      rec.interimResults = false
-      recognitionRef.current = rec
-
-      rec.onstart = () => setOpname(true)
-      rec.onresult = (e) => {
-        let final = ''
-        for (const res of e.results) {
-          if (res.isFinal) final += res[0].transcript
-        }
-        if (final) setInput(prev => (prev + ' ' + final).trimStart())
-      }
-      rec.onerror = () => setOpname(false)
-      rec.onend = () => { setOpname(false); inputRef.current?.focus() }
-      rec.start()
-    } catch (err) {
-      console.error('SpeechRecognition fout:', err)
-      setOpname(false)
-    }
-  }
-
+  // Load history
   useEffect(() => {
     api.get('/coach-chat')
       .then(rows => {
         if (!rows?.length) return
-        const geladen = rows.map(r => ({
+        scrollInstantRef.current = true
+        setBerichten(rows.map(r => ({
           rol: r.is_ai ? 'ai' : 'user',
           tekst: r.bericht,
           datum: r.created_at,
           upload_type: r.upload_type,
-        }))
-        scrollInstantRef.current = true
-        setBerichten(geladen)
+        })))
         setNieuweMsg(true)
       })
       .catch(() => {})
       .finally(() => setHistLaden(false))
   }, [])
 
-  // Auto-trigger upload wanneer we via dashboard navigeren (bijv. 'suunto')
+  // Navigate to upload on external trigger
   useEffect(() => {
     if (coachTrigger && !histLaden) {
       setUploadType(coachTrigger)
@@ -97,6 +72,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     }
   }, [coachTrigger, histLaden])
 
+  // Auto-scroll on new message
   useEffect(() => {
     if (nieuweMsg) {
       bottomRef.current?.scrollIntoView({ behavior: scrollInstantRef.current ? 'instant' : 'smooth' })
@@ -104,6 +80,38 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       setNieuweMsg(false)
     }
   }, [berichten, nieuweMsg])
+
+  // Close upload menu on outside click
+  useEffect(() => {
+    if (!toonUploadMenu) return
+    const handler = (e) => {
+      if (!e.target.closest('.upload-menu-overlay') && !e.target.closest('.coach-icon-btn')) {
+        setToonUploadMenu(false)
+      }
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [toonUploadMenu])
+
+  function toggleOpname() {
+    if (opname) { recognitionRef.current?.stop(); return }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return
+    try {
+      const rec = new SR()
+      rec.lang = 'nl-NL'; rec.continuous = false; rec.interimResults = false
+      recognitionRef.current = rec
+      rec.onstart  = () => setOpname(true)
+      rec.onresult = (e) => {
+        let final = ''
+        for (const r of e.results) if (r.isFinal) final += r[0].transcript
+        if (final) setInput(prev => (prev + ' ' + final).trimStart())
+      }
+      rec.onerror = () => setOpname(false)
+      rec.onend   = () => { setOpname(false); inputRef.current?.focus() }
+      rec.start()
+    } catch { setOpname(false) }
+  }
 
   function selectUploadType(type) {
     setUploadType(type)
@@ -124,7 +132,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   }
 
   function leesAlsBase64(file) {
-    return new Promise((res) => {
+    return new Promise(res => {
       const reader = new FileReader()
       reader.onload = e => res(e.target.result)
       reader.readAsDataURL(file)
@@ -135,32 +143,31 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     e?.preventDefault()
     if ((!input.trim() && !uploads.length) || laden) return
 
-    const tekst = input.trim()
+    const tekst    = input.trim()
     const bestanden = uploads.map(u => ({ base64: u.base64, naam: u.bestand.name }))
-    const type = uploads[0]?.type || null
+    const type     = uploads[0]?.type || null
 
     const previewTekst = uploads.length
       ? `${tekst ? tekst + '\n' : ''}📎 ${uploads.length} bestand(en): ${uploads.map(u => u.bestand.name).join(', ')}`
       : tekst
 
-    const nu = new Date().toISOString()
-    setBerichten(b => [...b, { rol: 'user', tekst: previewTekst, datum: nu }])
+    setBerichten(b => [...b, { rol: 'user', tekst: previewTekst, datum: new Date().toISOString() }])
     setNieuweMsg(true)
     setInput('')
     setUploads([])
     setLaden(true)
+    setToonUploadMenu(false)
 
     try {
       const res = await api.post('/coach-chat', { bericht: tekst, bestanden, upload_type: type })
-      const nieuweB = []
-      if (res.opgeslagen) {
-        nieuweB.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
-      }
-      nieuweB.push({ rol: 'ai', tekst: res.antwoord, datum: nu })
-      setBerichten(b => [...b, ...nieuweB])
+      const nieuw = []
+      if (res.opgeslagen) nieuw.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
+      nieuw.push({ rol: 'ai', tekst: res.antwoord, datum: new Date().toISOString() })
+      setBerichten(b => [...b, ...nieuw])
       setNieuweMsg(true)
     } catch (err) {
       setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
+      setNieuweMsg(true)
     } finally {
       setLaden(false)
       inputRef.current?.focus()
@@ -173,111 +180,155 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     setBerichten([])
   }
 
+  // ── Render helpers ──────────────────────────────────────────────────────
+
+  function renderBericht(b, i) {
+    const datumLabel = b.datum
+      ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+      : null
+    const vorigeDatum = i > 0 && berichten[i - 1]?.datum
+      ? new Date(berichten[i - 1].datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+      : null
+    const toonDatum = datumLabel && datumLabel !== vorigeDatum
+
+    if (b.rol === 'systeem' && b.opgeslagen) {
+      const cfg = SAVED_CFG[b.opgeslagen.type] || SAVED_CFG.maaltijd
+      const label = b.opgeslagen.type === 'maaltijd' ? b.opgeslagen.samenvatting : b.opgeslagen.label
+      return (
+        <div key={i} className="saved-pill" style={{ color: cfg.kleur, background: cfg.kleur.replace('var(--', 'var(--').replace(')', '-dim)') }}>
+          ✓ <strong>Opgeslagen:</strong> {label}
+        </div>
+      )
+    }
+
+    return (
+      <div key={i}>
+        {toonDatum && (
+          <div className="chat-date-sep"><span>{datumLabel}</span></div>
+        )}
+        {b.rol === 'ai' ? (
+          <div className="msg-ai">
+            <div className="msg-avatar">⚡</div>
+            <div className={`msg-bubble-ai${b.fout ? '' : ''}`}
+              style={b.fout ? { borderLeft: '2px solid var(--red)' } : {}}
+              dangerouslySetInnerHTML={{ __html: formatBericht(b.tekst) }}
+            />
+          </div>
+        ) : (
+          <div className="msg-user">
+            <div className="msg-bubble-user">{b.tekst}</div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── JSX ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="coach-pagina">
-      <header className="coach-header">
+    <div className="coach-page">
+
+      {/* Header */}
+      <div className="coach-header">
         <div>
-          <h1>APEX Coach</h1>
-          <p className="subtitle">AI personal trainer & coach</p>
+          <h1 className="t-xl">Coach</h1>
+          <p className="t-xs t-muted" style={{ marginTop: 2, letterSpacing: '0.04em', textTransform: 'none', fontSize: 'var(--t-sm)' }}>
+            AI personal trainer
+          </p>
         </div>
         {berichten.length > 0 && (
-          <button className="link-btn small" onClick={wisGesprek}>Wis gesprek</button>
+          <button className="btn btn-ghost btn-sm" onClick={wisGesprek}>Wis gesprek</button>
         )}
-      </header>
+      </div>
 
+      {/* Scroll-to-bottom button */}
       {toonScrollBtn && (
-        <button className="scroll-naar-onderen" onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+        <button className="scroll-bottom-btn" onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}>
           ↓ Naar onderen
         </button>
       )}
-      <div className="chat-berichten" id="chat-berichten-scroll" ref={chatRef}
+
+      {/* Messages */}
+      <div
+        className="coach-scroll"
+        ref={chatRef}
         onScroll={e => {
           const el = e.currentTarget
           setToonScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 200)
-        }}>
+        }}
+      >
         {histLaden ? (
-          <div className="center-loader"><div className="spinner" /></div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-8)' }}>
+            <div className="skeleton" style={{ width: 48, height: 48, borderRadius: '50%' }} />
+          </div>
         ) : berichten.length === 0 ? (
-          <div className="chat-welkom">
-            <div className="coach-avatar">⚡</div>
-            <h3>Hallo {user.name?.split(' ')[0]}!</h3>
-            <p>Stel me een vraag, of upload een foto/screenshot voor analyse.</p>
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 'var(--space-4)', padding: 'var(--space-6)',
+            minHeight: 300,
+          }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'var(--green-dim)', color: 'var(--green)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28,
+            }}>⚡</div>
+            <div style={{ textAlign: 'center' }}>
+              <h3 className="t-lg" style={{ marginBottom: 'var(--space-1)' }}>
+                Hallo {user?.name?.split(' ')[0] || 'atleet'}!
+              </h3>
+              <p className="t-sm t-muted">Stel een vraag of upload een foto voor analyse.</p>
+            </div>
             <button
-              className="suunto-ochtend-btn"
+              className="btn btn-secondary btn-full"
               onClick={() => { setUploadType('suunto'); fileRef.current?.click() }}
             >
-              ⌚ Deel Suunto ochtend dashboard
+              ⌚ Deel Suunto dashboard
             </button>
-            <div className="snelle-vragen">
+            <div className="quick-questions">
               {SNELLE_VRAGEN.map(v => (
-                <button key={v} className="snelle-vraag-btn" onClick={() => { setInput(v); inputRef.current?.focus() }}>
+                <button key={v} className="quick-btn" onClick={() => { setInput(v); inputRef.current?.focus() }}>
                   {v}
                 </button>
               ))}
             </div>
           </div>
-        ) : (() => {
-          let vorigeDatum = null
-          return [
-            <div key="hist-top" className="chat-hist-top">↑ Begin van gesprekgeschiedenis</div>,
-            ...berichten.map((b, i) => {
-              const datumLabel = b.datum
-                ? new Date(b.datum).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-                : null
-              const toonDatum = datumLabel && datumLabel !== vorigeDatum
-              if (toonDatum) vorigeDatum = datumLabel
+        ) : (
+          <>
+            <div style={{ textAlign: 'center', padding: 'var(--space-2) 0', fontSize: 'var(--t-xs)', color: 'var(--text-3)' }}>
+              ↑ Begin van gesprek
+            </div>
+            {berichten.map((b, i) => renderBericht(b, i))}
+          </>
+        )}
 
-              if (b.rol === 'systeem' && b.opgeslagen) {
-                const cfg = {
-                  inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
-                  suunto:   { icoon: '⌚', bg: '#eff6ff', border: '#bfdbfe', kleur: '#1e40af' },
-                  maaltijd: { icoon: '🍽️', bg: '#fff7ed', border: '#fed7aa', kleur: '#9a3412' },
-                }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }
-                return (
-                  <div key={i} className="opgeslagen-pill" style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.kleur }}>
-                    {cfg.icoon} <strong>Opgeslagen:</strong> {b.opgeslagen.type === 'maaltijd' ? b.opgeslagen.samenvatting : b.opgeslagen.label}
-                  </div>
-                )
-              }
-              return (
-                <div key={i}>
-                  {toonDatum && <div className="chat-datum-lijn"><span>{datumLabel}</span></div>}
-                  <div className={`bericht bericht--${b.rol} ${b.fout ? 'bericht--fout' : ''}`}>
-                    {b.rol === 'ai' && <div className="bericht-avatar">⚡</div>}
-                    <div className="bericht-bubble">
-                      <div className="bericht-tekst" dangerouslySetInnerHTML={{
-                        __html: formatBericht(b.tekst)
-                      }} />
-                    </div>
-                  </div>
-                </div>
-              )
-            }),
-          ]
-        })()}
-
+        {/* Typing indicator */}
         {laden && (
-          <div className="bericht bericht--ai">
-            <div className="bericht-avatar">⚡</div>
-            <div className="bericht-bubble typing-indicator">
-              <span /><span /><span />
+          <div className="msg-ai">
+            <div className="msg-avatar">⚡</div>
+            <div className="msg-bubble-ai">
+              <div className="typing-dots"><span /><span /><span /></div>
             </div>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
       {/* Upload previews */}
       {uploads.length > 0 && (
-        <div className="upload-previews">
+        <div className="upload-previews-bar">
           {uploads.map((u, i) => (
-            <div key={`${u.bestand.name}-${i}`} className="upload-preview">
+            <div key={`${u.bestand.name}-${i}`} className="upload-preview-item">
               {u.preview
                 ? <img src={u.preview} alt={u.bestand.name} />
-                : <div className="upload-doc-icon">📄</div>
+                : <div className="upload-preview-doc">📄</div>
               }
-              <div className="upload-label">{UPLOAD_TYPES.find(t => t.id === u.type)?.icon} {u.bestand.name}</div>
-              <button className="upload-remove" onClick={() => setUploads(arr => arr.filter((_, j) => j !== i))}>×</button>
+              <button
+                className="upload-preview-remove"
+                onClick={() => setUploads(arr => arr.filter((_, j) => j !== i))}
+              >×</button>
             </div>
           ))}
         </div>
@@ -285,10 +336,11 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
 
       {/* Upload type menu */}
       {toonUploadMenu && (
-        <div className="upload-menu">
+        <div className="upload-menu-overlay">
           {UPLOAD_TYPES.map(t => (
             <button key={t.id} className="upload-type-btn" onClick={() => selectUploadType(t.id)}>
-              <span>{t.icon}</span><span>{t.label}</span>
+              <span className="upload-icon">{t.icon}</span>
+              <span>{t.label}</span>
             </button>
           ))}
         </div>
@@ -296,45 +348,50 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
 
       <input ref={fileRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={onFileSelect} />
 
-      <form className="chat-invoer" onSubmit={verstuur}>
+      {/* Input bar */}
+      <form className="coach-input-bar" onSubmit={verstuur}>
         <button
           type="button"
-          className="upload-btn"
+          className={`coach-icon-btn${toonUploadMenu ? ' active' : ''}`}
           onClick={() => setToonUploadMenu(m => !m)}
           title="Bestand uploaden"
-        >
-          📎
-        </button>
+        >📎</button>
+
         {heeftStem && (
           <button
             type="button"
-            className={`mic-btn ${opname ? 'mic-btn--actief' : ''}`}
+            className={`coach-icon-btn${opname ? ' active' : ''}`}
             onClick={toggleOpname}
             title={opname ? 'Stop opname' : 'Inspreken'}
-          >
-            🎙️
-          </button>
+          >🎙️</button>
         )}
+
         <input
           ref={inputRef}
           type="text"
+          className="coach-text-input"
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Stel een vraag of beschrijf wat je at..."
+          placeholder="Stel een vraag..."
           disabled={laden}
-          className="chat-input"
           inputMode="text"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="sentences"
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) verstuur(e) }}
         />
-        <button type="submit" className="verstuur-btn" disabled={laden || (!input.trim() && !uploads.length)}>
-          ↑
-        </button>
+
+        <button
+          type="submit"
+          className="coach-send-btn"
+          disabled={laden || (!input.trim() && !uploads.length)}
+        >↑</button>
       </form>
     </div>
   )
 }
+
+// ── Markdown → HTML helpers ───────────────────────────────────────────────────
 
 function escHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -354,24 +411,18 @@ function formatTekstBlok(tekst) {
 function markdownTabelNaarHtml(tabelTekst) {
   const rijen = tabelTekst.trim().split('\n').filter(r => r.trim().startsWith('|'))
   if (rijen.length < 2) return formatTekstBlok(tabelTekst)
-
   const parseRij = r => r.split('|').slice(1, -1).map(cel =>
     escHtml(cel.trim()).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   )
-
   const isScheidingslijn = r => /^\|[\s\-:|]+\|/.test(r)
-  const kopRij = rijen[0]
-  const datarijen = rijen.slice(1).filter(r => !isScheidingslijn(r))
-
-  const koppen = parseRij(kopRij).map(k => `<th>${k}</th>`).join('')
-  const rijHtml = datarijen.map(r =>
-    `<tr>${parseRij(r).map(cel => `<td>${cel}</td>`).join('')}</tr>`
-  ).join('')
-
+  const koppen = parseRij(rijen[0]).map(k => `<th>${k}</th>`).join('')
+  const rijHtml = rijen.slice(1).filter(r => !isScheidingslijn(r))
+    .map(r => `<tr>${parseRij(r).map(cel => `<td>${cel}</td>`).join('')}</tr>`).join('')
   return `<div class="tabel-wrapper"><table class="coach-tabel"><thead><tr>${koppen}</tr></thead><tbody>${rijHtml}</tbody></table></div>`
 }
 
 function formatBericht(tekst) {
+  if (!tekst) return ''
   const blokken = []
   const tabelRe = /^(\|.+\|[ \t]*\n?){2,}/gm
   let lastIdx = 0, m
@@ -381,6 +432,5 @@ function formatBericht(tekst) {
     lastIdx = m.index + m[0].length
   }
   if (lastIdx < tekst.length) blokken.push({ tabel: false, s: tekst.slice(lastIdx) })
-
   return blokken.map(b => b.tabel ? markdownTabelNaarHtml(b.s) : formatTekstBlok(b.s)).join('')
 }
