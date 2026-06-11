@@ -352,8 +352,8 @@ function aggregateActivity(entries) {
 }
 
 // Recovery: balance + stress + HRV + hulpbronnen per dag
-// Alle dagen: nacht/ochtend venster 22-09 (uur < 9 || uur >= 22) als primaire bron.
-// Fallback naar meest recente meting als het ochtendvenster nog leeg is (dag nog bezig).
+// hrv_ochtend  = nacht/ochtend venster 22-09 (Nightly Recharge, consistent met Suunto app)
+// hrv_laatste  = meest recente meting van de dag (kan overdag zijn), met tijdstip
 function aggregateRecovery(entries) {
   const perDag = new Map()
   for (const e of entries || []) {
@@ -364,23 +364,24 @@ function aggregateRecovery(entries) {
     const ts = new Date(e.timestamp).getTime()
     const cur = perDag.get(datum) || {
       nacht: { bal: [], stress: [], hrv: [], res: [] },
-      recent: { bal: null, ts: 0, stress: null, hrv: null, res: null },
+      recent: { bal: null, ts: 0, stress: null, hrv: null, res: null, tijd: null },
     }
 
     // HRV: Suunto gebruikt verschillende veldnamen afhankelijk van firmware
     const hrv = d.HRV ?? d.Hrv ?? d.HrvValue ?? d.AverageHRV ?? d.DailyHRV ?? null
     const res = d.Resources ?? d.BodyResources ?? d.Resource ?? d.Vitality ?? null
 
-    // Meest recente waarde als fallback
+    // Meest recente meting bijhouden (voor hrv_laatste)
     if (ts > cur.recent.ts) {
       cur.recent.ts = ts
+      cur.recent.tijd = String(e.timestamp).slice(11, 16) // "HH:MM" uit lokale timestamp
       if (typeof d.Balance === 'number') cur.recent.bal = d.Balance
       if (d.StressState >= 1 && d.StressState <= 4) cur.recent.stress = d.StressState
       if (hrv != null && hrv > 0) cur.recent.hrv = Math.round(hrv)
       if (res != null && res >= 0) cur.recent.res = Math.round(res)
     }
 
-    // Nacht/ochtend venster (22:00-09:00) — consistent met Suunto Nightly Recharge
+    // Nacht/ochtend venster (22:00-09:00) — Nightly Recharge window
     if (uur < 9 || uur >= 22) {
       if (typeof d.Balance === 'number') cur.nacht.bal.push(d.Balance)
       if (d.StressState >= 1 && d.StressState <= 4) cur.nacht.stress.push(d.StressState)
@@ -394,7 +395,6 @@ function aggregateRecovery(entries) {
   const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length
   const out = new Map()
   for (const [datum, v] of perDag) {
-    // Gebruik nachtvenster als primaire bron; fallback naar meest recente meting
     const heeftNacht = v.nacht.hrv.length > 0
     const avgBal    = v.nacht.bal.length    > 0 ? avg(v.nacht.bal)    : v.recent.bal
     const avgStress = v.nacht.stress.length > 0 ? avg(v.nacht.stress) : v.recent.stress
@@ -404,6 +404,8 @@ function aggregateRecovery(entries) {
       herstel_balans:  avgBal    != null ? Number(avgBal.toFixed(2))             : null,
       stress_pct:      avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
       hrv_ochtend:     avgHrv,
+      hrv_laatste:     v.recent.hrv,
+      hrv_laatste_tijd: v.recent.hrv ? v.recent.tijd : null,
       hulpbronnen_pct: avgRes,
     })
   }
@@ -439,6 +441,8 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
     )
   `
   await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hulpbronnen_pct INTEGER`
+  await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hrv_laatste INTEGER`
+  await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hrv_laatste_tijd TEXT`
 
   let sleep = [], activity = [], recovery = []
   try { sleep    = await fetch247(`/247samples/sleep?from=${from}&to=${to}`, accessToken) }
@@ -477,6 +481,8 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       // Recovery-HRV heeft voorrang: dit is de Nightly Recharge HRV die Suunto toont (diepe slaap).
       // Slaap-AvgHRV is een gemiddelde over de hele nacht (inclusief lichte slaap/REM) en wijkt af.
       hrv_ochtend:      r.hrv_ochtend      ?? s.hrv_ochtend ?? null,
+      hrv_laatste:      r.hrv_laatste      ?? null,
+      hrv_laatste_tijd: r.hrv_laatste_tijd ?? null,
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
       rust_hartslag:    a.rust_hartslag    ?? null,
@@ -492,11 +498,12 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
     const res = await sql`
       INSERT INTO dagelijkse_wellness
         (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
-         hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, hulpbronnen_pct, bron)
+         hrv_ochtend, hrv_laatste, hrv_laatste_tijd,
+         herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, hulpbronnen_pct, bron)
       VALUES
         (${row.user_id}, ${row.datum}, ${row.slaap_uur}, ${row.slaap_score}, ${row.diepe_slaap_min},
-         ${row.rem_slaap_min}, ${row.lichte_slaap_min}, ${row.hrv_ochtend}, ${row.herstel_balans},
-         ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.hulpbronnen_pct}, ${row.bron})
+         ${row.rem_slaap_min}, ${row.lichte_slaap_min}, ${row.hrv_ochtend}, ${row.hrv_laatste}, ${row.hrv_laatste_tijd},
+         ${row.herstel_balans}, ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.hulpbronnen_pct}, ${row.bron})
       ON CONFLICT (user_id, datum) DO UPDATE SET
         slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
         slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
@@ -504,6 +511,8 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
         lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
         hrv_ochtend      = EXCLUDED.hrv_ochtend,
+        hrv_laatste      = EXCLUDED.hrv_laatste,
+        hrv_laatste_tijd = EXCLUDED.hrv_laatste_tijd,
         herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
         stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
         rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),

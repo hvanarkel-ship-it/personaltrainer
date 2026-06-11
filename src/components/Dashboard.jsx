@@ -224,16 +224,26 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
         {/* Metrics row */}
         {heeftData && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${h.hrv_laatste ? 4 : 3}, 1fr)`, gap: 'var(--space-2)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ textAlign: 'center' }}>
               <MetricHero
                 value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : null}
                 unit={h.hrv_ochtend ? 'ms' : ''}
-                label="HRV"
+                label="Nightly"
                 color={h.hrv_ochtend >= 60 ? 'var(--green)' : h.hrv_ochtend >= 45 ? 'var(--amber)' : h.hrv_ochtend ? 'var(--red)' : undefined}
               />
             </div>
-            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-3)', paddingRight: 'var(--space-3)' }}>
+            {h.hrv_laatste && (
+              <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                <MetricHero
+                  value={Math.round(h.hrv_laatste)}
+                  unit="ms"
+                  label={h.hrv_laatste_tijd ? `HRV ${h.hrv_laatste_tijd}` : 'HRV nu'}
+                  color={h.hrv_laatste >= 60 ? 'var(--green)' : h.hrv_laatste >= 45 ? 'var(--amber)' : 'var(--red)'}
+                />
+              </div>
+            )}
+            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-2)' }}>
               <MetricHero
                 value={h.slaap_uur ? parseFloat(h.slaap_uur).toFixed(1) : null}
                 unit={h.slaap_uur ? 'u' : ''}
@@ -241,7 +251,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 color={h.slaap_uur >= 7.5 ? 'var(--green)' : h.slaap_uur >= 6 ? 'var(--amber)' : h.slaap_uur ? 'var(--red)' : undefined}
               />
             </div>
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-2)' }}>
               <MetricHero
                 value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : null}
                 label="Balans"

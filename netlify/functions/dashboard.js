@@ -75,7 +75,7 @@ export const handler = async (event) => {
     // Meest recente rij MET HRV — kan een andere datum zijn dan recentWellness
     // (Suunto slaat slaap op onder de datum waarop je ging slapen, niet wakker werd)
     const [recentWellnessHrv] = await sql`
-      SELECT hrv_ochtend, slaap_uur, slaap_score, datum
+      SELECT hrv_ochtend, hrv_laatste, hrv_laatste_tijd, slaap_uur, slaap_score, datum
       FROM dagelijkse_wellness WHERE user_id = ${userId}
         AND hrv_ochtend IS NOT NULL
       ORDER BY datum DESC LIMIT 1
@@ -94,8 +94,10 @@ export const handler = async (event) => {
     let herstelData = null
     if (recentTraining || recentWellness || recentWellnessHrv) {
       herstelData = {
-        hrv_ochtend:   hrvBron?.hrv_ochtend   ?? null,
-        slaap_uur:     hrvBron?.slaap_uur     ?? null,
+        hrv_ochtend:      hrvBron?.hrv_ochtend      ?? null,
+        hrv_laatste:      hrvBron?.hrv_laatste      ?? null,
+        hrv_laatste_tijd: hrvBron?.hrv_laatste_tijd ?? null,
+        slaap_uur:        hrvBron?.slaap_uur        ?? null,
         slaap_score:   hrvBron?.slaap_score ?? null,
         herstel_balans: gebruikHandmatig
           ? (recentTraining?.herstel_balans ?? (recentWellness?.herstel_balans != null ? recentWellness.herstel_balans * 100 : null))
