@@ -1,33 +1,83 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api.js'
+import Card from './ui/Card.jsx'
+import Sheet from './ui/Sheet.jsx'
+import Chip from './ui/Chip.jsx'
+
+// ── Constants ───────────────────────────────────────────────────────────────
 
 const TYPES = ['ontbijt', 'lunch', 'diner', 'snack', 'pre-workout', 'post-workout']
+
+const TYPE_ICON = {
+  ontbijt: '🌅', lunch: '☀️', diner: '🌙',
+  snack: '🍎', 'pre-workout': '⚡', 'post-workout': '💪',
+}
+
+const LEEG_FORM = { maaltijd_type: 'ontbijt', beschrijving: '', kcal: '', eiwit_g: '', koolhydraten_g: '', vetten_g: '' }
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
 const vandaagStr = () => new Date().toISOString().split('T')[0]
 
+function datumLabel(d) {
+  const today = vandaagStr()
+  const gisteren = new Date(); gisteren.setDate(gisteren.getDate() - 1)
+  const gisterStr = gisteren.toISOString().split('T')[0]
+  if (d === today) return 'Vandaag'
+  if (d === gisterStr) return 'Gisteren'
+  return new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function fmt(v, dec = 0) {
+  const n = parseFloat(v)
+  if (isNaN(n)) return '—'
+  return dec ? n.toFixed(dec) : String(Math.round(n))
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+
 export default function Voeding({ onNavigeer }) {
-  const [datum, setDatum] = useState(vandaagStr())
+  const [datum, setDatum]         = useState(vandaagStr())
   const [maaltijden, setMaaltijden] = useState([])
-  const [laden, setLaden] = useState(true)
-  const [toonForm, setToonForm] = useState(false)
-  const [analyseert, setAnalyseert] = useState(false)
-  const [form, setForm] = useState({ maaltijd_type: 'ontbijt', beschrijving: '', kcal: '', eiwit_g: '', koolhydraten_g: '', vetten_g: '' })
+  const [profiel, setProfiel]     = useState(null)
+  const [laden, setLaden]         = useState(true)
+  const [fout, setFout]           = useState('')
+
+  // Add sheet
+  const [addOpen, setAddOpen]     = useState(false)
+  const [form, setForm]           = useState(LEEG_FORM)
   const [aiNotities, setAiNotities] = useState('')
-  const [opslaan, setOpslaan] = useState(false)
-  const [fout, setFout] = useState('')
-  const [bewerkenId, setBewerkenId] = useState(null)
-  const [bewerkenForm, setBewerkenForm] = useState({})
-  const [bewerkenLaden, setBewerkenLaden] = useState(false)
+  const [analyseert, setAnalyseert] = useState(false)
+  const [opslaan, setOpslaan]     = useState(false)
   const fotoRef = useRef(null)
 
+  // Edit sheet
+  const [editOpen, setEditOpen]   = useState(false)
+  const [editId, setEditId]       = useState(null)
+  const [editForm, setEditForm]   = useState({})
+  const [editLaden, setEditLaden] = useState(false)
+
+  // Fetch profile once
+  useEffect(() => {
+    api.get('/profiel').then(setProfiel).catch(() => {})
+  }, [])
+
+  // Fetch meals when date changes
   useEffect(() => {
     setLaden(true)
-    setBewerkenId(null)
     api.get(`/maaltijd?datum=${datum}`)
-      .then(setMaaltijden).catch(e => setFout(e.message)).finally(() => setLaden(false))
+      .then(setMaaltijden)
+      .catch(e => setFout(e.message))
+      .finally(() => setLaden(false))
   }, [datum])
 
-  const upd = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
-  const updBew = k => e => setBewerkenForm(f => ({ ...f, [k]: e.target.value }))
+  function navigeerDag(delta) {
+    const d = new Date(datum + 'T12:00:00')
+    d.setDate(d.getDate() + delta)
+    setDatum(d.toISOString().split('T')[0])
+  }
+
+  // ── Camera / AI analysis ────────────────────────────────────────────────
 
   async function analyseerFoto(e) {
     const file = e.target.files?.[0]
@@ -38,7 +88,14 @@ export default function Voeding({ onNavigeer }) {
       const res = await api.post('/upload-analyse', { upload_type: 'maaltijd', bestanden: [{ base64, naam: file.name }] })
       if (res.succes && res.data) {
         const d = res.data
-        setForm(f => ({ ...f, beschrijving: d.beschrijving || f.beschrijving, kcal: d.kcal || f.kcal, eiwit_g: d.eiwit_g || f.eiwit_g, koolhydraten_g: d.koolhydraten_g || f.koolhydraten_g, vetten_g: d.vetten_g || f.vetten_g }))
+        setForm(f => ({
+          ...f,
+          beschrijving:    d.beschrijving    || f.beschrijving,
+          kcal:            d.kcal            || f.kcal,
+          eiwit_g:         d.eiwit_g         || f.eiwit_g,
+          koolhydraten_g:  d.koolhydraten_g  || f.koolhydraten_g,
+          vetten_g:        d.vetten_g        || f.vetten_g,
+        }))
         setAiNotities(d.ai_notities || '')
       }
     } catch (err) { setFout('Analyse mislukt: ' + err.message) }
@@ -49,31 +106,36 @@ export default function Voeding({ onNavigeer }) {
     return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file) })
   }
 
+  // ── Add meal ────────────────────────────────────────────────────────────
+
   async function submit(e) {
     e.preventDefault(); setOpslaan(true); setFout('')
     try {
       const payload = { datum, ...Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')), ai_notities: aiNotities || undefined }
       const nieuw = await api.post('/maaltijd', payload)
       setMaaltijden(m => [...m, nieuw])
-      setToonForm(false); setAiNotities('')
-      setForm({ maaltijd_type: 'ontbijt', beschrijving: '', kcal: '', eiwit_g: '', koolhydraten_g: '', vetten_g: '' })
+      setAddOpen(false); setAiNotities('')
+      setForm(LEEG_FORM)
     } catch (err) { setFout(err.message) }
     finally { setOpslaan(false) }
   }
 
-  function startBewerken(m) {
-    setBewerkenId(m.id)
-    setBewerkenForm({ maaltijd_type: m.maaltijd_type || 'snack', beschrijving: m.beschrijving || '', kcal: m.kcal ?? '', eiwit_g: m.eiwit_g ?? '', koolhydraten_g: m.koolhydraten_g ?? '', vetten_g: m.vetten_g ?? '' })
+  // ── Edit meal ───────────────────────────────────────────────────────────
+
+  function startEdit(m) {
+    setEditId(m.id)
+    setEditForm({ maaltijd_type: m.maaltijd_type || 'snack', beschrijving: m.beschrijving || '', kcal: m.kcal ?? '', eiwit_g: m.eiwit_g ?? '', koolhydraten_g: m.koolhydraten_g ?? '', vetten_g: m.vetten_g ?? '' })
+    setEditOpen(true)
   }
 
-  async function slaBewerkenOp(id) {
-    setBewerkenLaden(true)
+  async function saveEdit() {
+    setEditLaden(true)
     try {
-      const bijgewerkt = await api.put(`/maaltijd/${id}`, bewerkenForm)
-      setMaaltijden(m => m.map(x => x.id === id ? { ...x, ...bijgewerkt } : x))
-      setBewerkenId(null)
+      const bijgewerkt = await api.put(`/maaltijd/${editId}`, editForm)
+      setMaaltijden(m => m.map(x => x.id === editId ? { ...x, ...bijgewerkt } : x))
+      setEditOpen(false)
     } catch (err) { setFout(err.message) }
-    finally { setBewerkenLaden(false) }
+    finally { setEditLaden(false) }
   }
 
   async function verwijder(id) {
@@ -84,222 +146,331 @@ export default function Voeding({ onNavigeer }) {
     } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
+  // ── Derived data ─────────────────────────────────────────────────────────
+
   const totaal = maaltijden.reduce((s, m) => ({
-    kcal: s.kcal + (m.kcal || 0),
+    kcal:  s.kcal  + (m.kcal || 0),
     eiwit: s.eiwit + (parseFloat(m.eiwit_g) || 0),
-    kh: s.kh + (parseFloat(m.koolhydraten_g) || 0),
-    vet: s.vet + (parseFloat(m.vetten_g) || 0),
+    kh:    s.kh    + (parseFloat(m.koolhydraten_g) || 0),
+    vet:   s.vet   + (parseFloat(m.vetten_g) || 0),
   }), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
 
-  const isVandaag = datum === vandaagStr()
+  const p = profiel || {}
+  const doelKcal   = p.doel_kcal            || null
+  const doelEiwit  = p.doel_eiwit_g         || null
+  const doelKh     = p.doel_koolhydraten_g  || null
+  const doelVet    = p.doel_vetten_g        || null
+
+  const isVandaag  = datum === vandaagStr()
+
+  // Group meals by type, keep order
+  const groepen = TYPES
+    .map(t => ({ type: t, items: maaltijden.filter(m => m.maaltijd_type === t) }))
+    .filter(g => g.items.length > 0)
+  const overig = maaltijden.filter(m => !TYPES.includes(m.maaltijd_type))
 
   return (
     <div className="page">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="page-header">
-        <div><h1>🍽️ Voeding</h1><p className="subtitle">Maaltijdtracking & macro's</p></div>
-        <button className="btn btn-primary" onClick={() => { setToonForm(!toonForm); setBewerkenId(null) }}>
-          {toonForm ? 'Annuleer' : '+ Maaltijd'}
+        <div>
+          <h1 className="t-xl">Voeding</h1>
+          <p className="t-sm t-muted" style={{ marginTop: 2 }}>Maaltijdtracking & macro's</p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>
+          + Maaltijd
         </button>
       </div>
 
-      {/* Datum navigator */}
-      <div className="datum-nav">
-        <button className="icon-btn" onClick={() => { const d = new Date(datum); d.setDate(d.getDate() - 1); setDatum(d.toISOString().split('T')[0]) }}>‹</button>
-        <input type="date" value={datum} onChange={e => setDatum(e.target.value)} className="datum-input" />
-        <button className="icon-btn" onClick={() => { const d = new Date(datum); d.setDate(d.getDate() + 1); setDatum(d.toISOString().split('T')[0]) }} disabled={isVandaag}>›</button>
+      {fout && <Card><p className="t-sm t-red">{fout}</p></Card>}
+
+      {/* ── Date navigator ─────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <button
+          onClick={() => navigeerDag(-1)}
+          className="btn btn-secondary btn-sm"
+          style={{ minWidth: 44 }}
+        >‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <span className="t-md" style={{ fontWeight: 600 }}>{datumLabel(datum)}</span>
+          {datum !== vandaagStr() && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ display: 'block', margin: '2px auto 0' }}
+              onClick={() => setDatum(vandaagStr())}
+            >
+              Terug naar vandaag
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => navigeerDag(1)}
+          className="btn btn-secondary btn-sm"
+          style={{ minWidth: 44 }}
+          disabled={isVandaag}
+        >›</button>
       </div>
 
-      {fout && <div className="alert alert-error">{fout}</div>}
-
-      {/* Dagtotaal */}
+      {/* ── Day totals ─────────────────────────────────────────────────── */}
       {maaltijden.length > 0 && (
-        <div className="card dagtotaal-card">
-          <h3>Dagtotaal</h3>
-          <div className="dagtotaal-grid">
-            <DagBlok waarde={totaal.kcal} label="kcal" kleur="" />
-            <DagBlok waarde={Math.round(totaal.eiwit)} label="g eiwit" kleur="groen" />
-            <DagBlok waarde={Math.round(totaal.kh)} label="g koolhyd." kleur="blauw" />
-            <DagBlok waarde={Math.round(totaal.vet)} label="g vet" kleur="oranje" />
+        <Card>
+          <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>Dagtotaal</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)' }}>
+            <TotaalBlok waarde={totaal.kcal}         doel={doelKcal}  label="kcal"   color="var(--text)" />
+            <TotaalBlok waarde={Math.round(totaal.eiwit)} doel={doelEiwit} label="eiwit" color="var(--green)" unit="g" />
+            <TotaalBlok waarde={Math.round(totaal.kh)}   doel={doelKh}   label="koolh." color="var(--blue)"  unit="g" />
+            <TotaalBlok waarde={Math.round(totaal.vet)}  doel={doelVet}  label="vet"    color="var(--amber)" unit="g" />
           </div>
+        </Card>
+      )}
+
+      {/* ── Meal list ──────────────────────────────────────────────────── */}
+      {laden ? (
+        <div className="section-gap">
+          {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 72, borderRadius: 'var(--r-lg)' }} />)}
+        </div>
+      ) : maaltijden.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-icon">🍽️</span>
+          <span className="t-md">
+            Nog geen maaltijden op {new Date(datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+          </span>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>+ Toevoegen</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => onNavigeer('coach')}>Via Coach →</button>
+          </div>
+        </div>
+      ) : (
+        <div className="section-gap">
+          {groepen.map(({ type, items }) => (
+            <div key={type}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                <span style={{ fontSize: 14 }}>{TYPE_ICON[type] || '🍽️'}</span>
+                <span className="t-label">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+              </div>
+              <div className="section-gap" style={{ gap: 'var(--space-2)' }}>
+                {items.map(m => (
+                  <MaaltijdKaart key={m.id} m={m} onEdit={() => startEdit(m)} onVerwijder={() => verwijder(m.id)} />
+                ))}
+              </div>
+            </div>
+          ))}
+          {overig.map(m => (
+            <MaaltijdKaart key={m.id} m={m} onEdit={() => startEdit(m)} onVerwijder={() => verwijder(m.id)} />
+          ))}
         </div>
       )}
 
-      {/* Nieuw maaltijd formulier */}
-      {toonForm && (
-        <div className="card">
-          <h3>Maaltijd toevoegen</h3>
-          <form onSubmit={submit}>
-            <div className="type-keuze">
+      {/* ── Add meal sheet ─────────────────────────────────────────────── */}
+      <Sheet open={addOpen} onClose={() => { setAddOpen(false); setAiNotities('') }} title="Maaltijd toevoegen">
+        <form onSubmit={submit}>
+          <div className="section-gap">
+
+            {/* Type picker */}
+            <div className="form-group">
+              <label>Type</label>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {TYPES.map(t => (
+                  <button
+                    key={t} type="button"
+                    onClick={() => setForm(f => ({ ...f, maaltijd_type: t }))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                      padding: '6px 12px',
+                      background: form.maaltijd_type === t ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                      border: form.maaltijd_type === t ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                      borderRadius: 'var(--r-xs)', cursor: 'pointer',
+                      color: form.maaltijd_type === t ? 'var(--text)' : 'var(--text-3)',
+                      fontSize: 'var(--t-xs)', fontWeight: 700,
+                      letterSpacing: '0.04em', textTransform: 'uppercase',
+                      transition: 'background var(--dur-fast), border-color var(--dur-fast)',
+                    }}
+                  >
+                    <span>{TYPE_ICON[t]}</span>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Camera button */}
+            <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={analyseerFoto} style={{ display: 'none' }} />
+            <button type="button" className="btn btn-secondary btn-full" onClick={() => fotoRef.current.click()} disabled={analyseert}>
+              {analyseert ? '🔍 Analyseren...' : '📸 Foto analyseren met AI'}
+            </button>
+            {aiNotities && (
+              <Card variant="inset">
+                <p className="t-sm t-muted" style={{ fontStyle: 'italic' }}>✨ {aiNotities}</p>
+              </Card>
+            )}
+
+            {/* Description */}
+            <div className="form-group">
+              <label>Beschrijving</label>
+              <input className="input" value={form.beschrijving} onChange={e => setForm(f => ({ ...f, beschrijving: e.target.value }))} placeholder="Bijv. Havermout met banaan en whey" />
+            </div>
+
+            {/* Macros */}
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label>Kcal</label>
+                <input className="input" type="number" value={form.kcal} onChange={e => setForm(f => ({ ...f, kcal: e.target.value }))} placeholder="350" />
+              </div>
+              <div className="form-group">
+                <label>Eiwit (g)</label>
+                <input className="input" type="number" step="0.1" value={form.eiwit_g} onChange={e => setForm(f => ({ ...f, eiwit_g: e.target.value }))} placeholder="25" />
+              </div>
+              <div className="form-group">
+                <label>Koolhyd. (g)</label>
+                <input className="input" type="number" step="0.1" value={form.koolhydraten_g} onChange={e => setForm(f => ({ ...f, koolhydraten_g: e.target.value }))} placeholder="45" />
+              </div>
+              <div className="form-group">
+                <label>Vet (g)</label>
+                <input className="input" type="number" step="0.1" value={form.vetten_g} onChange={e => setForm(f => ({ ...f, vetten_g: e.target.value }))} placeholder="8" />
+              </div>
+            </div>
+
+            {fout && <p className="t-sm t-red">{fout}</p>}
+            <button type="submit" className="btn btn-primary btn-full" disabled={opslaan}>
+              {opslaan ? 'Opslaan...' : 'Maaltijd opslaan'}
+            </button>
+          </div>
+        </form>
+      </Sheet>
+
+      {/* ── Edit meal sheet ─────────────────────────────────────────────── */}
+      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Maaltijd bewerken">
+        <div className="section-gap">
+
+          {/* Type picker */}
+          <div className="form-group">
+            <label>Type</label>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               {TYPES.map(t => (
-                <button key={t} type="button" className={`type-btn ${form.maaltijd_type === t ? 'active' : ''}`}
-                  onClick={() => setForm(f => ({ ...f, maaltijd_type: t }))}>
+                <button
+                  key={t} type="button"
+                  onClick={() => setEditForm(f => ({ ...f, maaltijd_type: t }))}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                    padding: '6px 12px',
+                    background: editForm.maaltijd_type === t ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                    border: editForm.maaltijd_type === t ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                    borderRadius: 'var(--r-xs)', cursor: 'pointer',
+                    color: editForm.maaltijd_type === t ? 'var(--text)' : 'var(--text-3)',
+                    fontSize: 'var(--t-xs)', fontWeight: 700,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    transition: 'background var(--dur-fast), border-color var(--dur-fast)',
+                  }}
+                >
+                  <span>{TYPE_ICON[t]}</span>
                   {t}
                 </button>
               ))}
             </div>
-            <div className="foto-sectie">
-              <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={analyseerFoto} style={{ display: 'none' }} />
-              <button type="button" className="btn btn-secondary" onClick={() => fotoRef.current.click()} disabled={analyseert}>
-                {analyseert ? '🔍 Analyseren...' : '📸 Foto analyseren'}
-              </button>
-              {aiNotities && <div className="ai-feedback">{aiNotities}</div>}
+          </div>
+
+          <div className="form-group">
+            <label>Beschrijving</label>
+            <input className="input" value={editForm.beschrijving || ''} onChange={e => setEditForm(f => ({ ...f, beschrijving: e.target.value }))} placeholder="Naam van de maaltijd" />
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label>Kcal</label>
+              <input className="input" type="number" value={editForm.kcal ?? ''} onChange={e => setEditForm(f => ({ ...f, kcal: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label>Beschrijving</label>
-              <input value={form.beschrijving} onChange={upd('beschrijving')} placeholder="Bijv. Havermout met banaan en whey" />
+              <label>Eiwit (g)</label>
+              <input className="input" type="number" step="0.1" value={editForm.eiwit_g ?? ''} onChange={e => setEditForm(f => ({ ...f, eiwit_g: e.target.value }))} />
             </div>
-            <div className="macro-invoer-grid">
-              <div className="form-group">
-                <label>Kcal</label>
-                <input type="number" value={form.kcal} onChange={upd('kcal')} placeholder="350" />
-              </div>
-              <div className="form-group">
-                <label>Eiwit (g)</label>
-                <input type="number" step="0.1" value={form.eiwit_g} onChange={upd('eiwit_g')} placeholder="25" />
-              </div>
-              <div className="form-group">
-                <label>Koolhyd. (g)</label>
-                <input type="number" step="0.1" value={form.koolhydraten_g} onChange={upd('koolhydraten_g')} placeholder="45" />
-              </div>
-              <div className="form-group">
-                <label>Vet (g)</label>
-                <input type="number" step="0.1" value={form.vetten_g} onChange={upd('vetten_g')} placeholder="8" />
-              </div>
+            <div className="form-group">
+              <label>Koolhyd. (g)</label>
+              <input className="input" type="number" step="0.1" value={editForm.koolhydraten_g ?? ''} onChange={e => setEditForm(f => ({ ...f, koolhydraten_g: e.target.value }))} />
             </div>
-            <button type="submit" className="btn btn-primary btn-full" disabled={opslaan}>
-              {opslaan ? 'Opslaan...' : 'Maaltijd opslaan'}
+            <div className="form-group">
+              <label>Vet (g)</label>
+              <input className="input" type="number" step="0.1" value={editForm.vetten_g ?? ''} onChange={e => setEditForm(f => ({ ...f, vetten_g: e.target.value }))} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveEdit} disabled={editLaden}>
+              {editLaden ? 'Opslaan...' : 'Opslaan'}
             </button>
-          </form>
+            <button className="btn btn-ghost" onClick={() => setEditOpen(false)}>Annuleer</button>
+          </div>
         </div>
-      )}
+      </Sheet>
 
-      {/* Maaltijdlijst */}
-      {laden ? <div className="center-loader"><div className="spinner" /></div> :
-        maaltijden.length === 0 ? (
-          <div className="leeg-staat">
-            <p>🍽️</p>
-            <p>Nog geen maaltijden op {new Date(datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}.</p>
-            <button className="btn btn-secondary" onClick={() => onNavigeer('coach')}>Upload via Coach →</button>
-          </div>
-        ) : (
-          <div className="lijst">
-            {TYPES.filter(t => maaltijden.some(m => m.maaltijd_type === t)).map(type => (
-              <div key={type}>
-                <div className="sectie-titel">{type.charAt(0).toUpperCase() + type.slice(1)}</div>
-                {maaltijden.filter(m => m.maaltijd_type === type).map(m => (
-                  <div key={m.id} className="card maaltijd-kaart">
-                    {bewerkenId === m.id ? (
-                      /* ── Inline edit formulier ── */
-                      <div>
-                        <div className="type-keuze" style={{ marginBottom: 10 }}>
-                          {TYPES.map(t => (
-                            <button key={t} type="button" className={`type-btn ${bewerkenForm.maaltijd_type === t ? 'active' : ''}`}
-                              onClick={() => setBewerkenForm(f => ({ ...f, maaltijd_type: t }))}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="form-group">
-                          <label>Beschrijving</label>
-                          <input value={bewerkenForm.beschrijving} onChange={updBew('beschrijving')} placeholder="Naam van de maaltijd" />
-                        </div>
-                        <div className="macro-invoer-grid">
-                          <div className="form-group">
-                            <label>Kcal</label>
-                            <input type="number" value={bewerkenForm.kcal} onChange={updBew('kcal')} />
-                          </div>
-                          <div className="form-group">
-                            <label>Eiwit (g)</label>
-                            <input type="number" step="0.1" value={bewerkenForm.eiwit_g} onChange={updBew('eiwit_g')} />
-                          </div>
-                          <div className="form-group">
-                            <label>Koolhyd. (g)</label>
-                            <input type="number" step="0.1" value={bewerkenForm.koolhydraten_g} onChange={updBew('koolhydraten_g')} />
-                          </div>
-                          <div className="form-group">
-                            <label>Vet (g)</label>
-                            <input type="number" step="0.1" value={bewerkenForm.vetten_g} onChange={updBew('vetten_g')} />
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => slaBewerkenOp(m.id)} disabled={bewerkenLaden}>
-                            {bewerkenLaden ? 'Opslaan...' : 'Opslaan'}
-                          </button>
-                          <button className="btn btn-ghost" onClick={() => setBewerkenId(null)}>Annuleer</button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* ── Weergave ── */
-                      <div>
-                        <div className="maaltijd-kop">
-                          <span className="maaltijd-naam">{m.beschrijving || 'Maaltijd'}</span>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="icon-btn sm" onClick={() => startBewerken(m)} title="Bewerken">✏️</button>
-                            <button className="verwijder-btn" onClick={() => verwijder(m.id)}>×</button>
-                          </div>
-                        </div>
-                        <div className="maaltijd-macros">
-                          {m.kcal != null && <MacroTag waarde={m.kcal} label="kcal" />}
-                          {m.eiwit_g != null && <MacroTag waarde={parseFloat(m.eiwit_g)} label="g eiwit" kleur="groen" />}
-                          {m.koolhydraten_g != null && <MacroTag waarde={parseFloat(m.koolhydraten_g)} label="g kh" kleur="blauw" />}
-                          {m.vetten_g != null && <MacroTag waarde={parseFloat(m.vetten_g)} label="g vet" kleur="oranje" />}
-                        </div>
-                        {m.ai_notities && <p className="ai-feedback klein">{m.ai_notities}</p>}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* Maaltijden zonder type */}
-            {maaltijden.filter(m => !m.maaltijd_type || !TYPES.includes(m.maaltijd_type)).map(m => (
-              <div key={m.id} className="card maaltijd-kaart">
-                <div className="maaltijd-kop">
-                  <span className="maaltijd-naam">{m.beschrijving || 'Maaltijd'}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="icon-btn sm" onClick={() => startBewerken(m)}>✏️</button>
-                    <button className="verwijder-btn" onClick={() => verwijder(m.id)}>×</button>
-                  </div>
-                </div>
-                <div className="maaltijd-macros">
-                  {m.kcal != null && <MacroTag waarde={m.kcal} label="kcal" />}
-                  {m.eiwit_g != null && <MacroTag waarde={parseFloat(m.eiwit_g)} label="g eiwit" kleur="groen" />}
-                  {m.koolhydraten_g != null && <MacroTag waarde={parseFloat(m.koolhydraten_g)} label="g kh" kleur="blauw" />}
-                  {m.vetten_g != null && <MacroTag waarde={parseFloat(m.vetten_g)} label="g vet" kleur="oranje" />}
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      }
     </div>
   )
 }
 
-function MacroTag({ waarde, label, kleur }) {
-  const stijlen = {
-    groen: { background: '#f0fdf4', color: '#166534' },
-    blauw: { background: '#eff6ff', color: '#1e40af' },
-    oranje: { background: '#fff7ed', color: '#9a3412' },
-  }
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function TotaalBlok({ waarde, doel, label, color, unit = '' }) {
+  const pct = doel ? Math.min(100, Math.round((waarde / doel) * 100)) : null
   return (
-    <span className="macro-tag" style={stijlen[kleur] || {}}>
-      <strong>{isNaN(waarde) ? '—' : Number.isInteger(waarde) ? waarde : waarde.toFixed(1)}</strong> {label}
-    </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+      <div style={{ fontSize: 'var(--t-lg)', fontWeight: 700, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+        {waarde}{unit && <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-3)', marginLeft: 1 }}>{unit}</span>}
+      </div>
+      {doel && (
+        <>
+          <div className="progress-bar" style={{ height: 3 }}>
+            <div className="progress-fill" style={{ width: `${pct}%`, background: color }} />
+          </div>
+          <span className="t-xs t-muted">/ {doel}{unit}</span>
+        </>
+      )}
+      {!doel && <span className="t-xs t-muted">{label}</span>}
+      {doel && <span className="t-xs t-muted">{label}</span>}
+    </div>
   )
 }
 
-function DagBlok({ waarde, label, kleur }) {
-  const stijlen = {
-    groen: 'macro-blok--groen',
-    blauw: 'macro-blok--blauw',
-    oranje: 'macro-blok--oranje',
-  }
+function MaaltijdKaart({ m, onEdit, onVerwijder }) {
   return (
-    <div className={`macro-blok ${stijlen[kleur] || ''}`}>
-      <strong>{Number.isInteger(waarde) ? waarde : waarde.toFixed(1)}</strong>
-      <span>{label}</span>
+    <Card variant="raised">
+      <div className="row-between">
+        <span className="t-md" style={{ fontWeight: 500, flex: 1, paddingRight: 'var(--space-2)' }}>
+          {m.beschrijving || 'Maaltijd'}
+        </span>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
+          <button
+            onClick={onEdit}
+            style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', borderRadius: 'var(--r-xs)' }}
+            title="Bewerken"
+          >✏️</button>
+          <button
+            onClick={onVerwijder}
+            style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
+          >×</button>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+        {m.kcal     != null && <MacroPill value={m.kcal}                          label="kcal"  />}
+        {m.eiwit_g  != null && <MacroPill value={fmt(m.eiwit_g, 1)}  unit="g"    label="eiwit" color="var(--green)" />}
+        {m.koolhydraten_g != null && <MacroPill value={fmt(m.koolhydraten_g, 1)} unit="g" label="koolh." color="var(--blue)" />}
+        {m.vetten_g != null && <MacroPill value={fmt(m.vetten_g, 1)} unit="g"    label="vet"   color="var(--amber)" />}
+      </div>
+      {m.ai_notities && (
+        <p className="t-sm t-muted" style={{ marginTop: 'var(--space-2)', fontStyle: 'italic' }}>
+          ✨ {m.ai_notities}
+        </p>
+      )}
+    </Card>
+  )
+}
+
+function MacroPill({ value, unit, label, color }) {
+  return (
+    <div className="card-inset" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 52, padding: '4px 10px' }}>
+      <span style={{ fontSize: 'var(--t-sm)', fontWeight: 700, color: color || 'var(--text)', lineHeight: 1 }}>
+        {value}{unit && <span style={{ fontSize: 9, marginLeft: 1 }}>{unit}</span>}
+      </span>
+      <span className="t-xs t-muted">{label}</span>
     </div>
   )
 }
