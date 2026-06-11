@@ -39,7 +39,7 @@ export const handler = async (event) => {
           huidige_waarde = COALESCE(${d.huidige_waarde??null}, huidige_waarde),
           doel_waarde = COALESCE(${d.doel_waarde??null}, doel_waarde),
           actief = COALESCE(${d.actief??null}, actief),
-          deadline = COALESCE(${d.deadline||null}, deadline),
+          deadline = ${d.deadline || null},
           beschrijving = COALESCE(${d.beschrijving||null}, beschrijving)
         WHERE id = ${id} AND user_id = ${userId}
         RETURNING *
