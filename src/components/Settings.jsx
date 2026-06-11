@@ -1,74 +1,80 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
+import SportIcoon from '../sportIcoon.jsx'
+import Card from './ui/Card.jsx'
+import Chip from './ui/Chip.jsx'
 
-const SPORTEN = ['hyrox', 'fitness', 'hardlopen', 'fietsen', 'wielrennen', 'zwemmen', 'padel', 'tennis', 'wandelen', 'yoga', 'voetbal']
-const SPORTEN_ICONS = { hyrox: '⚡', fitness: '🏋️', hardlopen: '🏃', fietsen: '🚴', wielrennen: '🚵', zwemmen: '🏊', padel: '🎾', tennis: '🎾', wandelen: '🚶', yoga: '🧘', voetbal: '⚽' }
-const STIJLEN = [
-  { id: 'direct', label: 'Direct & bondig' },
-  { id: 'motiverend', label: 'Motiverend' },
-  { id: 'wetenschappelijk', label: 'Wetenschappelijk' },
-  { id: 'vriendelijk', label: 'Vriendelijk & ondersteunend' },
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const SPORTEN = ['hyrox','fitness','hardlopen','fietsen','wielrennen','zwemmen','padel','tennis','wandelen','yoga','voetbal']
+const COACH_STIJLEN = [
+  { id: 'direct',          label: 'Direct & bondig' },
+  { id: 'motiverend',      label: 'Motiverend' },
+  { id: 'wetenschappelijk',label: 'Wetenschappelijk' },
+  { id: 'vriendelijk',     label: 'Vriendelijk & ondersteunend' },
+]
+const TABS = [
+  { id: 'profiel',      label: 'Profiel' },
+  { id: 'coach',        label: 'Coach' },
+  { id: 'voeding',      label: "Macro's" },
+  { id: 'koppelingen',  label: 'Koppelingen' },
 ]
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, onSuuntoStatusClear }) {
-  const [tab, setTab] = useState('profiel')
+  const [tab, setTab]       = useState('profiel')
   const [profiel, setProfiel] = useState(null)
-  const [laden, setLaden] = useState(true)
+  const [laden, setLaden]   = useState(true)
   const [opslaan, setOpslaan] = useState(false)
-  const [intervalsSyncing, setIntervalsSyncing] = useState(false)
-  const [intervalsConnecting, setIntervalsConnecting] = useState(false)
-  const [intervalsForm, setIntervalsForm] = useState({ athlete_id: '', api_key: '' })
-  const [melding, setMelding] = useState(null)
-  const [runalyzeForm, setRunalyzeForm] = useState({ api_token: '' })
-  const [runalyzeConnecting, setRunalyzeConnecting] = useState(false)
-  const [runalyzeSyncing, setRunalyzeSyncing] = useState(false)
-  const [runalyzeLaatste, setRunalyzeLaatste] = useState(null)
-  const [suuntoSyncing, setSuuntoSyncing] = useState(false)
-  const [suuntoLaatste, setSuuntoLaatste] = useState(null)
+  const [toast, setToast]   = useState(null)
+
+  // Suunto
+  const [suuntoSyncing, setSuuntoSyncing]     = useState(false)
+  const [suuntoLaatste, setSuuntoLaatste]     = useState(null)
 
   useEffect(() => { laadProfiel() }, [])
 
+  // Navigate to koppelingen tab after Suunto OAuth callback
+  useEffect(() => {
+    if (suuntoStatus) setTab('koppelingen')
+  }, [suuntoStatus])
+
+  function showToast(tekst, type = 'success') {
+    setToast({ tekst, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
   async function laadProfiel() {
     try {
-      const data = await api.get('/profiel')
+      const d = await api.get('/profiel')
       setProfiel({
-        name: data.name || '',
-        geboortejaar: data.geboortejaar || '',
-        geslacht: data.geslacht || '',
-        lengte_cm: data.lengte_cm || '',
-        gewicht_kg: data.gewicht_kg || '',
-        sporten: data.sporten || ['fitness', 'padel', 'fietsen'],
-        doel_kcal: data.doel_kcal || 2400,
-        doel_eiwit_g: data.doel_eiwit_g || 160,
-        doel_koolhydraten_g: data.doel_koolhydraten_g || 250,
-        doel_vetten_g: data.doel_vetten_g || 80,
-        coach_context: data.coach_context || '',
-        coach_naam: data.coach_naam || 'APEX Coach',
-        coach_stijl: data.coach_stijl || 'direct',
-        intervals_verbonden: !!data.intervals_athlete_id,
-        intervals_athlete_id: data.intervals_athlete_id || null,
-        runalyze_verbonden: !!data.runalyze_verbonden,
-        suunto_verbonden:   !!data.suunto_verbonden,
+        name: d.name || '',
+        geboortejaar: d.geboortejaar || '',
+        geslacht: d.geslacht || '',
+        lengte_cm: d.lengte_cm || '',
+        gewicht_kg: d.gewicht_kg || '',
+        sporten: d.sporten || ['fitness', 'padel', 'fietsen'],
+        doel_kcal: d.doel_kcal || 2400,
+        doel_eiwit_g: d.doel_eiwit_g || 160,
+        doel_koolhydraten_g: d.doel_koolhydraten_g || 250,
+        doel_vetten_g: d.doel_vetten_g || 80,
+        coach_context: d.coach_context || '',
+        coach_naam: d.coach_naam || 'APEX Coach',
+        coach_stijl: d.coach_stijl || 'direct',
+        suunto_verbonden: !!d.suunto_verbonden,
       })
-    } catch {
-      setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
-    } finally {
-      setLaden(false)
-    }
+    } catch { showToast('Kan profiel niet laden', 'error') }
+    finally { setLaden(false) }
   }
 
   async function slaOp(extra = {}) {
     setOpslaan(true)
-    setMelding(null)
     try {
       await api.put('/profiel', { ...profiel, ...extra })
-      setMelding({ type: 'success', tekst: '✓ Opgeslagen' })
-      setTimeout(() => setMelding(null), 3000)
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Opslaan mislukt: ' + err.message })
-    } finally {
-      setOpslaan(false)
-    }
+      showToast('Opgeslagen')
+    } catch (err) { showToast('Opslaan mislukt: ' + err.message, 'error') }
+    finally { setOpslaan(false) }
   }
 
   function toggleSport(sport) {
@@ -76,87 +82,31 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
     setProfiel(p => ({ ...p, sporten: cur.includes(sport) ? cur.filter(s => s !== sport) : [...cur, sport] }))
   }
 
-  async function verbindIntervals() {
-    setIntervalsConnecting(true)
-    setMelding(null)
-    try {
-      const res = await api.post('/intervals-connect', intervalsForm)
-      setProfiel(p => ({ ...p, intervals_verbonden: true, intervals_athlete_id: intervalsForm.athlete_id }))
-      setIntervalsForm({ athlete_id: '', api_key: '' })
-      setMelding({ type: 'success', tekst: `✓ Intervals.icu gekoppeld${res.athlete_name ? ` als ${res.athlete_name}` : ''}` })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
-    } finally {
-      setIntervalsConnecting(false)
-    }
-  }
-
-  async function syncIntervals() {
-    setIntervalsSyncing(true)
-    setMelding(null)
-    try {
-      const res = await api.post('/intervals-sync', {})
-      const debugInfo = res.debug ? ` (ontvangen: ${res.debug.activities_received ?? 0} activiteiten, ${res.debug.wellness_received ?? 0} wellness)` : ''
-      const errorInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
-      setMelding({ type: res.gesynchroniseerd > 0 || res.wellness > 0 ? 'success' : 'error', tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} + ${res.wellness} wellness-dagen gesynchroniseerd${debugInfo}${errorInfo}` })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Intervals sync mislukt: ' + err.message })
-    } finally {
-      setIntervalsSyncing(false)
-    }
-  }
-
-  async function ontkoppelIntervals() {
-    try {
-      await api.put('/profiel', { ontkoppel_intervals: true })
-      setProfiel(p => ({ ...p, intervals_verbonden: false, intervals_athlete_id: null }))
-      setMelding({ type: 'success', tekst: 'Intervals.icu ontkoppeld.' })
-    } catch {
-      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
-    }
-  }
-
   async function verbindSuunto() {
-    setMelding(null)
     try {
       const { url } = await api.get('/suunto-connect')
       window.location.href = url
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Suunto koppelen mislukt: ' + err.message })
-    }
+    } catch (err) { showToast('Suunto koppelen mislukt: ' + err.message, 'error') }
   }
 
   async function syncSuunto(reset = false) {
-    if (reset && !confirm('Weet je het zeker? Alle Suunto-records worden gewist en opnieuw geïmporteerd.')) return
+    if (reset && !confirm('Alle Suunto-records worden gewist en opnieuw geïmporteerd. Doorgaan?')) return
     setSuuntoSyncing(true)
-    setMelding(null)
     try {
-      const path = reset ? '/suunto-sync?reset=1' : '/suunto-sync'
-      const res = await api.post(path, {})
-      const fout = res.debug?.workouts_error ? ` ⚠️ ${res.debug.workouts_error}` : ''
-      const ontvangen = res.debug?.workouts_received ?? 0
+      const res = await api.post(reset ? '/suunto-sync?reset=1' : '/suunto-sync', {})
       const wellnessDagen = res.wellness?.wellness_dagen ?? 0
-      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, ontvangen, wellnessDagen, tijdstip: new Date() })
-      const wellnessTekst = wellnessDagen > 0 ? ` + ${wellnessDagen} dagen slaap/HRV/herstel` : ''
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuwe workouts, ${res.overgeslagen} al bekend${wellnessTekst}${fout}` })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Suunto sync mislukt: ' + err.message })
-    } finally {
-      setSuuntoSyncing(false)
-    }
+      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, wellnessDagen, tijdstip: new Date() })
+      showToast(`${res.gesynchroniseerd} nieuwe workouts${wellnessDagen > 0 ? ` + ${wellnessDagen} slaap/HRV dagen` : ''}`)
+    } catch (err) { showToast('Suunto sync mislukt: ' + err.message, 'error') }
+    finally { setSuuntoSyncing(false) }
   }
 
   async function diagnoseSuunto() {
-    setMelding(null)
     try {
       const res = await api.get('/suunto-debug')
-      const tekst = JSON.stringify(res, null, 2)
-      const blob = new Blob([tekst], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Diagnose mislukt: ' + err.message })
-    }
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' })
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch (err) { showToast('Diagnose mislukt: ' + err.message, 'error') }
   }
 
   async function ontkoppelSuunto() {
@@ -164,481 +114,409 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
       await api.put('/profiel', { ontkoppel_suunto: true })
       setProfiel(p => ({ ...p, suunto_verbonden: false }))
       setSuuntoLaatste(null)
-      setMelding({ type: 'success', tekst: 'Suunto ontkoppeld.' })
-    } catch {
-      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
-    }
+      showToast('Suunto ontkoppeld')
+    } catch { showToast('Fout bij ontkoppelen', 'error') }
   }
 
-  async function verbindRunalyze() {
-    setRunalyzeConnecting(true)
-    setMelding(null)
-    try {
-      await api.post('/runalyze-connect', runalyzeForm)
-      setProfiel(p => ({ ...p, runalyze_verbonden: true }))
-      setRunalyzeForm({ api_token: '' })
-      setMelding({ type: 'success', tekst: '✓ Runalyze gekoppeld' })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
-    } finally {
-      setRunalyzeConnecting(false)
-    }
-  }
+  // ── Render ───────────────────────────────────────────────────────────────
 
-  async function syncRunalyze() {
-    setRunalyzeSyncing(true)
-    setMelding(null)
-    try {
-      const res = await api.post('/runalyze-sync', {})
-      const debugInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
-      setRunalyzeLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, tijdstip: new Date() })
-      setMelding({ type: 'success', tekst: `↻ ${res.gesynchroniseerd} nieuw, ${res.overgeslagen} al bekend${debugInfo}` })
-    } catch (err) {
-      setMelding({ type: 'error', tekst: 'Runalyze sync mislukt: ' + err.message })
-    } finally {
-      setRunalyzeSyncing(false)
-    }
-  }
-
-  async function ontkoppelRunalyze() {
-    try {
-      await api.put('/profiel', { ontkoppel_runalyze: true })
-      setProfiel(p => ({ ...p, runalyze_verbonden: false }))
-      setMelding({ type: 'success', tekst: 'Runalyze ontkoppeld.' })
-    } catch {
-      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
-    }
-  }
-
-  if (laden) return <div className="page-loading"><div className="spinner" /></div>
-
-  const TABS = [
-    { id: 'profiel', label: 'Profiel', icon: '👤' },
-    { id: 'coach', label: 'Coach', icon: '🤖' },
-    { id: 'doelen', label: "Macro's", icon: '🥗' },
-    { id: 'integraties', label: 'Koppelingen', icon: '🔗' },
-  ]
+  if (laden) return (
+    <div className="page">
+      <div className="section-gap">
+        {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 64, borderRadius: 'var(--r-lg)' }} />)}
+      </div>
+    </div>
+  )
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Instellingen</h1>
-          <p className="subtitle">Profiel & koppelingen</p>
-        </div>
-        <button className="btn btn-ghost" onClick={onUitloggen} style={{ fontSize: '0.8rem' }}>
-          Uitloggen
-        </button>
-      </div>
 
-      {melding && (
-        <div className={`alert alert-${melding.type}`} style={{ marginBottom: '12px' }}>
-          {melding.tekst}
+      {/* Toast */}
+      {toast && (
+        <div className="toast" style={{ background: toast.type === 'error' ? 'var(--red-dim)' : 'var(--bg-raised)', color: toast.type === 'error' ? 'var(--red)' : 'var(--text)' }}>
+          {toast.type === 'success' ? '✓ ' : '⚠ '}{toast.tekst}
         </div>
       )}
 
-      <div className="settings-tabs">
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <div className="page-header">
+        <div>
+          <h1 className="t-xl">Instellingen</h1>
+          <p className="t-sm t-muted" style={{ marginTop: 2 }}>Profiel & koppelingen</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onUitloggen}>Uitloggen</button>
+      </div>
+
+      {/* ── Tab bar ───────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 'var(--space-1)', overflowX: 'auto', padding: '2px 0' }}>
         {TABS.map(t => (
-          <button key={t.id} className={`settings-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-            <span className="tab-icon">{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              flexShrink: 0,
+              padding: '8px 16px',
+              background: tab === t.id ? 'var(--bg-surface)' : 'transparent',
+              border: tab === t.id ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent',
+              borderRadius: 'var(--r-xs)',
+              color: tab === t.id ? 'var(--text)' : 'var(--text-3)',
+              fontSize: 'var(--t-sm)', fontWeight: 600, cursor: 'pointer',
+              transition: 'color var(--dur-fast), background var(--dur-fast)',
+              whiteSpace: 'nowrap',
+            }}
+          >{t.label}</button>
         ))}
       </div>
 
-      {/* ── PROFIEL ── */}
-      {tab === 'profiel' && (
-        <div className="card">
-          <h3>Persoonlijke gegevens</h3>
-          <div className="form-group">
-            <label>Naam</label>
-            <input value={profiel.name} onChange={e => setProfiel(p => ({ ...p, name: e.target.value }))} placeholder="Jouw naam" />
-          </div>
-          <div className="form-rij">
-            <div className="form-group">
-              <label>Geboortejaar</label>
-              <input type="number" value={profiel.geboortejaar} onChange={e => setProfiel(p => ({ ...p, geboortejaar: parseInt(e.target.value) || '' }))} placeholder="1990" min="1940" max="2010" />
-            </div>
-            <div className="form-group">
-              <label>Geslacht</label>
-              <select value={profiel.geslacht} onChange={e => setProfiel(p => ({ ...p, geslacht: e.target.value }))}>
-                <option value="">Kies...</option>
-                <option value="man">Man</option>
-                <option value="vrouw">Vrouw</option>
-                <option value="anders">Anders</option>
-              </select>
-            </div>
-          </div>
-          <div className="form-rij">
-            <div className="form-group">
-              <label>Lengte (cm)</label>
-              <input type="number" value={profiel.lengte_cm} onChange={e => setProfiel(p => ({ ...p, lengte_cm: parseInt(e.target.value) || '' }))} placeholder="180" />
-            </div>
-            <div className="form-group">
-              <label>Gewicht (kg)</label>
-              <input type="number" step="0.1" value={profiel.gewicht_kg} onChange={e => setProfiel(p => ({ ...p, gewicht_kg: parseFloat(e.target.value) || '' }))} placeholder="80.0" />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Actieve sporten</label>
-            <div className="sport-checkboxes">
-              {SPORTEN.map(sport => (
-                <label key={sport} className={`sport-check ${profiel.sporten?.includes(sport) ? 'active' : ''}`}>
-                  <input type="checkbox" checked={profiel.sporten?.includes(sport) || false} onChange={() => toggleSport(sport)} />
-                  {SPORTEN_ICONS[sport] || '🏃'} {sport}
-                </label>
-              ))}
-            </div>
-          </div>
-          <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
-            {opslaan ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
-      )}
+      {/* ── PROFIEL ───────────────────────────────────────────────────── */}
+      {tab === 'profiel' && profiel && (
+        <Card>
+          <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-4)' }}>Persoonlijke gegevens</span>
 
-      {/* ── COACH ── */}
-      {tab === 'coach' && (
-        <div className="card">
-          <h3>Coach instellingen</h3>
-          <div className="form-group">
-            <label>Coach naam</label>
-            <input value={profiel.coach_naam} onChange={e => setProfiel(p => ({ ...p, coach_naam: e.target.value }))} placeholder="APEX Coach" />
-          </div>
-          <div className="form-group">
-            <label>Communicatiestijl</label>
-            <select value={profiel.coach_stijl} onChange={e => setProfiel(p => ({ ...p, coach_stijl: e.target.value }))}>
-              {STIJLEN.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Jouw context voor de coach</label>
-            <textarea
-              value={profiel.coach_context}
-              onChange={e => setProfiel(p => ({ ...p, coach_context: e.target.value }))}
-              placeholder={`Vertel de coach meer over jezelf:\n\n• Blessures of gezondheidsklachten\n• Trainingsachtergrond en niveau\n• Dieet beperkingen of allergieën\n• Doelen op lange termijn\n• Beschikbare apparatuur\n• Levensstijl en tijdsdruk`}
-              rows={8}
-              style={{ minHeight: '160px' }}
-            />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginTop: '6px' }}>
-              Deze context wordt altijd meegegeven aan de coach voor persoonlijker advies.
-            </p>
-          </div>
-          <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
-            {opslaan ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
-      )}
+          <div className="section-gap">
+            <div className="form-group">
+              <label>Naam</label>
+              <input className="input" value={profiel.name} onChange={e => setProfiel(p => ({ ...p, name: e.target.value }))} placeholder="Jouw naam" />
+            </div>
 
-      {/* ── DOELEN ── */}
-      {tab === 'doelen' && (
-        <div className="card">
-          <h3>Dagelijkse voedingsdoelen</h3>
-          <div className="macro-blokken" style={{ marginBottom: '16px' }}>
-            <div className="macro-blok"><strong>{profiel.doel_kcal}</strong><span>kcal</span></div>
-            <div className="macro-blok macro-blok--groen"><strong>{profiel.doel_eiwit_g}g</strong><span>eiwit</span></div>
-            <div className="macro-blok macro-blok--blauw"><strong>{profiel.doel_koolhydraten_g}g</strong><span>koolhyd</span></div>
-            <div className="macro-blok macro-blok--oranje"><strong>{profiel.doel_vetten_g}g</strong><span>vetten</span></div>
-          </div>
-          <div className="form-group">
-            <label>Calorieën per dag (kcal)</label>
-            <input type="number" value={profiel.doel_kcal} onChange={e => setProfiel(p => ({ ...p, doel_kcal: parseInt(e.target.value) || 2400 }))} min="1000" max="6000" step="50" />
-          </div>
-          <div className="form-group">
-            <label>Eiwit per dag (g)</label>
-            <input type="number" value={profiel.doel_eiwit_g} onChange={e => setProfiel(p => ({ ...p, doel_eiwit_g: parseInt(e.target.value) || 160 }))} min="50" max="400" />
-          </div>
-          <div className="form-group">
-            <label>Koolhydraten per dag (g)</label>
-            <input type="number" value={profiel.doel_koolhydraten_g} onChange={e => setProfiel(p => ({ ...p, doel_koolhydraten_g: parseInt(e.target.value) || 250 }))} min="50" max="600" />
-          </div>
-          <div className="form-group">
-            <label>Vetten per dag (g)</label>
-            <input type="number" value={profiel.doel_vetten_g} onChange={e => setProfiel(p => ({ ...p, doel_vetten_g: parseInt(e.target.value) || 80 }))} min="30" max="300" />
-          </div>
-          <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
-            {opslaan ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
-      )}
-
-      {/* ── INTEGRATIES ── */}
-      {tab === 'integraties' && (
-        <div className="lijst">
-
-          {/* Intervals.icu */}
-          <div className="card integratie-card">
-            <div className="integratie-header">
-              <div className="integratie-logo" style={{ background: '#1a1a2e', fontSize: '0.75rem', fontWeight: 700, color: '#e94560' }}>ICU</div>
-              <div className="integratie-info">
-                <strong>Intervals.icu</strong>
-                <span>Trainingen, HRV & slaap</span>
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label>Geboortejaar</label>
+                <input className="input" type="number" value={profiel.geboortejaar}
+                  onChange={e => setProfiel(p => ({ ...p, geboortejaar: parseInt(e.target.value) || '' }))}
+                  placeholder="1990" min="1940" max="2010" />
               </div>
-              <span className={`integratie-badge ${profiel.intervals_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-                {profiel.intervals_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
-              </span>
+              <div className="form-group">
+                <label>Geslacht</label>
+                <select className="input" value={profiel.geslacht} onChange={e => setProfiel(p => ({ ...p, geslacht: e.target.value }))}>
+                  <option value="">Kies...</option>
+                  <option value="man">Man</option>
+                  <option value="vrouw">Vrouw</option>
+                  <option value="anders">Anders</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Lengte (cm)</label>
+                <input className="input" type="number" value={profiel.lengte_cm}
+                  onChange={e => setProfiel(p => ({ ...p, lengte_cm: parseInt(e.target.value) || '' }))}
+                  placeholder="180" />
+              </div>
+              <div className="form-group">
+                <label>Gewicht (kg)</label>
+                <input className="input" type="number" step="0.1" value={profiel.gewicht_kg}
+                  onChange={e => setProfiel(p => ({ ...p, gewicht_kg: parseFloat(e.target.value) || '' }))}
+                  placeholder="80.0" />
+              </div>
             </div>
-            {profiel.intervals_verbonden ? (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Athlete <strong>{profiel.intervals_athlete_id}</strong> — trainingen, HRV en slaapdata worden gesynchroniseerd. Alle gekoppelde apparaten (Suunto, Garmin, enz.) worden automatisch meegenomen.
-                </p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncIntervals} disabled={intervalsSyncing}>
-                    {intervalsSyncing ? '...' : '↻ Nu synchroniseren'}
-                  </button>
-                  <button className="btn btn-ghost" onClick={ontkoppelIntervals}>Ontkoppelen</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Koppel Intervals.icu voor automatische import van trainingen én wellness data (HRV, slaap, TSB). Werkt met alle apparaten die naar Intervals.icu synchroniseren: Suunto, Garmin, Wahoo en meer.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontSize: '0.8rem' }}>Athlete ID <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(bijv. i12345 — zie URL op intervals.icu)</span></label>
-                    <input
-                      value={intervalsForm.athlete_id}
-                      onChange={e => setIntervalsForm(f => ({ ...f, athlete_id: e.target.value }))}
-                      placeholder="i12345"
-                      autoCapitalize="none"
-                    />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontSize: '0.8rem' }}>API Key <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(Intervals.icu → Instellingen → API Key)</span></label>
-                    <input
-                      type="password"
-                      value={intervalsForm.api_key}
-                      onChange={e => setIntervalsForm(f => ({ ...f, api_key: e.target.value }))}
-                      placeholder="••••••••••••••••"
-                    />
-                  </div>
-                  <button
-                    className="btn btn-full"
-                    onClick={verbindIntervals}
-                    disabled={intervalsConnecting || !intervalsForm.athlete_id || !intervalsForm.api_key}
-                    style={{ background: '#1a1a2e', color: '#e94560', border: '1px solid #e94560', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
-                  >
-                    {intervalsConnecting ? 'Verbinden...' : 'Verbinden met Intervals.icu'}
-                  </button>
-                </div>
-              </>
-            )}
+
+            <div className="form-group">
+              <label>Actieve sporten</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                {SPORTEN.map(sport => {
+                  const active = profiel.sporten?.includes(sport)
+                  return (
+                    <button
+                      key={sport} type="button"
+                      onClick={() => toggleSport(sport)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                        padding: '10px 4px',
+                        background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                        border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                        borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                        color: active ? 'var(--text)' : 'var(--text-3)',
+                        transition: 'border-color var(--dur-fast), color var(--dur-fast)',
+                      }}
+                    >
+                      <SportIcoon sport={sport} size={16} />
+                      <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        {sport}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
+              {opslaan ? 'Opslaan...' : 'Opslaan'}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* ── COACH ─────────────────────────────────────────────────────── */}
+      {tab === 'coach' && profiel && (
+        <Card>
+          <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-4)' }}>Coach instellingen</span>
+
+          <div className="section-gap">
+            <div className="form-group">
+              <label>Coach naam</label>
+              <input className="input" value={profiel.coach_naam}
+                onChange={e => setProfiel(p => ({ ...p, coach_naam: e.target.value }))}
+                placeholder="APEX Coach" />
+            </div>
+
+            <div className="form-group">
+              <label>Communicatiestijl</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {COACH_STIJLEN.map(s => {
+                  const active = profiel.coach_stijl === s.id
+                  return (
+                    <button
+                      key={s.id} type="button"
+                      onClick={() => setProfiel(p => ({ ...p, coach_stijl: s.id }))}
+                      style={{
+                        textAlign: 'left', padding: 'var(--space-3) var(--space-4)',
+                        background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                        border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                        borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                        color: active ? 'var(--text)' : 'var(--text-3)',
+                        fontSize: 'var(--t-sm)', fontWeight: active ? 600 : 400,
+                        transition: 'border-color var(--dur-fast), color var(--dur-fast)',
+                      }}
+                    >{s.label}</button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Jouw context voor de coach</label>
+              <textarea
+                className="input"
+                value={profiel.coach_context}
+                onChange={e => setProfiel(p => ({ ...p, coach_context: e.target.value }))}
+                rows={8}
+                style={{ minHeight: 160, resize: 'vertical' }}
+                placeholder={`Vertel de coach meer over jezelf:\n\n• Blessures of gezondheidsklachten\n• Trainingsachtergrond en niveau\n• Dieet beperkingen of allergieën\n• Doelen op lange termijn\n• Beschikbare apparatuur\n• Levensstijl en tijdsdruk`}
+              />
+              <p className="t-xs t-muted" style={{ marginTop: 'var(--space-1)' }}>
+                Deze context wordt altijd meegegeven aan de coach voor persoonlijker advies.
+              </p>
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
+              {opslaan ? 'Opslaan...' : 'Opslaan'}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* ── VOEDING / MACROS ──────────────────────────────────────────── */}
+      {tab === 'voeding' && profiel && (
+        <Card>
+          <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-4)' }}>Dagelijkse voedingsdoelen</span>
+
+          {/* Live preview */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
+            <MacroPreview waarde={profiel.doel_kcal}            label="kcal"   color="var(--text)" />
+            <MacroPreview waarde={`${profiel.doel_eiwit_g}g`}   label="eiwit"  color="var(--green)" />
+            <MacroPreview waarde={`${profiel.doel_koolhydraten_g}g`} label="koolhyd." color="var(--blue)" />
+            <MacroPreview waarde={`${profiel.doel_vetten_g}g`}  label="vet"    color="var(--amber)" />
           </div>
 
-          {/* Suunto callback melding */}
-          {suuntoStatus && (
-            <div style={{
-              padding: '12px 16px', borderRadius: 10, marginBottom: 12, fontSize: '0.875rem', fontWeight: 600,
-              background: suuntoStatus === 'verbonden' ? '#f0fdf4' : '#fff1f2',
-              border: `1px solid ${suuntoStatus === 'verbonden' ? '#bbf7d0' : '#fecdd3'}`,
-              color: suuntoStatus === 'verbonden' ? '#166534' : '#be123c',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span>{suuntoStatus === 'verbonden' ? '✓ Suunto succesvol gekoppeld! Klik op "Nu synchroniseren" om je workouts te importeren.' : `Suunto koppelen mislukt. Probeer opnieuw.`}</span>
-              <button onClick={() => { onSuuntoStatusClear?.(); laadProfiel() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', color: 'inherit' }}>×</button>
+          <div className="section-gap">
+            <div className="form-group">
+              <label>Calorieën per dag (kcal)</label>
+              <input className="input" type="number" value={profiel.doel_kcal}
+                onChange={e => setProfiel(p => ({ ...p, doel_kcal: parseInt(e.target.value) || 2400 }))}
+                min="1000" max="6000" step="50" />
             </div>
+            <div className="form-group">
+              <label>Eiwit per dag (g)</label>
+              <input className="input" type="number" value={profiel.doel_eiwit_g}
+                onChange={e => setProfiel(p => ({ ...p, doel_eiwit_g: parseInt(e.target.value) || 160 }))}
+                min="50" max="400" />
+            </div>
+            <div className="form-group">
+              <label>Koolhydraten per dag (g)</label>
+              <input className="input" type="number" value={profiel.doel_koolhydraten_g}
+                onChange={e => setProfiel(p => ({ ...p, doel_koolhydraten_g: parseInt(e.target.value) || 250 }))}
+                min="50" max="600" />
+            </div>
+            <div className="form-group">
+              <label>Vetten per dag (g)</label>
+              <input className="input" type="number" value={profiel.doel_vetten_g}
+                onChange={e => setProfiel(p => ({ ...p, doel_vetten_g: parseInt(e.target.value) || 80 }))}
+                min="30" max="300" />
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={() => slaOp()} disabled={opslaan}>
+              {opslaan ? 'Opslaan...' : 'Opslaan'}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* ── KOPPELINGEN ───────────────────────────────────────────────── */}
+      {tab === 'koppelingen' && profiel && (
+        <div className="section-gap">
+
+          {/* Suunto OAuth callback banner */}
+          {suuntoStatus && (
+            <Card variant="inset" style={{ borderLeft: `3px solid ${suuntoStatus === 'verbonden' ? 'var(--green)' : 'var(--red)'}` }}>
+              <div className="row-between">
+                <p className="t-sm" style={{ color: suuntoStatus === 'verbonden' ? 'var(--green)' : 'var(--red)' }}>
+                  {suuntoStatus === 'verbonden'
+                    ? '✓ Suunto succesvol gekoppeld! Klik op "Nu synchroniseren" om je workouts te importeren.'
+                    : 'Suunto koppelen mislukt. Probeer opnieuw.'}
+                </p>
+                <button
+                  onClick={() => { onSuuntoStatusClear?.(); laadProfiel() }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, flexShrink: 0 }}
+                >×</button>
+              </div>
+            </Card>
           )}
 
           {/* Suunto */}
-          <div className="card integratie-card">
-            <div className="integratie-header">
-              <div className="integratie-logo" style={{ background: '#e3f2fd', fontSize: '0.7rem', fontWeight: 800, color: '#1565c0', letterSpacing: '-0.5px' }}>SUN</div>
-              <div className="integratie-info">
-                <strong>Suunto</strong>
-                <span>Directe workout import via OAuth</span>
-              </div>
-              <span className={`integratie-badge ${profiel.suunto_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-                {profiel.suunto_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
-              </span>
-            </div>
+          <IntegratieCard
+            logo="SUN"
+            logoStyle={{ background: 'var(--blue-dim)', color: 'var(--blue)', fontWeight: 800, fontSize: 10 }}
+            naam="Suunto"
+            subtitel="Directe workout import via OAuth"
+            verbonden={profiel.suunto_verbonden}
+          >
             {profiel.suunto_verbonden ? (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: 10 }}>
-                  Suunto is gekoppeld. Workouts worden direct vanuit de Suunto cloud gesynchroniseerd.
-                </p>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
+                <p className="t-sm t-muted">Workouts worden direct vanuit de Suunto cloud gesynchroniseerd.</p>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" style={{ flex: '1 1 140px' }} onClick={() => syncSuunto(false)} disabled={suuntoSyncing}>
-                    {suuntoSyncing ? '...' : '↻ Nu synchroniseren'}
+                    {suuntoSyncing ? '...' : '↻ Synchroniseren'}
                   </button>
-                  <button className="btn btn-ghost" onClick={() => syncSuunto(true)} disabled={suuntoSyncing} title="Wist bestaande Suunto-records en haalt alles opnieuw op">
+                  <button className="btn btn-ghost btn-sm" onClick={() => syncSuunto(true)} disabled={suuntoSyncing} title="Wist bestaande Suunto records en herstart">
                     ⟲ Volledig opnieuw
                   </button>
-                  <button className="btn btn-ghost" onClick={diagnoseSuunto} title="Toon ruwe Suunto API response in nieuw tabblad">
-                    🔍 Diagnose
-                  </button>
-                  <button className="btn btn-ghost" onClick={ontkoppelSuunto}>Ontkoppelen</button>
+                  <button className="btn btn-ghost btn-sm" onClick={diagnoseSuunto}>🔍 Diagnose</button>
+                  <button className="btn btn-ghost btn-sm" onClick={ontkoppelSuunto}>Ontkoppelen</button>
                 </div>
-                {suuntoLaatste && (
-                  <div style={{ marginTop: 12, padding: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: '0.82rem' }}>
-                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: 6 }}>
-                      Laatste sync: {suuntoLaatste.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-                      {' — '}{suuntoLaatste.nieuw.length} nieuw, {suuntoLaatste.overgeslagen} al bekend
-                      {suuntoLaatste.wellnessDagen > 0 && (
-                        <> — 💤 {suuntoLaatste.wellnessDagen} dagen slaap/HRV</>
-                      )}
-                    </div>
-                    {suuntoLaatste.nieuw.length > 0 ? (
-                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {suuntoLaatste.nieuw.slice(0, 10).map((a, i) => (
-                          <li key={i} style={{ color: '#166534' }}>
-                            • <strong>{a.datum}</strong> — {a.sport}
-                            {a.titel && a.titel !== a.sport ? ` (${a.titel})` : ''}
-                            {a.duur_min ? ` — ${a.duur_min}min` : ''}
-                            {a.km ? ` — ${a.km}km` : ''}
-                            {a.kcal ? ` — ${a.kcal}kcal` : ''}
-                            {a.gem_hartslag ? ` — gem ${a.gem_hartslag}bpm` : ''}
-                          </li>
-                        ))}
-                        {suuntoLaatste.nieuw.length > 10 && (
-                          <li style={{ color: '#166534', fontStyle: 'italic' }}>...en {suuntoLaatste.nieuw.length - 10} meer</li>
-                        )}
-                      </ul>
-                    ) : (
-                      <div style={{ color: '#166534', fontStyle: 'italic' }}>Alle data al up-to-date.</div>
-                    )}
-                  </div>
-                )}
-              </>
+                {suuntoLaatste && <SyncResultaat resultaat={suuntoLaatste} />}
+              </div>
             ) : (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: 10 }}>
-                  Koppel Suunto direct via OAuth2 voor automatische workout import. Je hebt een Suunto developer account nodig met <code>client_id</code>, <code>client_secret</code> en <code>subscription_key</code>.
+              <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
+                <p className="t-sm t-muted">
+                  Koppel Suunto direct via OAuth2. Je hebt een Suunto developer account nodig.
                 </p>
                 <button
                   className="btn btn-full"
                   onClick={verbindSuunto}
-                  style={{ background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', marginTop: 12 }}
+                  style={{ background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(127,184,255,0.3)', borderRadius: 'var(--r-sm)', fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', padding: '12px', fontSize: 'var(--t-md)' }}
                 >
                   Verbinden met Suunto →
                 </button>
-              </>
-            )}
-          </div>
-
-          {/* Runalyze */}
-          <div className="card integratie-card">
-            <div className="integratie-header">
-              <div className="integratie-logo" style={{ background: '#e8f5e9', fontSize: '0.7rem', fontWeight: 800, color: '#2e7d32', letterSpacing: '-0.5px' }}>RUN</div>
-              <div className="integratie-info">
-                <strong>Runalyze</strong>
-                <span>Suunto trainingen & analyses</span>
               </div>
-              <span className={`integratie-badge ${profiel.runalyze_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
-                {profiel.runalyze_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
-              </span>
-            </div>
-            {profiel.runalyze_verbonden ? (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Runalyze is gekoppeld. Activiteiten van je Suunto (en andere toestellen) worden gesynchroniseerd inclusief hartslagdata en trainingsanalyses.
-                </p>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: '8px' }}>
-                  🕕 Auto-sync elke ochtend om 07:00 (NL tijd). Suunto-data wordt 's nachts gesynchroniseerd naar Runalyze.
-                </div>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncRunalyze} disabled={runalyzeSyncing}>
-                    {runalyzeSyncing ? '...' : '↻ Nu synchroniseren'}
-                  </button>
-                  <button className="btn btn-ghost" onClick={ontkoppelRunalyze}>Ontkoppelen</button>
-                </div>
-                {runalyzeLaatste && (
-                  <div style={{ marginTop: '12px', padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem' }}>
-                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: '6px' }}>
-                      Laatste sync: {runalyzeLaatste.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-                      {' — '}{runalyzeLaatste.nieuw.length} nieuw, {runalyzeLaatste.overgeslagen} al bekend
-                    </div>
-                    {runalyzeLaatste.nieuw.length > 0 ? (
-                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {runalyzeLaatste.nieuw.slice(0, 10).map((a, i) => (
-                          <li key={i} style={{ color: '#166534' }}>
-                            • <strong>{a.datum}</strong> — {a.sport}
-                            {a.titel && a.titel !== a.sport ? ` (${a.titel})` : ''}
-                            {a.duur_min ? ` — ${a.duur_min}min` : ''}
-                            {a.km ? ` — ${a.km}km` : ''}
-                            {a.kcal ? ` — ${a.kcal}kcal` : ''}
-                            {a.gem_hartslag ? ` — gem ${a.gem_hartslag}bpm` : ''}
-                          </li>
-                        ))}
-                        {runalyzeLaatste.nieuw.length > 10 && (
-                          <li style={{ color: '#166534', fontStyle: 'italic' }}>...en {runalyzeLaatste.nieuw.length - 10} meer</li>
-                        )}
-                      </ul>
-                    ) : (
-                      <div style={{ color: '#166534', fontStyle: 'italic' }}>Geen nieuwe activiteiten — alle data is al up-to-date.</div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
-                  Koppel Runalyze voor directe import van je Suunto-activiteiten. Runalyze synct automatisch met de Suunto app en biedt diepgaande trainingsanalyses. Haal je API token op via Runalyze → Instellingen → Apps.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontSize: '0.8rem' }}>API Token <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(Runalyze → Instellingen → Apps → API)</span></label>
-                    <input
-                      type="password"
-                      value={runalyzeForm.api_token}
-                      onChange={e => setRunalyzeForm(f => ({ ...f, api_token: e.target.value }))}
-                      placeholder="••••••••••••••••"
-                      autoCapitalize="none"
-                    />
-                  </div>
-                  <button
-                    className="btn btn-full"
-                    onClick={verbindRunalyze}
-                    disabled={runalyzeConnecting || !runalyzeForm.api_token}
-                    style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
-                  >
-                    {runalyzeConnecting ? 'Verbinden...' : 'Verbinden met Runalyze'}
-                  </button>
-                </div>
-              </>
             )}
-          </div>
+          </IntegratieCard>
 
           {/* Apple Health */}
-          <IntegratieUploadCard
-            kleur="#FF3B30"
-            letter="♥"
+          <IntegratieCard
+            logo="♥"
+            logoStyle={{ background: 'rgba(255,59,48,0.15)', color: '#FF3B30', fontSize: 16 }}
             naam="Apple Health"
             subtitel="Stappen, HRV, slaap"
-            beschrijving="Upload schermafbeeldingen van Apple Health via de Coach voor automatische analyse."
-            onNavigeer={onNavigeer}
-          />
+            badge={<Chip label="Screenshot" color="muted" />}
+          >
+            <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
+              <p className="t-sm t-muted">Upload schermafbeeldingen van Apple Health via de Coach voor automatische analyse.</p>
+              <button className="btn btn-secondary btn-full" onClick={() => onNavigeer('coach')}>
+                Uploaden via Coach →
+              </button>
+            </div>
+          </IntegratieCard>
 
           {/* MyFitnessPal */}
-          <IntegratieUploadCard
-            kleur="#00B0FF"
-            letter="M"
+          <IntegratieCard
+            logo="M"
+            logoStyle={{ background: 'rgba(0,176,255,0.15)', color: '#00B0FF', fontWeight: 800, fontSize: 16 }}
             naam="MyFitnessPal"
             subtitel="Voeding & calorieën"
-            beschrijving="MyFitnessPal heeft geen openbare API meer. Export je dagoverzicht als screenshot en upload via de Coach."
-            onNavigeer={onNavigeer}
-          />
+            badge={<Chip label="Screenshot" color="muted" />}
+          >
+            <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
+              <p className="t-sm t-muted">MyFitnessPal heeft geen openbare API meer. Export je dagoverzicht als screenshot en upload via de Coach.</p>
+              <button className="btn btn-secondary btn-full" onClick={() => onNavigeer('coach')}>
+                Uploaden via Coach →
+              </button>
+            </div>
+          </IntegratieCard>
+
         </div>
       )}
     </div>
   )
 }
 
-function IntegratieUploadCard({ kleur, letter, naam, subtitel, beschrijving, uploadType, onNavigeer }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function MacroPreview({ waarde, label, color }) {
   return (
-    <div className="card integratie-card">
-      <div className="integratie-header">
-        <div className="integratie-logo" style={{ background: kleur }}>{letter}</div>
-        <div className="integratie-info">
-          <strong>{naam}</strong>
-          <span>{subtitel}</span>
-        </div>
-        <span className="integratie-badge badge-upload">📷 Upload</span>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 'var(--t-lg)', fontWeight: 700, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+        {waarde}
       </div>
-      <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>{beschrijving}</p>
-      <button className="btn btn-secondary btn-full" style={{ marginTop: '12px' }} onClick={() => onNavigeer('coach', uploadType ? { uploadType } : undefined)}>
-        Uploaden via Coach →
-      </button>
+      <div className="metric-label" style={{ marginTop: 2 }}>{label}</div>
     </div>
+  )
+}
+
+function IntegratieCard({ logo, logoStyle, naam, subtitel, verbonden, badge, children }) {
+  return (
+    <Card>
+      <div className="row-between" style={{ marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 'var(--r-sm)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, fontWeight: 700,
+            ...logoStyle,
+          }}>
+            {logo}
+          </div>
+          <div>
+            <div className="t-md" style={{ fontWeight: 600 }}>{naam}</div>
+            <div className="t-sm t-muted">{subtitel}</div>
+          </div>
+        </div>
+        {badge || (
+          verbonden !== undefined && (
+            <Chip label={verbonden ? 'Verbonden' : 'Niet verbonden'} color={verbonden ? 'green' : 'muted'} dot={verbonden} />
+          )
+        )}
+      </div>
+      {children}
+    </Card>
+  )
+}
+
+function SyncResultaat({ resultaat }) {
+  return (
+    <Card variant="inset">
+      <p className="t-sm" style={{ fontWeight: 600, color: 'var(--green)', marginBottom: resultaat.nieuw.length ? 'var(--space-2)' : 0 }}>
+        {resultaat.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+        {' — '}{resultaat.nieuw.length} nieuw, {resultaat.overgeslagen} al bekend
+        {resultaat.wellnessDagen > 0 && ` — ${resultaat.wellnessDagen} dagen slaap/HRV`}
+      </p>
+      {resultaat.nieuw.length > 0 ? (
+        <div className="section-gap" style={{ gap: 4 }}>
+          {resultaat.nieuw.slice(0, 10).map((a, i) => (
+            <div key={i} className="t-xs t-muted">
+              <strong style={{ color: 'var(--text-2)' }}>{a.datum}</strong>
+              {' — '}{a.sport}
+              {a.titel && a.titel !== a.sport ? ` (${a.titel})` : ''}
+              {a.duur_min ? ` · ${a.duur_min}m` : ''}
+              {a.km       ? ` · ${a.km}km` : ''}
+              {a.kcal     ? ` · ${a.kcal}kcal` : ''}
+            </div>
+          ))}
+          {resultaat.nieuw.length > 10 && (
+            <div className="t-xs t-muted" style={{ fontStyle: 'italic' }}>...en {resultaat.nieuw.length - 10} meer</div>
+          )}
+        </div>
+      ) : (
+        <p className="t-xs t-muted" style={{ fontStyle: 'italic' }}>Alle data al up-to-date.</p>
+      )}
+    </Card>
   )
 }
