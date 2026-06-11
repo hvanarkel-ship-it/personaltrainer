@@ -352,8 +352,9 @@ function aggregateActivity(entries) {
 }
 
 // Recovery: balance + stress + HRV + hulpbronnen per dag
-// Vandaag → meest recente meting (hele dag); historisch → ochtend 04-09 gemiddelde
-function aggregateRecovery(entries, vandaag) {
+// Alle dagen: nacht/ochtend venster 22-09 (uur < 9 || uur >= 22) als primaire bron.
+// Fallback naar meest recente meting als het ochtendvenster nog leeg is (dag nog bezig).
+function aggregateRecovery(entries) {
   const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
@@ -362,16 +363,15 @@ function aggregateRecovery(entries, vandaag) {
     const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
     const ts = new Date(e.timestamp).getTime()
     const cur = perDag.get(datum) || {
-      ochtend: { bal: [], stress: [], hrv: [], res: [] },
-      recent:  { bal: null, ts: 0, stress: null, hrv: null, res: null },
+      nacht: { bal: [], stress: [], hrv: [], res: [] },
+      recent: { bal: null, ts: 0, stress: null, hrv: null, res: null },
     }
 
     // HRV: Suunto gebruikt verschillende veldnamen afhankelijk van firmware
     const hrv = d.HRV ?? d.Hrv ?? d.HrvValue ?? d.AverageHRV ?? d.DailyHRV ?? null
-    // Hulpbronnen (Body Resources / Body Battery equivalent)
     const res = d.Resources ?? d.BodyResources ?? d.Resource ?? d.Vitality ?? null
 
-    // Meest recente waarde altijd bijhouden (voor vandaag)
+    // Meest recente waarde als fallback
     if (ts > cur.recent.ts) {
       cur.recent.ts = ts
       if (typeof d.Balance === 'number') cur.recent.bal = d.Balance
@@ -380,12 +380,12 @@ function aggregateRecovery(entries, vandaag) {
       if (res != null && res >= 0) cur.recent.res = Math.round(res)
     }
 
-    // Ochtend aggregatie (04-09) voor historische dagen
-    if (uur >= 4 && uur < 9) {
-      if (typeof d.Balance === 'number') cur.ochtend.bal.push(d.Balance)
-      if (d.StressState >= 1 && d.StressState <= 4) cur.ochtend.stress.push(d.StressState)
-      if (hrv != null && hrv > 0) cur.ochtend.hrv.push(Math.round(hrv))
-      if (res != null && res >= 0) cur.ochtend.res.push(Math.round(res))
+    // Nacht/ochtend venster (22:00-09:00) — consistent met Suunto Nightly Recharge
+    if (uur < 9 || uur >= 22) {
+      if (typeof d.Balance === 'number') cur.nacht.bal.push(d.Balance)
+      if (d.StressState >= 1 && d.StressState <= 4) cur.nacht.stress.push(d.StressState)
+      if (hrv != null && hrv > 0) cur.nacht.hrv.push(Math.round(hrv))
+      if (res != null && res >= 0) cur.nacht.res.push(Math.round(res))
     }
 
     perDag.set(datum, cur)
@@ -394,18 +394,12 @@ function aggregateRecovery(entries, vandaag) {
   const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length
   const out = new Map()
   for (const [datum, v] of perDag) {
-    let avgBal, avgStress, avgHrv, avgRes
-    if (datum === vandaag) {
-      avgBal    = v.recent.bal
-      avgStress = v.recent.stress
-      avgHrv    = v.recent.hrv
-      avgRes    = v.recent.res
-    } else {
-      avgBal    = v.ochtend.bal.length    > 0 ? avg(v.ochtend.bal)    : null
-      avgStress = v.ochtend.stress.length > 0 ? avg(v.ochtend.stress) : null
-      avgHrv    = v.ochtend.hrv.length    > 0 ? Math.round(avg(v.ochtend.hrv)) : null
-      avgRes    = v.ochtend.res.length    > 0 ? Math.round(avg(v.ochtend.res)) : null
-    }
+    // Gebruik nachtvenster als primaire bron; fallback naar meest recente meting
+    const heeftNacht = v.nacht.hrv.length > 0
+    const avgBal    = v.nacht.bal.length    > 0 ? avg(v.nacht.bal)    : v.recent.bal
+    const avgStress = v.nacht.stress.length > 0 ? avg(v.nacht.stress) : v.recent.stress
+    const avgHrv    = heeftNacht ? Math.round(avg(v.nacht.hrv)) : v.recent.hrv
+    const avgRes    = v.nacht.res.length    > 0 ? Math.round(avg(v.nacht.res)) : v.recent.res
     out.set(datum, {
       herstel_balans:  avgBal    != null ? Number(avgBal.toFixed(2))             : null,
       stress_pct:      avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
@@ -463,7 +457,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
 
   const slaapMap    = aggregateSleep(sleep)
   const activityMap = aggregateActivity(activity)
-  const recoveryMap = aggregateRecovery(recovery, vandaagLokaal)
+  const recoveryMap = aggregateRecovery(recovery)
 
   // Unie van alle datums
   const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys()])
@@ -480,8 +474,9 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       diepe_slaap_min:  s.diepe_slaap_min  ?? null,
       rem_slaap_min:    s.rem_slaap_min    ?? null,
       lichte_slaap_min: s.lichte_slaap_min ?? null,
-      // Slaap-HRV heeft voorrang; recovery-HRV als fallback (bevat dagelijks HRV-overzicht)
-      hrv_ochtend:      s.hrv_ochtend      ?? r.hrv_ochtend ?? null,
+      // Recovery-HRV heeft voorrang: dit is de Nightly Recharge HRV die Suunto toont (diepe slaap).
+      // Slaap-AvgHRV is een gemiddelde over de hele nacht (inclusief lichte slaap/REM) en wijkt af.
+      hrv_ochtend:      r.hrv_ochtend      ?? s.hrv_ochtend ?? null,
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
       rust_hartslag:    a.rust_hartslag    ?? null,
@@ -508,7 +503,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
         rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
         lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
-        hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
+        hrv_ochtend      = EXCLUDED.hrv_ochtend,
         herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
         stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
         rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
