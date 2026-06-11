@@ -459,12 +459,49 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   debug.activity_entries = activity.length
   debug.recovery_entries = recovery.length
 
-  // Vandaag in lokale tijd (YYYY-MM-DD) — zelfde formaat als de timestamps in de API
-  const vandaagLokaal = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
+  // Debug: welke HRV-velden zitten er in de recovery entries?
+  const recoveryHrvVelden = { HRV: 0, Hrv: 0, HrvValue: 0, AverageHRV: 0, DailyHRV: 0, geen: 0 }
+  for (const e of recovery || []) {
+    const d = e?.entryData || {}
+    if      (d.HRV        != null) recoveryHrvVelden.HRV++
+    else if (d.Hrv        != null) recoveryHrvVelden.Hrv++
+    else if (d.HrvValue   != null) recoveryHrvVelden.HrvValue++
+    else if (d.AverageHRV != null) recoveryHrvVelden.AverageHRV++
+    else if (d.DailyHRV   != null) recoveryHrvVelden.DailyHRV++
+    else                           recoveryHrvVelden.geen++
+  }
+  debug.recovery_hrv_velden = recoveryHrvVelden
+
+  // Debug: welke HRV-velden in sleep?
+  const sleepHrvVelden = { AvgHRV: 0, MaxHRV: 0, geen: 0 }
+  for (const e of sleep || []) {
+    const d = e?.entryData || {}
+    if (d.AvgHRV != null) sleepHrvVelden.AvgHRV++
+    if (d.MaxHRV != null) sleepHrvVelden.MaxHRV++
+    if (d.AvgHRV == null && d.MaxHRV == null) sleepHrvVelden.geen++
+  }
+  debug.sleep_hrv_velden = sleepHrvVelden
+
+  // Debug: sample van recovery en sleep entry om veldnamen te zien
+  const firstRecovery = recovery?.[0]?.entryData
+  if (firstRecovery) debug.recovery_sample_keys = Object.keys(firstRecovery)
+  const firstSleep = sleep?.[0]?.entryData
+  if (firstSleep) debug.sleep_sample_keys = Object.keys(firstSleep)
 
   const slaapMap    = aggregateSleep(sleep)
   const activityMap = aggregateActivity(activity)
   const recoveryMap = aggregateRecovery(recovery)
+
+  // Debug: HRV per dag (sleep vs recovery bron)
+  const vandaag = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
+  const recenteDagen = [...new Set([...slaapMap.keys(), ...recoveryMap.keys()])]
+    .sort().slice(-3) // laatste 3 dagen
+  debug.hrv_per_dag = recenteDagen.map(datum => ({
+    datum,
+    sleep_hrv:    slaapMap.get(datum)?.hrv_ochtend ?? null,
+    recovery_hrv: recoveryMap.get(datum)?.hrv_ochtend ?? null,
+    opgeslagen:   recoveryMap.get(datum)?.hrv_ochtend ?? slaapMap.get(datum)?.hrv_ochtend ?? null,
+  }))
 
   // Unie van alle datums
   const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys()])
