@@ -167,11 +167,13 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     ? Math.round(baselineScores.reduce((a, b) => a + b, 0) / baselineScores.length)
     : null
 
-  // Extra Suunto metrics (steps, rest HR etc.)
+  // Extra Suunto metrics — gebruik meest recente rij per veld
   const laatste = wellness[0] || null
   const extraMetrics = [
-    { val: laatste?.rust_hartslag, unit: 'bpm', label: 'Rust-HR' },
-    { val: laatste?.stappen ? (laatste.stappen).toLocaleString('nl-NL') : null, unit: '', label: 'Stappen' },
+    { val: laatste?.hulpbronnen_pct != null ? `${laatste.hulpbronnen_pct}%` : null, unit: '', label: 'Hulpbronnen' },
+    { val: laatste?.rust_hartslag, unit: 'bpm', label: 'HR slaap' },
+    { val: laatste?.min_hartslag_dag, unit: 'bpm', label: 'HR dag' },
+    { val: laatste?.stappen ? laatste.stappen.toLocaleString('nl-NL') : null, unit: '', label: 'Stappen' },
     { val: laatste?.kcal_actief, unit: 'kcal', label: 'Actief' },
   ].filter(x => x.val)
 

@@ -325,27 +325,29 @@ function aggregateSleep(entries) {
 // Activity samples (per 10 min): aggregeer per dag
 // - stappen = som StepCount
 // - kcal = som EnergyConsumption (joules → kcal: /4184)
-// - rust_HR = min HR tussen 03:00-06:00 lokaal
+// - rust_hartslag  = min HR 03:00-06:00 (slaap)
+// - min_hartslag_dag = min HR 09:00-22:00 (overdag, rust gemeten)
 function aggregateActivity(entries) {
-  const perDag = new Map() // datum → {stappen, joules, hrSlaap: []}
+  const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
     if (!d || !e.timestamp) continue
     const datum = localDate(e.timestamp)
     const uur = parseInt(String(e.timestamp).slice(11, 13), 10)
-    const cur = perDag.get(datum) || { stappen: 0, joules: 0, hrSlaap: [] }
+    const cur = perDag.get(datum) || { stappen: 0, joules: 0, hrSlaap: [], hrDag: [] }
     cur.stappen += parseInt(d.StepCount, 10) || 0
     cur.joules  += parseFloat(d.EnergyConsumption) || 0
     if (uur >= 3 && uur < 6 && d.HR > 30) cur.hrSlaap.push(d.HR)
+    if (uur >= 9 && uur < 22 && d.HR > 30) cur.hrDag.push(d.HR)
     perDag.set(datum, cur)
   }
   const out = new Map()
   for (const [datum, v] of perDag) {
-    const hr = v.hrSlaap.length > 0 ? Math.round(Math.min(...v.hrSlaap)) : null
     out.set(datum, {
-      stappen:       v.stappen > 0 ? v.stappen : null,
-      kcal_actief:   v.joules  > 0 ? Math.round(v.joules / 4184) : null,
-      rust_hartslag: hr,
+      stappen:           v.stappen   > 0 ? v.stappen : null,
+      kcal_actief:       v.joules    > 0 ? Math.round(v.joules / 4184) : null,
+      rust_hartslag:     v.hrSlaap.length > 0 ? Math.round(Math.min(...v.hrSlaap)) : null,
+      min_hartslag_dag:  v.hrDag.length   > 0 ? Math.round(Math.min(...v.hrDag))   : null,
     })
   }
   return out
@@ -443,6 +445,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hulpbronnen_pct INTEGER`
   await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hrv_laatste INTEGER`
   await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS hrv_laatste_tijd TEXT`
+  await sql`ALTER TABLE dagelijkse_wellness ADD COLUMN IF NOT EXISTS min_hartslag_dag INTEGER`
 
   let sleep = [], activity = [], recovery = []
   try { sleep    = await fetch247(`/247samples/sleep?from=${from}&to=${to}`, accessToken) }
@@ -486,6 +489,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
       rust_hartslag:    a.rust_hartslag    ?? null,
+      min_hartslag_dag: a.min_hartslag_dag ?? null,
       stappen:          a.stappen          ?? null,
       kcal_actief:      a.kcal_actief      ?? null,
       hulpbronnen_pct:  r.hulpbronnen_pct  ?? null,
@@ -499,11 +503,11 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       INSERT INTO dagelijkse_wellness
         (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
          hrv_ochtend, hrv_laatste, hrv_laatste_tijd,
-         herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief, hulpbronnen_pct, bron)
+         herstel_balans, stress_pct, rust_hartslag, min_hartslag_dag, stappen, kcal_actief, hulpbronnen_pct, bron)
       VALUES
         (${row.user_id}, ${row.datum}, ${row.slaap_uur}, ${row.slaap_score}, ${row.diepe_slaap_min},
          ${row.rem_slaap_min}, ${row.lichte_slaap_min}, ${row.hrv_ochtend}, ${row.hrv_laatste}, ${row.hrv_laatste_tijd},
-         ${row.herstel_balans}, ${row.stress_pct}, ${row.rust_hartslag}, ${row.stappen}, ${row.kcal_actief}, ${row.hulpbronnen_pct}, ${row.bron})
+         ${row.herstel_balans}, ${row.stress_pct}, ${row.rust_hartslag}, ${row.min_hartslag_dag}, ${row.stappen}, ${row.kcal_actief}, ${row.hulpbronnen_pct}, ${row.bron})
       ON CONFLICT (user_id, datum) DO UPDATE SET
         slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
         slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
@@ -516,6 +520,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
         stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
         rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
+        min_hartslag_dag = COALESCE(EXCLUDED.min_hartslag_dag, dagelijkse_wellness.min_hartslag_dag),
         stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
         kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
         hulpbronnen_pct  = COALESCE(EXCLUDED.hulpbronnen_pct,  dagelijkse_wellness.hulpbronnen_pct),
