@@ -147,9 +147,13 @@ export default function App() {
 
   async function installAndroid() {
     if (!installPrompt) return
-    await installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') setInstallPrompt(null)
+    try {
+      await installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      if (outcome === 'accepted') setInstallPrompt(null)
+    } catch {
+      setInstallPrompt(null)
+    }
   }
 
   function sluitIosHint() {
