@@ -75,7 +75,8 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [oForm, setOForm]       = useState({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
 
-  useEffect(() => {
+  function laadData() {
+    setLaden(true)
     Promise.all([
       api.get('/dashboard').catch(e => { setFout(e.message); return null }),
       api.get('/wellness?dagen=14').catch(() => ({ wellness: [] })),
@@ -83,7 +84,15 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       if (d) setData(d)
       setWellness(w?.wellness || [])
     }).finally(() => setLaden(false))
-  }, [])
+  }
+
+  useEffect(() => {
+    laadData()
+    // Herlaad data als gebruiker terugkomt naar de app/tab
+    const onVisible = () => { if (!document.hidden) laadData() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function logOchtend() {
     if (!oForm.hrv_ochtend && !oForm.slaap_uur) return
@@ -188,6 +197,18 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {streak >= 2 && <Chip label={`🔥 ${streak}`} color="amber" />}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={laadData}
+            disabled={laden}
+            style={{ padding: '8px', minWidth: 36 }}
+            title="Vernieuwen"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+              style={laden ? { animation: 'spin 1s linear infinite' } : undefined}>
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
           <button
             className="btn btn-ghost btn-sm"
             onClick={onUitloggen}
