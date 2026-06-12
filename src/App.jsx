@@ -84,6 +84,7 @@ export default function App() {
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
   const [suuntoStatus, setSuuntoStatus] = useState(() => new URLSearchParams(window.location.search).get('suunto'))
+  const [dashboardKey, setDashboardKey] = useState(0)
   const [isStyleguide] = useState(() => window.location.pathname === '/styleguide' || new URLSearchParams(window.location.search).has('styleguide'))
 
   useEffect(() => {
@@ -237,9 +238,14 @@ export default function App() {
       {/* Alle andere schermen mounten/unmounten normaal */}
       {Scherm && scherm !== 'coach' && (
         <Scherm
+          key={scherm === 'dashboard' ? dashboardKey : scherm}
           user={user}
           {...navProps}
-          {...(scherm === 'settings' ? { suuntoStatus, onSuuntoStatusClear: () => setSuuntoStatus(null) } : {})}
+          {...(scherm === 'settings' ? {
+            suuntoStatus,
+            onSuuntoStatusClear: () => setSuuntoStatus(null),
+            onDataVernieuwd: () => setDashboardKey(k => k + 1),
+          } : {})}
         />
       )}
 

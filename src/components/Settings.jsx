@@ -22,7 +22,7 @@ const TABS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, onSuuntoStatusClear }) {
+export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, onSuuntoStatusClear, onDataVernieuwd }) {
   const [tab, setTab]       = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden]   = useState(true)
@@ -97,6 +97,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
       const wellnessDagen = res.wellness?.wellness_dagen ?? 0
       setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, wellnessDagen, tijdstip: new Date() })
       showToast(`${res.gesynchroniseerd} nieuwe workouts${wellnessDagen > 0 ? ` + ${wellnessDagen} slaap/HRV dagen` : ''}`)
+      onDataVernieuwd?.()
     } catch (err) { showToast('Suunto sync mislukt: ' + err.message, 'error') }
     finally { setSuuntoSyncing(false) }
   }
