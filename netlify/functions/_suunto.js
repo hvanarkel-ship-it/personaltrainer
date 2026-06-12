@@ -276,35 +276,35 @@ function localDate(iso) {
 }
 
 // Slaap aggregatie: hoofdslaap per nacht (IsNap=false), bedtimeEnd → datum
+// Elke entry is een slaapfase-segment; HRV = max AvgHRV over alle segmenten
+// (consistent met Suunto app die het beste/diepste segment toont).
 function aggregateSleep(entries) {
-  const perDag = new Map() // datum → {slaap_min, score, deep, rem, light, hrv_sum, hrv_count}
-  const gezien = new Set() // dedupe op SleepId
+  const perDag = new Map()
 
   for (const e of entries || []) {
     const d = e?.entryData
     if (!d) continue
     if (d.IsNap) continue
-    if (d.SleepId && gezien.has(d.SleepId)) continue
-    if (d.SleepId) gezien.add(d.SleepId)
 
-    // Toewijzen aan datum waarop je opstond (bedtimeEnd) of timestamp
     const datum = localDate(d.BedtimeEnd || e.timestamp)
     if (!datum) continue
 
-    const cur = perDag.get(datum) || { slaap_min: 0, score: 0, deep: 0, rem: 0, light: 0, hrv_sum: 0, hrv_count: 0 }
-    const dur = parseFloat(d.Duration) || 0
-    cur.slaap_min += dur / 60
-    cur.deep  += (parseFloat(d.DeepSleepDuration)  || 0) / 60
-    cur.rem   += (parseFloat(d.REMSleepDuration)   || 0) / 60
-    cur.light += (parseFloat(d.LightSleepDuration) || 0) / 60
-    if (d.SleepQualityScore > cur.score) cur.score = d.SleepQualityScore
-    if (d.AvgHRV && d.AvgHRVSampleCount) {
-      cur.hrv_sum   += d.AvgHRV * d.AvgHRVSampleCount
-      cur.hrv_count += d.AvgHRVSampleCount
-    } else if (d.AvgHRV) {
-      cur.hrv_sum   += d.AvgHRV
-      cur.hrv_count += 1
+    const cur = perDag.get(datum) || {
+      slaap_min: 0, score: 0, deep: 0, rem: 0, light: 0,
+      hrv_max: 0, hrMin: null,
     }
+    cur.slaap_min += (parseFloat(d.Duration)           || 0) / 60
+    cur.deep      += (parseFloat(d.DeepSleepDuration)  || 0) / 60
+    cur.rem       += (parseFloat(d.REMSleepDuration)   || 0) / 60
+    cur.light     += (parseFloat(d.LightSleepDuration) || 0) / 60
+    if (d.SleepQualityScore > cur.score) cur.score = d.SleepQualityScore
+
+    // Max AvgHRV over alle segmenten — Suunto toont het beste slaapsegment
+    if (d.AvgHRV > cur.hrv_max) cur.hrv_max = d.AvgHRV
+
+    // HRMin uit slaapdata is nauwkeuriger dan afgeleid uit activity-samples
+    if (d.HRMin > 0 && (cur.hrMin === null || d.HRMin < cur.hrMin)) cur.hrMin = d.HRMin
+
     perDag.set(datum, cur)
   }
 
@@ -316,7 +316,8 @@ function aggregateSleep(entries) {
       diepe_slaap_min:  v.deep  > 0 ? Math.round(v.deep)  : null,
       rem_slaap_min:    v.rem   > 0 ? Math.round(v.rem)   : null,
       lichte_slaap_min: v.light > 0 ? Math.round(v.light) : null,
-      hrv_ochtend:      v.hrv_count > 0 ? Math.round(v.hrv_sum / v.hrv_count) : null,
+      hrv_ochtend:      v.hrv_max > 0 ? Math.round(v.hrv_max) : null,
+      rust_hartslag:    v.hrMin,
     })
   }
   return out
@@ -498,9 +499,8 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
     .sort().slice(-3) // laatste 3 dagen
   debug.hrv_per_dag = recenteDagen.map(datum => ({
     datum,
-    sleep_hrv:    slaapMap.get(datum)?.hrv_ochtend ?? null,
-    recovery_hrv: recoveryMap.get(datum)?.hrv_ochtend ?? null,
-    opgeslagen:   recoveryMap.get(datum)?.hrv_ochtend ?? slaapMap.get(datum)?.hrv_ochtend ?? null,
+    sleep_hrv_max: slaapMap.get(datum)?.hrv_ochtend ?? null,
+    opgeslagen:    slaapMap.get(datum)?.hrv_ochtend ?? null,
   }))
 
   // Unie van alle datums
@@ -518,14 +518,14 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       diepe_slaap_min:  s.diepe_slaap_min  ?? null,
       rem_slaap_min:    s.rem_slaap_min    ?? null,
       lichte_slaap_min: s.lichte_slaap_min ?? null,
-      // Recovery-HRV heeft voorrang: dit is de Nightly Recharge HRV die Suunto toont (diepe slaap).
-      // Slaap-AvgHRV is een gemiddelde over de hele nacht (inclusief lichte slaap/REM) en wijkt af.
-      hrv_ochtend:      r.hrv_ochtend      ?? s.hrv_ochtend ?? null,
+      // HRV = max AvgHRV uit slaapfase-segmenten (consistent met Suunto Nightly Recharge).
+      // Recovery endpoint bevat geen HRV (alleen Balance + StressState).
+      hrv_ochtend:      s.hrv_ochtend ?? null,
       hrv_laatste:      r.hrv_laatste      ?? null,
       hrv_laatste_tijd: r.hrv_laatste_tijd ?? null,
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
-      rust_hartslag:    a.rust_hartslag    ?? null,
+      rust_hartslag:    s.rust_hartslag    ?? a.rust_hartslag ?? null,
       min_hartslag_dag: a.min_hartslag_dag ?? null,
       stappen:          a.stappen          ?? null,
       kcal_actief:      a.kcal_actief      ?? null,
