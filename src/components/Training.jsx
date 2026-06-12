@@ -154,7 +154,7 @@ export default function Training({ onNavigeer }) {
           <p className="t-sm t-muted" style={{ marginTop: 2 }}>Log en volg je workouts</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => onNavigeer('statistieken')} title="Statistieken">
+          <button className="btn btn-icon btn-sm" onClick={() => onNavigeer('statistieken')} title="Statistieken" style={{ padding: '8px', minWidth: 36 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
             </svg>

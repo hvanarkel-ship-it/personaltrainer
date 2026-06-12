@@ -167,6 +167,7 @@ body {
 .btn-danger   { background: var(--red);       color: #fff; }
 .btn-secondary { background: var(--bg-raised); color: var(--text); }
 .btn-ghost    { background: transparent;      color: var(--text-2); }
+.btn-icon     { background: var(--bg-raised); color: var(--text); border: 1px solid rgba(255,255,255,0.08); }
 .btn-full     { width: 100%; }
 .btn-sm       { padding: 8px var(--space-4); font-size: var(--t-sm); min-height: 36px; border-radius: var(--r-xs); }
 

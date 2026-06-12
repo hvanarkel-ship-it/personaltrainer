@@ -198,7 +198,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {streak >= 2 && <Chip label={`🔥 ${streak}`} color="amber" />}
           <button
-            className="btn btn-ghost btn-sm"
+            className="btn btn-icon btn-sm"
             onClick={laadData}
             disabled={laden}
             style={{ padding: '8px', minWidth: 36 }}
@@ -210,7 +210,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             </svg>
           </button>
           <button
-            className="btn btn-ghost btn-sm"
+            className="btn btn-icon btn-sm"
             onClick={onUitloggen}
             style={{ padding: '8px', minWidth: 36 }}
             title="Uitloggen"
