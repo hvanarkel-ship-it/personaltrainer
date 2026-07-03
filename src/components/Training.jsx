@@ -73,6 +73,7 @@ export default function Training({ onNavigeer }) {
   const [laden, setLaden]           = useState(true)
   const [sheetOpen, setSheetOpen]   = useState(false)
   const [form, setForm]             = useState(LEEG_FORM)
+  const [editId, setEditId]         = useState(null)
   const [opslaan, setOpslaan]       = useState(false)
   const [fout, setFout]             = useState('')
   const [bronFilter, setBronFilter] = useState('alle')
@@ -91,13 +92,38 @@ export default function Training({ onNavigeer }) {
     setFout('')
     setOpslaan(true)
     try {
-      const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
-      const nieuw = await api.post('/training', payload)
-      setTrainingen(t => [nieuw, ...t])
-      setSheetOpen(false)
-      setForm(LEEG_FORM)
+      if (editId) {
+        // Bij bewerken alle velden meesturen: '' wist bewust een veld
+        const bijgewerkt = await api.put(`/training/${editId}`, form)
+        setTrainingen(t => t.map(x => x.id === editId ? bijgewerkt : x))
+      } else {
+        const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
+        const nieuw = await api.post('/training', payload)
+        setTrainingen(t => [nieuw, ...t])
+      }
+      sluitSheet()
     } catch (err) { setFout(err.message) }
     finally { setOpslaan(false) }
+  }
+
+  function startEdit(t) {
+    setEditId(t.id)
+    setForm({
+      datum: normDatum(t.datum) || vandaagStr(),
+      sport: t.sport || 'fitness',
+      duur_min: t.duur_min ?? '', kcal: t.kcal ?? '',
+      gem_hartslag: t.gem_hartslag ?? '', max_hartslag: t.max_hartslag ?? '',
+      hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '',
+      zone2_min: t.zone2_min ?? '', zone3_min: t.zone3_min ?? '', zone4_min: t.zone4_min ?? '',
+      rpe: t.rpe ? String(t.rpe) : '', notities: t.notities ?? '',
+    })
+    setSheetOpen(true)
+  }
+
+  function sluitSheet() {
+    setSheetOpen(false)
+    setEditId(null)
+    setForm({ ...LEEG_FORM, datum: vandaagStr() })
   }
 
   async function verwijder(id) {
@@ -235,12 +261,12 @@ export default function Training({ onNavigeer }) {
         </div>
       ) : (
         <div className="section-gap">
-          {gefilterd.map(t => <TrainingKaart key={t.id} t={t} onVerwijder={verwijder} />)}
+          {gefilterd.map(t => <TrainingKaart key={t.id} t={t} onEdit={startEdit} onVerwijder={verwijder} />)}
         </div>
       )}
 
       {/* ── Log training sheet ─────────────────────────────────────────── */}
-      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Nieuwe training">
+      <Sheet open={sheetOpen} onClose={sluitSheet} title={editId ? 'Training bewerken' : 'Nieuwe training'}>
         <form onSubmit={submit}>
           <div className="section-gap">
 
@@ -369,7 +395,7 @@ export default function Training({ onNavigeer }) {
             {fout && <p className="t-sm t-red">{fout}</p>}
 
             <button type="submit" className="btn btn-primary btn-full" disabled={opslaan}>
-              {opslaan ? 'Opslaan...' : 'Training opslaan'}
+              {opslaan ? 'Opslaan...' : editId ? 'Wijzigingen opslaan' : 'Training opslaan'}
             </button>
           </div>
         </form>
@@ -537,7 +563,7 @@ function MaandOverzicht({ trainingen }) {
 
 // ── Training card ────────────────────────────────────────────────────────────
 
-function TrainingKaart({ t, onVerwijder }) {
+function TrainingKaart({ t, onEdit, onVerwijder }) {
   const color = SPORT_COLOR[t.sport] || 'var(--text-3)'
   const rpe   = t.rpe ? parseInt(t.rpe) : null
   const load  = rpe && t.duur_min ? Math.round(normMin(t.duur_min) * rpe / 10) : null
@@ -564,9 +590,18 @@ function TrainingKaart({ t, onVerwijder }) {
             </div>
           </div>
         </div>
-        {/* Right: bron + delete */}
+        {/* Right: bron + edit + delete */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <Chip label={BRON_LABEL[bron] || bron} color={BRON_COLOR[bron] || 'muted'} />
+          <button
+            onClick={() => onEdit(t)}
+            title="Bewerken"
+            style={{
+              background: 'none', border: 'none', color: 'var(--text-3)',
+              cursor: 'pointer', padding: '4px', fontSize: 13, lineHeight: 1,
+              borderRadius: 'var(--r-xs)', transition: 'color var(--dur-fast)',
+            }}
+          >✏️</button>
           <button
             onClick={() => onVerwijder(t.id)}
             style={{

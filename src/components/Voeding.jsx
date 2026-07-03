@@ -149,6 +149,34 @@ export default function Voeding({ onNavigeer }) {
     } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
+  // ── Herhaal een eerdere dag ─────────────────────────────────────────────
+
+  const [kopieert, setKopieert] = useState(false)
+
+  async function herhaalGisteren() {
+    setKopieert(true); setFout('')
+    try {
+      const d = new Date(datum + 'T12:00:00'); d.setDate(d.getDate() - 1)
+      const bronDatum = dagStr(d)
+      const items = await api.get(`/maaltijd?datum=${bronDatum}`)
+      if (!items.length) { setFout(`Geen maaltijden gevonden op ${datumLabel(bronDatum).toLowerCase()}`); return }
+      const nieuwe = []
+      for (const m of items) {
+        nieuwe.push(await api.post('/maaltijd', {
+          datum,
+          maaltijd_type:  m.maaltijd_type  || undefined,
+          beschrijving:   m.beschrijving   || undefined,
+          kcal:           m.kcal           ?? undefined,
+          eiwit_g:        m.eiwit_g        ?? undefined,
+          koolhydraten_g: m.koolhydraten_g ?? undefined,
+          vetten_g:       m.vetten_g       ?? undefined,
+        }))
+      }
+      setMaaltijden(ms => [...ms, ...nieuwe])
+    } catch (err) { setFout('Herhalen mislukt: ' + err.message) }
+    finally { setKopieert(false) }
+  }
+
   // ── Derived data ─────────────────────────────────────────────────────────
 
   const totaal = maaltijden.reduce((s, m) => ({
@@ -239,8 +267,11 @@ export default function Voeding({ onNavigeer }) {
           <span className="t-md">
             Nog geen maaltijden op {new Date(datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
           </span>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>+ Toevoegen</button>
+            <button className="btn btn-secondary btn-sm" onClick={herhaalGisteren} disabled={kopieert}>
+              {kopieert ? 'Kopiëren...' : '↻ Herhaal gisteren'}
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={() => onNavigeer('coach')}>Via Coach →</button>
           </div>
         </div>

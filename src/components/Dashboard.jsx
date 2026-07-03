@@ -63,6 +63,7 @@ const SPORT_COLOR = {
 
 const pad2 = n => String(n).padStart(2, '0')
 const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+const fmtSlaapMin = m => m >= 60 ? `${Math.floor(m/60)}u${m%60 ? pad2(m%60) : ''}` : `${m}m`
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -176,6 +177,22 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     ? Math.round(baselineScores.reduce((a, b) => a + b, 0) / baselineScores.length)
     : null
 
+  // HRV vs 7-daags gemiddelde (exclusief vandaag)
+  const eerdereHrv = hrv7.slice(0, 6).map(d => d.hrv).filter(Boolean)
+  const hrvGem7 = eerdereHrv.length >= 3
+    ? Math.round(eerdereHrv.reduce((a, b) => a + b, 0) / eerdereHrv.length)
+    : null
+  const hrvDelta = hrvGem7 && h.hrv_ochtend ? Math.round(h.hrv_ochtend) - hrvGem7 : null
+
+  // Slaapfases van de getoonde herstel-dag (Suunto)
+  const slaapRow = h?.datum ? wellnessByDatum.get(datumStr(h.datum)) : null
+  const fases = slaapRow ? [
+    { label: 'Diep',  min: slaapRow.diepe_slaap_min  || 0, color: 'var(--blue)' },
+    { label: 'REM',   min: slaapRow.rem_slaap_min    || 0, color: '#c084fc' },
+    { label: 'Licht', min: slaapRow.lichte_slaap_min || 0, color: 'var(--bg-surface)' },
+  ].filter(f => f.min > 0) : []
+  const fasesTotaal = fases.reduce((s, f) => s + f.min, 0)
+
   // Extra Suunto metrics — gebruik meest recente rij per veld
   const laatste = wellness[0] || null
   const extraMetrics = [
@@ -255,6 +272,14 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 label="Nightly"
                 color={h.hrv_ochtend >= 60 ? 'var(--green)' : h.hrv_ochtend >= 45 ? 'var(--amber)' : h.hrv_ochtend ? 'var(--red)' : undefined}
               />
+              {hrvDelta !== null && (
+                <div className="t-xs" style={{
+                  marginTop: 2, textTransform: 'none', letterSpacing: 0,
+                  color: hrvDelta >= 0 ? 'var(--green)' : 'var(--red)',
+                }}>
+                  {hrvDelta >= 0 ? '▲' : '▼'} {Math.abs(hrvDelta)} vs 7d
+                </div>
+              )}
             </div>
             {h.hrv_laatste && (
               <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
@@ -279,6 +304,26 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : null}
                 label="Balans"
               />
+            </div>
+          </div>
+        )}
+
+        {/* Sleep phase breakdown */}
+        {fasesTotaal > 0 && (
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
+              {fases.map(f => (
+                <div key={f.label} style={{ flex: f.min, background: f.color, borderRadius: 2 }}
+                  title={`${f.label}: ${fmtSlaapMin(f.min)}`} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+              {fases.map(f => (
+                <span key={f.label} className="t-xs" style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'none', letterSpacing: 0 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: f.color, display: 'inline-block' }} />
+                  {f.label} {fmtSlaapMin(f.min)}
+                </span>
+              ))}
             </div>
           </div>
         )}

@@ -47,6 +47,31 @@ export const handler = async (event) => {
       return cors(row, 201)
     }
 
+    if (event.httpMethod === 'PUT' && id !== 'training') {
+      const d = JSON.parse(event.body || '{}')
+      // Alleen meegestuurde velden bijwerken; '' wist een veld, ontbrekend blijft staan
+      const zet = v => v !== undefined
+      const num = v => (v === '' || v == null ? null : v)
+      const [row] = await sql`
+        UPDATE trainingen SET
+          datum        = CASE WHEN ${zet(d.datum)}        THEN ${d.datum || null}::date ELSE datum        END,
+          sport        = CASE WHEN ${zet(d.sport)}        THEN ${d.sport}               ELSE sport        END,
+          duur_min     = CASE WHEN ${zet(d.duur_min)}     THEN ${num(d.duur_min)}       ELSE duur_min     END,
+          kcal         = CASE WHEN ${zet(d.kcal)}         THEN ${num(d.kcal)}           ELSE kcal         END,
+          gem_hartslag = CASE WHEN ${zet(d.gem_hartslag)} THEN ${num(d.gem_hartslag)}   ELSE gem_hartslag END,
+          max_hartslag = CASE WHEN ${zet(d.max_hartslag)} THEN ${num(d.max_hartslag)}   ELSE max_hartslag END,
+          zone2_min    = CASE WHEN ${zet(d.zone2_min)}    THEN ${num(d.zone2_min)}      ELSE zone2_min    END,
+          zone3_min    = CASE WHEN ${zet(d.zone3_min)}    THEN ${num(d.zone3_min)}      ELSE zone3_min    END,
+          zone4_min    = CASE WHEN ${zet(d.zone4_min)}    THEN ${num(d.zone4_min)}      ELSE zone4_min    END,
+          rpe          = CASE WHEN ${zet(d.rpe)}          THEN ${num(d.rpe)}            ELSE rpe          END,
+          notities     = CASE WHEN ${zet(d.notities)}     THEN ${d.notities || null}    ELSE notities     END
+        WHERE id = ${id} AND user_id = ${userId}
+        RETURNING *
+      `
+      if (!row) return cors({ error: 'Training niet gevonden' }, 404)
+      return cors(row)
+    }
+
     if (event.httpMethod === 'DELETE' && id !== 'training') {
       await sql`DELETE FROM trainingen WHERE id = ${id} AND user_id = ${userId}`
       return cors({ success: true })
