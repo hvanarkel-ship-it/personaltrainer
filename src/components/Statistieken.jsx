@@ -153,15 +153,15 @@ export default function Statistieken({ onNavigeer }) {
           )}
         </div>
         {totSessies === 0
-          ? <p className="stat-leeg">Geen activiteiten gevonden. Voer een Intervals.icu sync uit in Instellingen.</p>
+          ? <p className="stat-leeg">Geen activiteiten gevonden. Voer een Suunto-sync uit in Instellingen of log een training.</p>
           : (
             <>
               <div className="vol-chart">
                 {weken.map((w, i) => {
                   const barH = Math.max(4, (w.totaalMin / maxWekMin) * 72)
                   const kleur = w.dominantSport
-                    ? (SPORT_KLEUR[w.dominantSport]?.kleur || '#1D9E75')
-                    : '#e5e7eb'
+                    ? (SPORT_KLEUR[w.dominantSport]?.kleur || 'var(--green)')
+                    : 'var(--bg-surface)'
                   const isActief = geselecteerdeWeek === i
                   const gedimd = geselecteerdeWeek !== null && !isActief
                   return (
@@ -290,10 +290,10 @@ function HrvSparkline({ wellness }) {
     <div>
       <div className="hrv-sparkline">
         {days.map((d, i) => {
-          const kleur = !d.hrv ? '#e5e7eb'
-            : d.hrv >= 60 ? '#22c55e'
-            : d.hrv >= 45 ? '#eab308'
-            : '#ef4444'
+          const kleur = !d.hrv ? 'var(--bg-surface)'
+            : d.hrv >= 60 ? 'var(--green)'
+            : d.hrv >= 45 ? 'var(--amber)'
+            : 'var(--red)'
           const h = d.hrv ? Math.max(4, (d.hrv / maxHrv) * 56) : 3
           return (
             <div key={i} className="hrv-spark-col"
@@ -334,7 +334,7 @@ function ActiviteitRij({ a }) {
           {a.kcal > 0 && <span>🔥 {a.kcal} kcal</span>}
         </div>
       </div>
-      {a.bron === 'intervals' && <span className="act-icu-badge">ICU</span>}
+      {a.bron === 'suunto' && <span className="act-bron-badge">Suunto</span>}
     </div>
   )
 }

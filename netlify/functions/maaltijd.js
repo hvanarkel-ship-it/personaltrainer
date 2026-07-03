@@ -36,14 +36,16 @@ export const handler = async (event) => {
 
     if (event.httpMethod === 'PUT' && hasId) {
       const d = JSON.parse(event.body || '{}')
+      // Lege string uit een leeggemaakt formulierveld → NULL (geen cast-fout op numeriek)
+      const num = v => (v === '' || v == null ? null : v)
       const [row] = await sql`
         UPDATE maaltijden SET
           maaltijd_type = COALESCE(${d.maaltijd_type||null}, maaltijd_type),
           beschrijving   = COALESCE(${d.beschrijving||null}, beschrijving),
-          kcal           = ${d.kcal != null ? d.kcal : null},
-          eiwit_g        = ${d.eiwit_g != null ? d.eiwit_g : null},
-          koolhydraten_g = ${d.koolhydraten_g != null ? d.koolhydraten_g : null},
-          vetten_g       = ${d.vetten_g != null ? d.vetten_g : null}
+          kcal           = ${num(d.kcal)},
+          eiwit_g        = ${num(d.eiwit_g)},
+          koolhydraten_g = ${num(d.koolhydraten_g)},
+          vetten_g       = ${num(d.vetten_g)}
         WHERE id = ${id} AND user_id = ${userId}
         RETURNING *`
       return cors(row)

@@ -11,7 +11,9 @@ export const handler = async (event) => {
 
   const sql = getDb()
   const userId = auth.user.userId
-  const vandaag = new Date().toISOString().split('T')[0]
+  // Nederlandse kalenderdag — de server draait in UTC, dus toISOString() zou
+  // tussen 00:00 en 01:00/02:00 NL-tijd nog "gisteren" geven
+  const vandaag = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
 
   // Sync Suunto data before reading — same rate-limit as coach (max 1x per 5 min)
   try {
@@ -125,15 +127,13 @@ export const handler = async (event) => {
       AND datum >= CURRENT_DATE - INTERVAL '30 days'
       ORDER BY datum DESC
     `
+    const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
+    const trainDagen = new Set(recentDagen.map(r => normalizeDate(r.datum)))
     let trainingStreak = 0
     for (let i = 0; i < 30; i++) {
-      const d = new Date(); d.setDate(d.getDate() - i)
-      const ds = d.toISOString().split('T')[0]
-      const gevonden = recentDagen.some(r => {
-        const rd = r.datum instanceof Date ? r.datum.toISOString().split('T')[0] : String(r.datum).slice(0, 10)
-        return rd === ds
-      })
-      if (gevonden) trainingStreak++
+      // Tel terug vanaf de NL-kalenderdag, niet de UTC-dag
+      const d = new Date(vandaag + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - i)
+      if (trainDagen.has(d.toISOString().split('T')[0])) trainingStreak++
       else break
     }
 
@@ -144,7 +144,6 @@ export const handler = async (event) => {
       vetten: s.vetten + (parseFloat(m.vetten_g) || 0),
     }), { kcal: 0, eiwit: 0, koolhydraten: 0, vetten: 0 })
 
-    const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
     const training_kcal_vandaag = weektrainingen
       .filter(t => normalizeDate(t.datum) === vandaag && t.sport !== 'herstel' && t.kcal)
       .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)

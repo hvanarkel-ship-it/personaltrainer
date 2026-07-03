@@ -20,13 +20,8 @@ const SPORT_COLOR = {
   overig:    'var(--text-3)',  wielrennen: 'var(--amber)',
 }
 
-const BRON_COLOR = {
-  suunto:    'blue',   intervals: 'amber',
-  runalyze:  'green',  handmatig: 'muted',
-}
-const BRON_LABEL = {
-  suunto: 'Suunto', intervals: 'Intervals', runalyze: 'Runalyze', handmatig: 'Handmatig',
-}
+const BRON_COLOR = { suunto: 'blue', handmatig: 'muted' }
+const BRON_LABEL = { suunto: 'Suunto', handmatig: 'Handmatig' }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -10,18 +10,22 @@ export const handler = async (event) => {
   const sql = getDb()
   const userId = auth.user.userId
   const dagen = Math.min(1825, Math.max(28, parseInt(event.queryStringParameters?.dagen || '84')))
-  const vanafDatum = new Date(Date.now() - dagen * 86400000).toISOString().split('T')[0]
+  const vandaagNL = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
+  const vanaf = new Date(vandaagNL + 'T12:00:00Z')
+  vanaf.setUTCDate(vanaf.getUTCDate() - dagen)
+  const vanafDatum = vanaf.toISOString().split('T')[0]
 
   try {
-    // Deduplication: if intervals + manual exist for same day/sport/duration-bucket, keep intervals record
+    // Deduplicatie: bestaat er voor dezelfde dag/sport/duur-bucket zowel een
+    // Suunto- als handmatig record, dan wint het Suunto-record (rijkere data)
     const activiteiten = await sql`
       WITH ranked AS (
         SELECT
           datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-          zone2_min, zone3_min, zone4_min, notities, bron, intervals_id,
+          zone2_min, zone3_min, zone4_min, notities, bron,
           ROW_NUMBER() OVER (
             PARTITION BY datum::date, sport, ROUND(COALESCE(duur_min, 0)::numeric / 15)
-            ORDER BY CASE WHEN intervals_id IS NOT NULL THEN 0 ELSE 1 END, created_at DESC
+            ORDER BY CASE WHEN bron = 'suunto' THEN 0 ELSE 1 END, created_at DESC
           ) AS rn
         FROM trainingen
         WHERE user_id = ${userId}
@@ -29,7 +33,7 @@ export const handler = async (event) => {
           AND datum >= ${vanafDatum}
       )
       SELECT datum, sport, duur_min, kcal, gem_hartslag, max_hartslag,
-        zone2_min, zone3_min, zone4_min, notities, bron, intervals_id
+        zone2_min, zone3_min, zone4_min, notities, bron
       FROM ranked WHERE rn = 1
       ORDER BY datum DESC
     `

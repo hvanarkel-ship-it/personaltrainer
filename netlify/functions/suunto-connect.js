@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken'
 import { requireAuth, cors } from './_auth.js'
 import { SUUNTO_AUTH_URL } from './_suunto.js'
 import { SUUNTO_REDIRECT_URI } from './_config.js'
@@ -12,11 +13,13 @@ export const handler = async (event) => {
     return cors({ error: 'SUUNTO_CLIENT_ID niet geconfigureerd in Netlify environment variables' }, 500)
   }
 
-  // Encode userId + timestamp in state voor veilige callback-verificatie
-  const state = Buffer.from(JSON.stringify({
-    userId: auth.user.userId,
-    ts: Date.now(),
-  })).toString('base64url')
+  // Getekende state (JWT) — de callback verifieert de handtekening zodat
+  // niemand een state met andermans userId kan vervalsen
+  const state = jwt.sign(
+    { userId: auth.user.userId, doel: 'suunto_oauth' },
+    process.env.JWT_SECRET,
+    { expiresIn: '10m' }
+  )
 
   const params = new URLSearchParams({
     response_type: 'code',

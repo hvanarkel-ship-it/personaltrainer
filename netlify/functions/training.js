@@ -39,7 +39,7 @@ export const handler = async (event) => {
           notities, bron, rpe, stemming)
         VALUES (${userId}, ${d.datum||null}, ${d.sport}, ${d.duur_min||null}, ${d.kcal||null},
           ${d.gem_hartslag||null}, ${d.max_hartslag||null}, ${d.hrv_ochtend||null},
-          ${d.slaap_uur||null}, ${d.slaap_score||null}, ${d.herstel_balans||null},
+          ${d.slaap_uur||null}, ${d.slaap_score||null}, ${d.herstel_balans??null},
           ${d.zone2_min||null}, ${d.zone3_min||null}, ${d.zone4_min||null},
           ${d.notities||null}, ${d.bron||'handmatig'}, ${d.rpe||null}, ${d.stemming||null})
         RETURNING *

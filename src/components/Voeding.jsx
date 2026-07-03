@@ -17,12 +17,15 @@ const LEEG_FORM = { maaltijd_type: 'ontbijt', beschrijving: '', kcal: '', eiwit_
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const vandaagStr = () => new Date().toISOString().split('T')[0]
+// Lokale kalenderdag — toISOString() zou rond middernacht de UTC-dag geven
+const pad2 = n => String(n).padStart(2, '0')
+const dagStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+const vandaagStr = () => dagStr(new Date())
 
 function datumLabel(d) {
   const today = vandaagStr()
   const gisteren = new Date(); gisteren.setDate(gisteren.getDate() - 1)
-  const gisterStr = gisteren.toISOString().split('T')[0]
+  const gisterStr = dagStr(gisteren)
   if (d === today) return 'Vandaag'
   if (d === gisterStr) return 'Gisteren'
   return new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -74,7 +77,7 @@ export default function Voeding({ onNavigeer }) {
   function navigeerDag(delta) {
     const d = new Date(datum + 'T12:00:00')
     d.setDate(d.getDate() + delta)
-    setDatum(d.toISOString().split('T')[0])
+    setDatum(dagStr(d))
   }
 
   // ── Camera / AI analysis ────────────────────────────────────────────────

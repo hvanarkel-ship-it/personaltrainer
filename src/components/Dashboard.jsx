@@ -100,7 +100,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     try {
       await api.post('/training', {
         sport: 'herstel',
-        datum: new Date().toISOString().split('T')[0],
+        datum: dagStr(new Date()),
         ...Object.fromEntries(Object.entries(oForm).filter(([, v]) => v !== '')),
       })
       const nieuw = await api.get('/dashboard')

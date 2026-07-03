@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken'
 import { getDb } from './_db.js'
 import { SUUNTO_TOKEN_URL } from './_suunto.js'
 import { APP_URL, SUUNTO_REDIRECT_URI } from './_config.js'
@@ -18,15 +19,16 @@ export const handler = async (event) => {
     return redirect(`${APP_URL}/?suunto=fout&reden=ontbrekende_parameters`)
   }
 
-  // Verificeer state en haal userId op
+  // Verificeer de JWT-handtekening van de state — vervalsing of verlopen
+  // states (>10 min) worden hier afgewezen
   let userId
   try {
-    const decoded = JSON.parse(Buffer.from(state, 'base64url').toString())
-    const ouderDan10Min = Date.now() - decoded.ts > 10 * 60 * 1000
-    if (ouderDan10Min) return redirect(`${APP_URL}/?suunto=fout&reden=sessie_verlopen`)
+    const decoded = jwt.verify(state, process.env.JWT_SECRET)
+    if (decoded.doel !== 'suunto_oauth') throw new Error('verkeerd doel')
     userId = decoded.userId
-  } catch {
-    return redirect(`${APP_URL}/?suunto=fout&reden=ongeldige_state`)
+  } catch (e) {
+    const reden = e.name === 'TokenExpiredError' ? 'sessie_verlopen' : 'ongeldige_state'
+    return redirect(`${APP_URL}/?suunto=fout&reden=${reden}`)
   }
 
   try {

@@ -811,9 +811,9 @@ select.input { cursor: pointer; }
 .act-datum { font-size: var(--t-xs); color: var(--text-3); margin-left: auto; text-transform: none; letter-spacing: 0; }
 .act-meta { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: 2px; }
 .act-meta span { font-size: var(--t-xs); color: var(--text-3); text-transform: none; letter-spacing: 0; }
-.act-icu-badge {
+.act-bron-badge {
   padding: 2px 8px; border-radius: var(--r-xs);
-  background: rgba(233,69,96,0.12); color: #e94560;
+  background: var(--blue-dim); color: var(--blue);
   font-size: 10px; font-weight: 800; flex-shrink: 0;
 }
 

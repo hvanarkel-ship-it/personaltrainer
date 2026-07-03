@@ -24,7 +24,7 @@ export const handler = async (event) => {
       const [row] = await sql`
         INSERT INTO doelen (user_id, titel, sport, beschrijving, doel_waarde, huidige_waarde, eenheid, deadline, actief)
         VALUES (${userId}, ${d.titel}, ${d.sport||null}, ${d.beschrijving||null},
-          ${d.doel_waarde||null}, ${d.huidige_waarde||null}, ${d.eenheid||null},
+          ${d.doel_waarde??null}, ${d.huidige_waarde??null}, ${d.eenheid||null},
           ${d.deadline||null}, ${d.actief !== false})
         RETURNING *
       `
@@ -33,14 +33,18 @@ export const handler = async (event) => {
 
     if (event.httpMethod === 'PUT' && id !== 'doelen') {
       const d = JSON.parse(event.body || '{}')
+      // Alleen meegestuurde velden bijwerken — de frontend stuurt partiële PUTs
+      // (bijv. alleen huidige_waarde bij voortgang). Een expliciet lege string
+      // wist het veld ('' → NULL), een ontbrekend veld blijft ongewijzigd.
+      const zet = v => v !== undefined
       const [row] = await sql`
         UPDATE doelen SET
-          titel = COALESCE(${d.titel||null}, titel),
-          huidige_waarde = COALESCE(${d.huidige_waarde??null}, huidige_waarde),
-          doel_waarde = COALESCE(${d.doel_waarde??null}, doel_waarde),
-          actief = COALESCE(${d.actief??null}, actief),
-          deadline = ${d.deadline || null},
-          beschrijving = COALESCE(${d.beschrijving||null}, beschrijving)
+          titel          = CASE WHEN ${zet(d.titel)}          THEN ${d.titel || null}          ELSE titel          END,
+          huidige_waarde = CASE WHEN ${zet(d.huidige_waarde)} THEN ${d.huidige_waarde ?? null} ELSE huidige_waarde END,
+          doel_waarde    = CASE WHEN ${zet(d.doel_waarde)}    THEN ${d.doel_waarde ?? null}    ELSE doel_waarde    END,
+          actief         = CASE WHEN ${zet(d.actief)}         THEN ${d.actief ?? null}         ELSE actief         END,
+          deadline       = CASE WHEN ${zet(d.deadline)}       THEN ${d.deadline || null}::date ELSE deadline       END,
+          beschrijving   = CASE WHEN ${zet(d.beschrijving)}   THEN ${d.beschrijving || null}   ELSE beschrijving   END
         WHERE id = ${id} AND user_id = ${userId}
         RETURNING *
       `
