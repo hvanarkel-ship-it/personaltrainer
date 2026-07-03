@@ -34,7 +34,7 @@ export const handler = async (event) => {
     await sql`UPDATE password_reset_tokens SET used = TRUE WHERE token = ${token}`
 
     // Direct inloggen na reset
-    const jwtToken = jwt.sign({ userId: resetToken.user_id }, process.env.JWT_SECRET, { expiresIn: '30d' })
+    const jwtToken = jwt.sign({ userId: resetToken.user_id }, process.env.JWT_SECRET, { expiresIn: '90d' })
 
     return cors({
       success: true,

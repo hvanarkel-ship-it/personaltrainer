@@ -20,7 +20,7 @@ export const handler = async (event) => {
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) return cors({ error: 'Onjuist e-mailadres of wachtwoord' }, 401)
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' })
+    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '90d' })
     return cors({ token, user: { id: user.id, email: user.email, name: user.name } })
   } catch (err) {
     console.error('Login error:', err)

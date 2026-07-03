@@ -28,7 +28,17 @@ async function req(path, options = {}) {
   }
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Er is een fout opgetreden')
+  if (!res.ok) {
+    // Verlopen of ongeldige sessie: token opruimen en terug naar het
+    // inlogscherm. Auth-endpoints uitgezonderd (daar betekent 401 fout wachtwoord).
+    if (res.status === 401 && token && !path.startsWith('/auth-')) {
+      localStorage.removeItem('apex_token')
+      localStorage.removeItem('apex_user')
+      window.location.reload()
+      return new Promise(() => {}) // pagina herlaadt — laat callers niet doorgaan
+    }
+    throw new Error(data.error || 'Er is een fout opgetreden')
+  }
   return data
 }
 
