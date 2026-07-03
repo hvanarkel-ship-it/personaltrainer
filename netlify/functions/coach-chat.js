@@ -210,7 +210,9 @@ export const handler = async (event) => {
       extractiePromise = detecteerMaaltijdTekst(sql, userId, bericht)
     }
 
-    // ── Suunto wellness altijd bijwerken voor ieder gesprek (max 1x per 5 min) ──
+    // ── Suunto wellness bijwerken (max 1x per 5 min), hard begrensd op 6s ──
+    // De functie heeft een totaalbudget van 26s; een trage Suunto API mag het
+    // AI-antwoord niet in de timeout duwen. Dashboard-load synct toch al volledig.
     try {
       const [laatste] = await sql`
         SELECT updated_at FROM dagelijkse_wellness
@@ -220,7 +222,12 @@ export const handler = async (event) => {
         (Date.now() - new Date(laatste.updated_at).getTime()) > 5 * 60 * 1000
       if (ouderDan5Min) {
         const token = await getValidToken(sql, userId).catch(() => null)
-        if (token) await syncSuuntoWellnessForUser(sql, userId, token, 2)
+        if (token) {
+          await Promise.race([
+            syncSuuntoWellnessForUser(sql, userId, token, 2),
+            new Promise(res => setTimeout(res, 6000)),
+          ])
+        }
       }
     } catch { /* geen Suunto of sync mislukt — doorgaan met bestaande data */ }
 
@@ -700,7 +707,9 @@ ${inbodyRegels}
 ═══ ACTIEVE DOELEN ═══
 ${doelenRegels}
 ${hyroxKennis}
-Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), begin dan daarmee voordat je de vraag van de gebruiker beantwoordt.`
+Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), begin dan daarmee voordat je de vraag van de gebruiker beantwoordt.
+
+BELANGRIJK — LENGTE: houd antwoorden compact en mobiel-leesbaar: maximaal ~250 woorden. Kies de 2-3 belangrijkste inzichten in plaats van alles op te sommen. Alleen als de gebruiker expliciet om een uitgebreide analyse of volledig plan vraagt mag het langer zijn.`
 
     // ── Bouw user bericht op (afbeeldingen + tekst + geëxtraheerde context) ──
     const userContent = bestandenNaarContent(bestanden || [])
@@ -728,7 +737,7 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
       { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : userContent }
     ]
 
-    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 2500, system: systemPrompt, messages })
+    const response = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1400, system: systemPrompt, messages })
     let antwoord = response.content[0].text
 
     // ── Check voor AUTO_SAVE blok in AI response (fallback als haiku/regex niets vindt) ──

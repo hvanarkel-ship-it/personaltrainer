@@ -27,7 +27,14 @@ async function req(path, options = {}) {
     ...options.headers,
   }
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
-  const data = await res.json()
+  // Bij een gateway-timeout (502/504) stuurt Netlify geen JSON terug;
+  // res.json() zou dan in Safari een cryptische pattern-fout gooien
+  let data
+  try { data = await res.json() } catch {
+    data = { error: res.status === 502 || res.status === 504
+      ? 'De server deed er te lang over. Probeer het opnieuw — een kortere vraag helpt.'
+      : `Onverwacht serverantwoord (${res.status})` }
+  }
   if (!res.ok) {
     // Verlopen of ongeldige sessie: token opruimen en terug naar het
     // inlogscherm. Auth-endpoints uitgezonderd (daar betekent 401 fout wachtwoord).
