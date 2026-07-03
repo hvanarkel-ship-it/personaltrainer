@@ -125,10 +125,22 @@ function parseWorkout(w) {
   const tss = parseFloat(w.tss?.trainingStressScore) || 0
   const tssRound = tss > 0 ? Math.round(tss) : null
 
-  // Sport en titel
+  // Sport en titel — eerst op naam/omschrijving (vangt sportmodi waarvan het
+  // activityId niet in onze map staat), daarna op activityId
   const activityId = parseInt(w.activityId, 10)
-  const sport = suuntoSport(activityId)
-  const titel = suuntoActivityTitle(activityId)
+  const naamTekst = [w.workoutName, w.name, w.description, summary?.description]
+    .filter(Boolean).join(' ').toLowerCase()
+  let sport = suuntoSport(activityId)
+  let titel = suuntoActivityTitle(activityId)
+  const naamSport =
+    /padel/.test(naamTekst)                    ? 'padel' :
+    /hyrox|hyro x/.test(naamTekst)             ? 'hyrox' :
+    /squash|badminton|tennis/.test(naamTekst)  ? 'tennis' :
+    /voetbal|soccer/.test(naamTekst)           ? 'voetbal' : null
+  if (naamSport && sport !== naamSport) {
+    sport = naamSport
+    titel = naamSport.charAt(0).toUpperCase() + naamSport.slice(1)
+  }
 
   // Pace voor hardlopen: totaalSec / 1000 / distM = sec per meter → omkeren naar min/km
   let pace = null
@@ -171,6 +183,7 @@ function parseWorkout(w) {
     _titel: titel,
     _hoogte: hoogte,
     _tss: tssRound,
+    _activityId: activityId,
   }
 }
 
@@ -216,7 +229,25 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
     for (const w of workouts) {
       const parsed = parseWorkout(w)
       if (!parsed) continue
-      if (bestaandeIds.has(parsed.suunto_id)) { overgeslagen++; continue }
+
+      // Debug: ruwe activityId + gekozen sport van recente workouts,
+      // zodat foute mappings (bijv. padel → fitness) traceerbaar zijn
+      if (!debug.sport_mapping) debug.sport_mapping = []
+      if (debug.sport_mapping.length < 15) {
+        debug.sport_mapping.push({ datum: parsed.datum, activityId: parsed._activityId, sport: parsed.sport })
+      }
+
+      if (bestaandeIds.has(parsed.suunto_id)) {
+        // Zelfherstellend: corrigeer de sport van al geïmporteerde workouts
+        // als de mapping inmiddels verbeterd is
+        await sql`
+          UPDATE trainingen SET sport = ${parsed.sport}
+          WHERE user_id = ${userId} AND suunto_id = ${parsed.suunto_id}
+            AND sport IS DISTINCT FROM ${parsed.sport}
+        `
+        overgeslagen++
+        continue
+      }
       parsed.user_id_placeholder = false
       nieuweRijen.push({ ...parsed, user_id: userId })
     }
