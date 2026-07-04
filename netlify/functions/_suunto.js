@@ -307,17 +307,27 @@ function localDate(iso) {
 }
 
 // Slaap aggregatie: hoofdslaap per nacht (IsNap=false), bedtimeEnd → datum
-// Elke entry is een slaapfase-segment; HRV = max AvgHRV over alle segmenten
-// (consistent met Suunto app die het beste/diepste segment toont).
+// Suunto levert per slaap MEERDERE snapshots met dezelfde SleepId (progressieve
+// updates gedurende de nacht). Alleen de laatste snapshot bevat de definitieve
+// waarden — zonder deze deduplicatie telt de slaapduur ~8x te hoog op en pakt
+// een HRV-max een tussentijdse piek i.p.v. de eindwaarde die Suunto toont.
 function aggregateSleep(entries) {
-  const perDag = new Map()
-
+  // Stap 1: per SleepId alleen de meest recente snapshot bewaren
+  const perSlaap = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
     if (!d) continue
     if (d.IsNap) continue
+    const key = d.SleepId ?? `${d.BedtimeStart || ''}|${d.BedtimeEnd || e.timestamp || ''}`
+    const ts = new Date(e.timestamp || 0).getTime() || 0
+    const cur = perSlaap.get(key)
+    if (!cur || ts >= cur.ts) perSlaap.set(key, { ts, d, timestamp: e.timestamp })
+  }
 
-    const datum = localDate(d.BedtimeEnd || e.timestamp)
+  // Stap 2: definitieve records per dag optellen (meerdere slaappjes per nacht kan)
+  const perDag = new Map()
+  for (const { d, timestamp } of perSlaap.values()) {
+    const datum = localDate(d.BedtimeEnd || timestamp)
     if (!datum) continue
 
     const cur = perDag.get(datum) || {
@@ -330,7 +340,7 @@ function aggregateSleep(entries) {
     cur.light     += (parseFloat(d.LightSleepDuration) || 0) / 60
     if (d.SleepQualityScore > cur.score) cur.score = d.SleepQualityScore
 
-    // Max AvgHRV over alle segmenten — Suunto toont het beste slaapsegment
+    // AvgHRV van het definitieve record — komt overeen met Suunto's HRV-kaart
     if (d.AvgHRV > cur.hrv_max) cur.hrv_max = d.AvgHRV
 
     // HRMin uit slaapdata is nauwkeuriger dan afgeleid uit activity-samples
@@ -429,18 +439,20 @@ function aggregateRecovery(entries) {
   const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length
   const out = new Map()
   for (const [datum, v] of perDag) {
+    // Balance/stress/hulpbronnen zijn live-meters: Suunto toont de ACTUELE
+    // waarde, geen nachtgemiddelde. Alleen HRV gebruikt het nachtvenster.
     const heeftNacht = v.nacht.hrv.length > 0
-    const avgBal    = v.nacht.bal.length    > 0 ? avg(v.nacht.bal)    : v.recent.bal
-    const avgStress = v.nacht.stress.length > 0 ? avg(v.nacht.stress) : v.recent.stress
-    const avgHrv    = heeftNacht ? Math.round(avg(v.nacht.hrv)) : v.recent.hrv
-    const avgRes    = v.nacht.res.length    > 0 ? Math.round(avg(v.nacht.res)) : v.recent.res
+    const bal    = v.recent.bal
+    const stress = v.recent.stress
+    const hrv    = heeftNacht ? Math.round(avg(v.nacht.hrv)) : v.recent.hrv
+    const res    = v.recent.res
     out.set(datum, {
-      herstel_balans:  avgBal    != null ? Number(avgBal.toFixed(2))             : null,
-      stress_pct:      avgStress != null ? Math.round((avgStress - 1) / 3 * 100) : null,
-      hrv_ochtend:     avgHrv,
+      herstel_balans:  bal    != null ? Number(bal.toFixed(2))                : null,
+      stress_pct:      stress != null ? Math.round((stress - 1) / 3 * 100)    : null,
+      hrv_ochtend:     hrv,
       hrv_laatste:     v.recent.hrv,
       hrv_laatste_tijd: v.recent.hrv ? v.recent.tijd : null,
-      hulpbronnen_pct: avgRes,
+      hulpbronnen_pct: res,
     })
   }
   return out
