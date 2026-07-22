@@ -51,7 +51,9 @@ export default function Voeding({ onNavigeer }) {
   const [form, setForm]           = useState(LEEG_FORM)
   const [aiNotities, setAiNotities] = useState('')
   const [analyseert, setAnalyseert] = useState(false)
+  const [schat, setSchat]         = useState(false)
   const [opslaan, setOpslaan]     = useState(false)
+  const [recent, setRecent]       = useState([])
   const fotoRef = useRef(null)
 
   // Edit sheet
@@ -64,6 +66,23 @@ export default function Voeding({ onNavigeer }) {
   useEffect(() => {
     api.get('/profiel').then(setProfiel).catch(() => {})
   }, [])
+
+  // Recente unieke maaltijden voor snel-opnieuw (over alle dagen)
+  function laadRecent() {
+    api.get('/maaltijd?limit=80').then(rows => {
+      const gezien = new Set()
+      const uniek = []
+      for (const m of rows) {
+        const key = (m.beschrijving || '').trim().toLowerCase()
+        if (!key || gezien.has(key)) continue
+        gezien.add(key)
+        uniek.push(m)
+        if (uniek.length >= 8) break
+      }
+      setRecent(uniek)
+    }).catch(() => {})
+  }
+  useEffect(() => { laadRecent() }, [])
 
   // Fetch meals when date changes
   useEffect(() => {
@@ -109,6 +128,40 @@ export default function Voeding({ onNavigeer }) {
     return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file) })
   }
 
+  // Schat macro's uit de beschrijving via AI (geen foto nodig)
+  async function schatMacros() {
+    if (!form.beschrijving.trim()) { setFout('Vul eerst een beschrijving in'); return }
+    setSchat(true); setFout('')
+    try {
+      const res = await api.post('/voeding-schat', { beschrijving: form.beschrijving })
+      const d = res.data || {}
+      setForm(f => ({
+        ...f,
+        beschrijving:   d.beschrijving  || f.beschrijving,
+        maaltijd_type:  d.maaltijd_type || f.maaltijd_type,
+        kcal:           d.kcal            != null ? String(d.kcal)            : f.kcal,
+        eiwit_g:        d.eiwit_g         != null ? String(d.eiwit_g)         : f.eiwit_g,
+        koolhydraten_g: d.koolhydraten_g  != null ? String(d.koolhydraten_g)  : f.koolhydraten_g,
+        vetten_g:       d.vetten_g        != null ? String(d.vetten_g)        : f.vetten_g,
+      }))
+      if (d.ai_notities) setAiNotities(d.ai_notities)
+    } catch (err) { setFout('Schatting mislukt: ' + err.message) }
+    finally { setSchat(false) }
+  }
+
+  // Vul het formulier met een eerder gelogde maaltijd
+  function vulRecent(m) {
+    setForm({
+      maaltijd_type:  m.maaltijd_type || 'snack',
+      beschrijving:   m.beschrijving  || '',
+      kcal:           m.kcal            ?? '',
+      eiwit_g:        m.eiwit_g         ?? '',
+      koolhydraten_g: m.koolhydraten_g  ?? '',
+      vetten_g:       m.vetten_g        ?? '',
+    })
+    setAiNotities('')
+  }
+
   // ── Add meal ────────────────────────────────────────────────────────────
 
   async function submit(e) {
@@ -119,6 +172,7 @@ export default function Voeding({ onNavigeer }) {
       setMaaltijden(m => [...m, nieuw])
       setAddOpen(false); setAiNotities('')
       setForm(LEEG_FORM)
+      laadRecent()
     } catch (err) { setFout(err.message) }
     finally { setOpslaan(false) }
   }
@@ -192,6 +246,10 @@ export default function Voeding({ onNavigeer }) {
   const doelKh     = p.doel_koolhydraten_g  || null
   const doelVet    = p.doel_vetten_g        || null
 
+  // Resterend tot dagdoel
+  const restKcal  = doelKcal  ? Math.round(doelKcal  - totaal.kcal)  : null
+  const restEiwit = doelEiwit ? Math.round(doelEiwit - totaal.eiwit) : null
+
   const isVandaag  = datum === vandaagStr()
 
   // Group meals by type, keep order
@@ -253,6 +311,16 @@ export default function Voeding({ onNavigeer }) {
             <TotaalBlok waarde={Math.round(totaal.kh)}   doel={doelKh}   label="koolh." color="var(--blue)"  unit="g" />
             <TotaalBlok waarde={Math.round(totaal.vet)}  doel={doelVet}  label="vet"    color="var(--amber)" unit="g" />
           </div>
+          {restKcal !== null && (
+            <p className="t-sm" style={{ marginTop: 'var(--space-3)', textAlign: 'center', color: 'var(--text-2)' }}>
+              {restKcal > 0
+                ? <>Nog <strong style={{ color: 'var(--text)' }}>{restKcal}</strong> kcal</>
+                : <><strong style={{ color: 'var(--amber)' }}>{Math.abs(restKcal)}</strong> kcal boven doel</>}
+              {restEiwit !== null && (restEiwit > 0
+                ? <> · nog <strong style={{ color: 'var(--green)' }}>{restEiwit}g</strong> eiwit</>
+                : <> · eiwitdoel gehaald ✓</>)}
+            </p>
+          )}
         </Card>
       )}
 
@@ -301,6 +369,34 @@ export default function Voeding({ onNavigeer }) {
         <form onSubmit={submit}>
           <div className="section-gap">
 
+            {/* Snel opnieuw — eerder gelogde maaltijden */}
+            {recent.length > 0 && (
+              <div className="form-group">
+                <label>Snel opnieuw</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  {recent.slice(0, 6).map(m => (
+                    <button
+                      key={m.id} type="button"
+                      onClick={() => vulRecent(m)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 12px', maxWidth: '100%',
+                        background: 'var(--bg-raised)', border: '1px solid transparent',
+                        borderRadius: 'var(--r-xs)', cursor: 'pointer', color: 'var(--text-2)',
+                        fontSize: 'var(--t-sm)', fontFamily: 'inherit',
+                      }}
+                    >
+                      <span>{TYPE_ICON[m.maaltijd_type] || '🍽️'}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.beschrijving}
+                      </span>
+                      {m.kcal != null && <span className="t-xs t-muted" style={{ flexShrink: 0 }}>{m.kcal}kcal</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Type picker */}
             <div className="form-group">
               <label>Type</label>
@@ -343,6 +439,14 @@ export default function Voeding({ onNavigeer }) {
             <div className="form-group">
               <label>Beschrijving</label>
               <input className="input" value={form.beschrijving} onChange={e => setForm(f => ({ ...f, beschrijving: e.target.value }))} placeholder="Bijv. Havermout met banaan en whey" />
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm btn-full"
+                onClick={schatMacros}
+                disabled={schat || !form.beschrijving.trim()}
+              >
+                {schat ? '✨ Schatten...' : '✨ Schat macro\'s met AI'}
+              </button>
             </div>
 
             {/* Macros */}
