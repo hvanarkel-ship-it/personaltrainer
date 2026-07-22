@@ -38,16 +38,37 @@ export const handler = async (event) => {
       ORDER BY datum DESC
     `
 
-    // One wellness record per day — prefer record with highest HRV when multiple exist
+    // Eén wellness-record per dag uit BEIDE bronnen: Suunto (dagelijkse_wellness)
+    // heeft voorrang, handmatige logs (trainingen) vullen aan
     const wellness = await sql`
-      SELECT DISTINCT ON (datum::date)
+      SELECT DISTINCT ON (datum)
         datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans
-      FROM trainingen
-      WHERE user_id = ${userId}
-        AND (hrv_ochtend IS NOT NULL OR slaap_uur IS NOT NULL)
-        AND datum >= CURRENT_DATE - INTERVAL '30 days'
-      ORDER BY datum::date ASC, hrv_ochtend DESC NULLS LAST
-    `
+      FROM (
+        SELECT datum::date AS datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, 0 AS prio
+        FROM dagelijkse_wellness
+        WHERE user_id = ${userId}
+          AND (hrv_ochtend IS NOT NULL OR slaap_uur IS NOT NULL)
+          AND datum >= CURRENT_DATE - INTERVAL '30 days'
+        UNION ALL
+        SELECT datum::date AS datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, 1 AS prio
+        FROM trainingen
+        WHERE user_id = ${userId}
+          AND (hrv_ochtend IS NOT NULL OR slaap_uur IS NOT NULL)
+          AND datum >= CURRENT_DATE - INTERVAL '30 days'
+      ) samen
+      ORDER BY datum ASC, prio ASC, hrv_ochtend DESC NULLS LAST
+    `.catch(() =>
+      // dagelijkse_wellness bestaat nog niet (nooit Suunto gekoppeld) → alleen handmatig
+      sql`
+        SELECT DISTINCT ON (datum::date)
+          datum, hrv_ochtend, slaap_uur, slaap_score, herstel_balans
+        FROM trainingen
+        WHERE user_id = ${userId}
+          AND (hrv_ochtend IS NOT NULL OR slaap_uur IS NOT NULL)
+          AND datum >= CURRENT_DATE - INTERVAL '30 days'
+        ORDER BY datum::date ASC, hrv_ochtend DESC NULLS LAST
+      `.catch(() => [])
+    )
 
     return cors({ activiteiten, wellness })
   } catch (err) {

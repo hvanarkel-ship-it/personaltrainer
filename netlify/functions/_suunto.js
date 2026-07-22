@@ -577,9 +577,9 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
     })
   }
 
-  let opgeslagen = 0
-  for (const row of rows) {
-    const res = await sql`
+  // Parallel upserten (Neon HTTP driver kan concurrent queries aan) —
+  // 28 dagen sequentieel duurde onnodig lang binnen het functie-budget
+  const upsertResultaten = await Promise.all(rows.map(row => sql`
       INSERT INTO dagelijkse_wellness
         (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
          hrv_ochtend, hrv_laatste, hrv_laatste_tijd,
@@ -607,9 +607,9 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         bron             = EXCLUDED.bron,
         updated_at       = NOW()
       RETURNING datum
-    `
-    opgeslagen += res.length
-  }
+    `.catch(err => { debug.upsert_error = err.message; return [] })
+  ))
+  const opgeslagen = upsertResultaten.reduce((s, r) => s + r.length, 0)
 
   return { wellness_dagen: opgeslagen, debug }
 }

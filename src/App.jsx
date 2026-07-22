@@ -31,7 +31,7 @@ import Statistieken from './components/Statistieken.jsx'
 import DbStatus from './components/DbStatus.jsx'
 import Styleguide from './components/Styleguide.jsx'
 
-const APP_VERSION = 'v2026.04-2'
+const APP_VERSION = 'v2026.07-1'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },

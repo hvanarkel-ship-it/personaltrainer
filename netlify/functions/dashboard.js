@@ -26,9 +26,14 @@ export const handler = async (event) => {
     if (ouderDan5Min) {
       const token = await getValidToken(sql, userId).catch(() => null)
       if (token) {
-        await Promise.all([
-          syncSuuntoWellnessForUser(sql, userId, token, 2),
-          syncSuuntoForUser(sql, userId, token),
+        // Begrensd op 8s: een trage Suunto API mag het dashboard niet blokkeren;
+        // de sync loopt op de achtergrond door en de volgende load toont het resultaat
+        await Promise.race([
+          Promise.all([
+            syncSuuntoWellnessForUser(sql, userId, token, 2),
+            syncSuuntoForUser(sql, userId, token),
+          ]),
+          new Promise(res => setTimeout(res, 8000)),
         ])
       }
     }

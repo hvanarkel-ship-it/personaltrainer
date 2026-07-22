@@ -276,7 +276,7 @@ export const handler = async (event) => {
           hrv_ochtend, herstel_balans, stress_pct, rust_hartslag, stappen, kcal_actief
         FROM dagelijkse_wellness WHERE user_id = ${userId}
         AND datum >= (CURRENT_DATE - INTERVAL '14 days') ORDER BY datum DESC`.catch(() => []),
-      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 100`,
+      sql`SELECT is_ai, bericht FROM gesprekken WHERE user_id = ${userId} ORDER BY created_at DESC, id DESC LIMIT 40`,
       sql`SELECT
           DATE_TRUNC('week', datum)::date AS week,
           COUNT(DISTINCT datum) AS dagen,

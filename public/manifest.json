@@ -5,9 +5,12 @@
   "start_url": "/",
   "id": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#F5F5F5",
-  "theme_color": "#1D9E75",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#0A0A0C",
+  "theme_color": "#0A0A0C",
   "orientation": "portrait-primary",
   "lang": "nl",
   "scope": "/",
@@ -37,28 +40,46 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["health", "fitness"],
+  "categories": [
+    "health",
+    "fitness"
+  ],
   "shortcuts": [
     {
       "name": "AI Coach",
       "short_name": "Coach",
       "url": "/",
       "description": "Stel een vraag aan je AI coach",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Training loggen",
       "short_name": "Training",
       "url": "/",
       "description": "Log een nieuwe training",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Maaltijd loggen",
       "short_name": "Voeding",
       "url": "/",
       "description": "Log een maaltijd",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "prefer_related_applications": false

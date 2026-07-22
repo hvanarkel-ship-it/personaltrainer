@@ -475,7 +475,7 @@ function MaaltijdKaart({ m, onEdit, onVerwijder }) {
           <button
             onClick={onEdit}
             style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', borderRadius: 'var(--r-xs)' }}
-            title="Bewerken"
+            title="Bewerken" aria-label="Bewerken"
           >✏️</button>
           <button
             onClick={onVerwijder}

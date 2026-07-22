@@ -219,7 +219,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             onClick={laadData}
             disabled={laden}
             style={{ padding: '8px', minWidth: 36 }}
-            title="Vernieuwen"
+            title="Vernieuwen" aria-label="Ververs dashboard"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
               style={laden ? { animation: 'spin 1s linear infinite' } : undefined}>
@@ -230,7 +230,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             className="btn btn-icon btn-sm"
             onClick={onUitloggen}
             style={{ padding: '8px', minWidth: 36 }}
-            title="Uitloggen"
+            title="Uitloggen" aria-label="Uitloggen"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
