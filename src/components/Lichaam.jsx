@@ -25,6 +25,12 @@ function deltaInfo(laatste, vorige, veld, laagIsGoed = true) {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
+const TREND_METRICS = [
+  { key: 'gewicht_kg',    label: 'Gewicht',    unit: 'kg', color: 'var(--blue)' },
+  { key: 'vetpercentage', label: 'Vet%',       unit: '%',  color: 'var(--amber)' },
+  { key: 'spiermassa_kg', label: 'Spiermassa', unit: 'kg', color: 'var(--green)' },
+]
+
 export default function Lichaam({ onNavigeer }) {
   const [metingen, setMetingen] = useState([])
   const [laden, setLaden]       = useState(true)
@@ -33,6 +39,7 @@ export default function Lichaam({ onNavigeer }) {
   const [analyseert, setAnalyseert] = useState(false)
   const [opslaan, setOpslaan]   = useState(false)
   const [fout, setFout]         = useState('')
+  const [trendKey, setTrendKey] = useState('gewicht_kg')
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -97,11 +104,14 @@ export default function Lichaam({ onNavigeer }) {
   const vorige  = metingen[1]
   const upd = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  // Weight trend (last 8 measurements)
-  const gewichtTrend = metingen
-    .filter(m => m.gewicht_kg)
-    .slice(0, 8)
-    .reverse()
+  // Beschikbare trend-metrics (minstens 2 metingen met data)
+  const beschikbareMetrics = TREND_METRICS.filter(
+    m => metingen.filter(x => x[m.key] != null && x[m.key] !== '').length >= 2
+  )
+  const actieveMetric = beschikbareMetrics.find(m => m.key === trendKey) || beschikbareMetrics[0]
+  const trendData = actieveMetric
+    ? metingen.filter(m => m[actieveMetric.key] != null && m[actieveMetric.key] !== '').slice(0, 8).reverse()
+    : []
 
   return (
     <div className="page">
@@ -156,16 +166,38 @@ export default function Lichaam({ onNavigeer }) {
         </Card>
       )}
 
-      {/* ── Weight trend chart ─────────────────────────────────────────── */}
-      {gewichtTrend.length > 1 && (
+      {/* ── Trend chart (wisselbaar) ───────────────────────────────────── */}
+      {actieveMetric && trendData.length > 1 && (
         <Card>
           <div className="card-header">
-            <span className="t-lg">Gewichtstrend</span>
-            <span className="t-sm t-muted">
-              {gewichtTrend[gewichtTrend.length - 1]?.gewicht_kg} kg
+            <span className="t-lg">Trend</span>
+            <span className="t-sm" style={{ fontWeight: 700, color: actieveMetric.color }}>
+              {trendData[trendData.length - 1]?.[actieveMetric.key]} {actieveMetric.unit}
             </span>
           </div>
-          <GewichtChart data={gewichtTrend} />
+          {beschikbareMetrics.length > 1 && (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+              {beschikbareMetrics.map(m => {
+                const active = m.key === actieveMetric.key
+                return (
+                  <button
+                    key={m.key} type="button"
+                    onClick={() => setTrendKey(m.key)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 'var(--r-xs)',
+                      background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                      border: active ? `1px solid ${m.color}` : '1px solid transparent',
+                      color: active ? m.color : 'var(--text-3)',
+                      fontSize: 'var(--t-xs)', fontWeight: 700, letterSpacing: '0.04em',
+                      textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit',
+                      transition: 'border-color var(--dur-fast), color var(--dur-fast)',
+                    }}
+                  >{m.label}</button>
+                )
+              })}
+            </div>
+          )}
+          <TrendChart data={trendData} metricKey={actieveMetric.key} color={actieveMetric.color} />
         </Card>
       )}
 
@@ -304,8 +336,8 @@ function StatBlok({ label, waarde, unit, delta }) {
   )
 }
 
-function GewichtChart({ data }) {
-  const vals = data.map(m => parseFloat(m.gewicht_kg))
+function TrendChart({ data, metricKey, color }) {
+  const vals = data.map(m => parseFloat(m[metricKey]))
   const min  = Math.min(...vals)
   const max  = Math.max(...vals)
   const spread = max - min || 0.1
@@ -313,19 +345,19 @@ function GewichtChart({ data }) {
   return (
     <div style={{ display: 'flex', gap: 4, height: 72, alignItems: 'flex-end' }}>
       {data.map((m, i) => {
-        const h    = 20 + ((parseFloat(m.gewicht_kg) - min) / spread) * 48
+        const h    = 20 + ((parseFloat(m[metricKey]) - min) / spread) * 48
         const isLast = i === data.length - 1
         return (
           <div key={m.id || i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             {isLast && (
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--blue)' }}>
-                {m.gewicht_kg}
+              <span style={{ fontSize: 9, fontWeight: 700, color }}>
+                {m[metricKey]}
               </span>
             )}
             <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
               <div style={{
                 width: '100%', height: h,
-                background: isLast ? 'var(--blue)' : 'var(--bg-surface)',
+                background: isLast ? color : 'var(--bg-surface)',
                 borderRadius: 3,
               }} />
             </div>
