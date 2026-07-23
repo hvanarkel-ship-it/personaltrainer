@@ -35,6 +35,8 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
   const [opname, setOpname]             = useState(false)
   const [nieuweMsg, setNieuweMsg]       = useState(false)
   const [toonScrollBtn, setToonScrollBtn] = useState(false)
+  const [laatstePoging, setLaatstePoging] = useState(null)
+  const [copiedIdx, setCopiedIdx]       = useState(null)
 
   const bottomRef     = useRef(null)
   const chatRef       = useRef(null)
@@ -139,6 +141,28 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     })
   }
 
+  // Stuur een payload naar de coach en verwerk antwoord/fout. Bewaart de poging
+  // bij een fout zodat 'opnieuw proberen' hem exact kan herhalen.
+  async function stuurNaarCoach(tekst, bestanden, type) {
+    setLaden(true)
+    try {
+      const res = await api.post('/coach-chat', { bericht: tekst, bestanden, upload_type: type })
+      const nieuw = []
+      if (res.opgeslagen) nieuw.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
+      nieuw.push({ rol: 'ai', tekst: res.antwoord, datum: new Date().toISOString() })
+      setBerichten(b => [...b, ...nieuw])
+      setNieuweMsg(true)
+      setLaatstePoging(null)
+    } catch (err) {
+      setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
+      setNieuweMsg(true)
+      setLaatstePoging({ tekst, bestanden, type })
+    } finally {
+      setLaden(false)
+      inputRef.current?.focus()
+    }
+  }
+
   async function verstuur(e) {
     e?.preventDefault()
     if ((!input.trim() && !uploads.length) || laden) return
@@ -155,23 +179,29 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
     setNieuweMsg(true)
     setInput('')
     setUploads([])
-    setLaden(true)
     setToonUploadMenu(false)
 
-    try {
-      const res = await api.post('/coach-chat', { bericht: tekst, bestanden, upload_type: type })
-      const nieuw = []
-      if (res.opgeslagen) nieuw.push({ rol: 'systeem', opgeslagen: res.opgeslagen })
-      nieuw.push({ rol: 'ai', tekst: res.antwoord, datum: new Date().toISOString() })
-      setBerichten(b => [...b, ...nieuw])
-      setNieuweMsg(true)
-    } catch (err) {
-      setBerichten(b => [...b, { rol: 'ai', tekst: 'Sorry, er is een fout opgetreden: ' + err.message, fout: true }])
-      setNieuweMsg(true)
-    } finally {
-      setLaden(false)
-      inputRef.current?.focus()
-    }
+    stuurNaarCoach(tekst, bestanden, type)
+  }
+
+  function opnieuwProberen() {
+    if (!laatstePoging || laden) return
+    // Verwijder de laatste fout-melding voordat we opnieuw sturen
+    setBerichten(b => {
+      const kopie = [...b]
+      if (kopie.length && kopie[kopie.length - 1].fout) kopie.pop()
+      return kopie
+    })
+    const p = laatstePoging
+    setLaatstePoging(null)
+    stuurNaarCoach(p.tekst, p.bestanden, p.type)
+  }
+
+  function kopieer(tekst, i) {
+    navigator.clipboard?.writeText(tekst).then(() => {
+      setCopiedIdx(i)
+      setTimeout(() => setCopiedIdx(c => (c === i ? null : c)), 1500)
+    }).catch(() => {})
   }
 
   async function wisGesprek() {
@@ -207,13 +237,30 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
           <div className="chat-date-sep"><span>{datumLabel}</span></div>
         )}
         {b.rol === 'ai' ? (
-          <div className="msg-ai">
-            <div className="msg-avatar">⚡</div>
-            <div className={`msg-bubble-ai${b.fout ? '' : ''}`}
-              style={b.fout ? { borderLeft: '2px solid var(--red)' } : {}}
-              dangerouslySetInnerHTML={{ __html: formatBericht(b.tekst) }}
-            />
-          </div>
+          <>
+            <div className="msg-ai">
+              <div className="msg-avatar">⚡</div>
+              <div className="msg-bubble-ai"
+                style={b.fout ? { borderLeft: '2px solid var(--red)' } : {}}
+                dangerouslySetInnerHTML={{ __html: formatBericht(b.tekst) }}
+              />
+            </div>
+            {!b.fout && b.tekst && b.tekst.length > 120 && (
+              <div style={{ paddingLeft: 36, marginTop: 2 }}>
+                <button
+                  onClick={() => kopieer(b.tekst, i)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: copiedIdx === i ? 'var(--green)' : 'var(--text-3)',
+                    fontSize: 'var(--t-xs)', fontWeight: 600, fontFamily: 'inherit',
+                    padding: '2px 0', letterSpacing: '0.02em',
+                  }}
+                >
+                  {copiedIdx === i ? '✓ Gekopieerd' : '⧉ Kopieer'}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="msg-user">
             <div className="msg-bubble-user">{b.tekst}</div>
@@ -313,6 +360,15 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
           </div>
         )}
 
+        {/* Retry na mislukt antwoord */}
+        {laatstePoging && !laden && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-2)' }}>
+            <button className="btn btn-secondary btn-sm" onClick={opnieuwProberen}>
+              ↻ Opnieuw proberen
+            </button>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -355,6 +411,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
           className={`coach-icon-btn${toonUploadMenu ? ' active' : ''}`}
           onClick={() => setToonUploadMenu(m => !m)}
           title="Bestand uploaden"
+          aria-label="Bestand uploaden"
         >📎</button>
 
         {heeftStem && (
@@ -363,6 +420,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
             className={`coach-icon-btn${opname ? ' active' : ''}`}
             onClick={toggleOpname}
             title={opname ? 'Stop opname' : 'Inspreken'}
+            aria-label={opname ? 'Stop opname' : 'Inspreken'}
           >🎙️</button>
         )}
 
@@ -385,6 +443,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
           type="submit"
           className="coach-send-btn"
           disabled={laden || (!input.trim() && !uploads.length)}
+          aria-label="Verstuur bericht"
         >↑</button>
       </form>
     </div>
