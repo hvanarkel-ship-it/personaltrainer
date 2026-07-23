@@ -45,8 +45,9 @@ export default function Doelen() {
   const [laden, setLaden]         = useState(true)
   const [fout, setFout]           = useState('')
 
-  // Add sheet
+  // Add / edit sheet
   const [addOpen, setAddOpen]     = useState(false)
+  const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(LEEG_FORM)
   const [opslaan, setOpslaan]     = useState(false)
 
@@ -64,14 +65,35 @@ export default function Doelen() {
 
   const upd = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  function startEditDoel(d) {
+    setEditId(d.id)
+    setForm({
+      titel: d.titel || '', sport: d.sport || '', beschrijving: d.beschrijving || '',
+      doel_waarde: d.doel_waarde ?? '', huidige_waarde: d.huidige_waarde ?? '',
+      eenheid: d.eenheid || '', deadline: d.deadline ? String(d.deadline).slice(0, 10) : '',
+    })
+    setAddOpen(true)
+  }
+
+  function sluitSheet() {
+    setAddOpen(false)
+    setEditId(null)
+    setForm(LEEG_FORM)
+  }
+
   async function submit(e) {
-    e.preventDefault(); setOpslaan(true)
+    e.preventDefault(); setOpslaan(true); setFout('')
     try {
-      const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
-      const nieuw = await api.post('/doelen', payload)
-      setDoelen(d => [nieuw, ...d])
-      setAddOpen(false)
-      setForm(LEEG_FORM)
+      if (editId) {
+        // Alle velden meesturen: '' wist bewust een veld (bv. deadline)
+        const bijgewerkt = await api.put(`/doelen/${editId}`, form)
+        setDoelen(d => d.map(x => x.id === editId ? bijgewerkt : x))
+      } else {
+        const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
+        const nieuw = await api.post('/doelen', payload)
+        setDoelen(d => [nieuw, ...d])
+      }
+      sluitSheet()
     } catch (err) { setFout(err.message) }
     finally { setOpslaan(false) }
   }
@@ -164,6 +186,7 @@ export default function Doelen() {
                   updateId={updateId} updateVal={updateVal}
                   updateLaden={updateLaden}
                   onStartUpdate={startUpdate}
+                  onEditDoel={startEditDoel}
                   onUpdateVal={setUpdateVal}
                   onSlaOp={slaUpdateOp}
                   onAnnuleer={() => setUpdateId(null)}
@@ -196,6 +219,7 @@ export default function Doelen() {
                     updateId={updateId} updateVal={updateVal}
                     updateLaden={updateLaden}
                     onStartUpdate={startUpdate}
+                    onEditDoel={startEditDoel}
                     onUpdateVal={setUpdateVal}
                     onSlaOp={slaUpdateOp}
                     onAnnuleer={() => setUpdateId(null)}
@@ -209,8 +233,8 @@ export default function Doelen() {
         </>
       )}
 
-      {/* ── Add goal sheet ─────────────────────────────────────────────── */}
-      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title="Nieuw doel">
+      {/* ── Add / edit goal sheet ──────────────────────────────────────── */}
+      <Sheet open={addOpen} onClose={sluitSheet} title={editId ? 'Doel bewerken' : 'Nieuw doel'}>
         <form onSubmit={submit}>
           <div className="section-gap">
 
@@ -251,7 +275,7 @@ export default function Doelen() {
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={opslaan}>
-              {opslaan ? 'Opslaan...' : 'Doel opslaan'}
+              {opslaan ? 'Opslaan...' : editId ? 'Wijzigingen opslaan' : 'Doel opslaan'}
             </button>
           </div>
         </form>
@@ -263,7 +287,7 @@ export default function Doelen() {
 
 // ── Goal card ────────────────────────────────────────────────────────────────
 
-function DoelKaart({ doel: d, gearchiveerd, updateId, updateVal, updateLaden, onStartUpdate, onUpdateVal, onSlaOp, onAnnuleer, onToggle, onVerwijder }) {
+function DoelKaart({ doel: d, gearchiveerd, updateId, updateVal, updateLaden, onStartUpdate, onEditDoel, onUpdateVal, onSlaOp, onAnnuleer, onToggle, onVerwijder }) {
   const pct     = d.doel_waarde && d.huidige_waarde != null
     ? Math.min(100, Math.round((d.huidige_waarde / d.doel_waarde) * 100)) : 0
   const bereikt = pct >= 100
@@ -275,15 +299,20 @@ function DoelKaart({ doel: d, gearchiveerd, updateId, updateVal, updateLaden, on
     <Card style={{ opacity: gearchiveerd ? 0.6 : 1 }}>
       {/* Top row */}
       <div className="row-between" style={{ marginBottom: 'var(--space-3)' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <button
+          type="button"
+          onClick={() => onEditDoel(d)}
+          title="Doel bewerken"
+          style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             {bereikt && <Chip label="✓ Bereikt" color="green" />}
-            <span className="t-md" style={{ fontWeight: 600 }}>{d.titel}</span>
+            <span className="t-md" style={{ fontWeight: 600, color: 'var(--text)' }}>{d.titel}</span>
           </div>
           {d.sport && (
             <span className="t-xs t-muted" style={{ marginTop: 2, display: 'block' }}>{d.sport}</span>
           )}
-        </div>
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexShrink: 0 }}>
           {dl && (
             <span style={{ fontSize: 'var(--t-xs)', fontWeight: 700, color: dl.color }}>{dl.tekst}</span>
@@ -292,7 +321,7 @@ function DoelKaart({ doel: d, gearchiveerd, updateId, updateVal, updateLaden, on
             onClick={() => onStartUpdate(d)}
             style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', fontSize: 13 }}
             title="Update voortgang"
-          >✏️</button>
+          >📈</button>
           <button
             onClick={() => onToggle(d.id, d.actief)}
             style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', fontSize: 13 }}

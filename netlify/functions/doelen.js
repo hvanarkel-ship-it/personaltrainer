@@ -37,17 +37,21 @@ export const handler = async (event) => {
       // (bijv. alleen huidige_waarde bij voortgang). Een expliciet lege string
       // wist het veld ('' → NULL), een ontbrekend veld blijft ongewijzigd.
       const zet = v => v !== undefined
+      const num = v => (v === '' || v == null ? null : v) // lege string uit een formulier → NULL (geen cast-fout)
       const [row] = await sql`
         UPDATE doelen SET
           titel          = CASE WHEN ${zet(d.titel)}          THEN ${d.titel || null}          ELSE titel          END,
-          huidige_waarde = CASE WHEN ${zet(d.huidige_waarde)} THEN ${d.huidige_waarde ?? null} ELSE huidige_waarde END,
-          doel_waarde    = CASE WHEN ${zet(d.doel_waarde)}    THEN ${d.doel_waarde ?? null}    ELSE doel_waarde    END,
+          sport          = CASE WHEN ${zet(d.sport)}          THEN ${d.sport || null}          ELSE sport          END,
+          eenheid        = CASE WHEN ${zet(d.eenheid)}        THEN ${d.eenheid || null}        ELSE eenheid        END,
+          huidige_waarde = CASE WHEN ${zet(d.huidige_waarde)} THEN ${num(d.huidige_waarde)}    ELSE huidige_waarde END,
+          doel_waarde    = CASE WHEN ${zet(d.doel_waarde)}    THEN ${num(d.doel_waarde)}       ELSE doel_waarde    END,
           actief         = CASE WHEN ${zet(d.actief)}         THEN ${d.actief ?? null}         ELSE actief         END,
           deadline       = CASE WHEN ${zet(d.deadline)}       THEN ${d.deadline || null}::date ELSE deadline       END,
           beschrijving   = CASE WHEN ${zet(d.beschrijving)}   THEN ${d.beschrijving || null}   ELSE beschrijving   END
         WHERE id = ${id} AND user_id = ${userId}
         RETURNING *
       `
+      if (!row) return cors({ error: 'Doel niet gevonden' }, 404)
       return cors(row)
     }
 
