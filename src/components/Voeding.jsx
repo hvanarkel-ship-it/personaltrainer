@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { api } from '../api.js'
+import { api, MACRO_DEFAULTS } from '../api.js'
 import Card from './ui/Card.jsx'
 import Sheet from './ui/Sheet.jsx'
 import Chip from './ui/Chip.jsx'
@@ -241,10 +241,10 @@ export default function Voeding({ onNavigeer }) {
   }), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
 
   const p = profiel || {}
-  const doelKcal   = p.doel_kcal            || null
-  const doelEiwit  = p.doel_eiwit_g         || null
-  const doelKh     = p.doel_koolhydraten_g  || null
-  const doelVet    = p.doel_vetten_g        || null
+  const doelKcal   = p.doel_kcal            || MACRO_DEFAULTS.kcal
+  const doelEiwit  = p.doel_eiwit_g         || MACRO_DEFAULTS.eiwit_g
+  const doelKh     = p.doel_koolhydraten_g  || MACRO_DEFAULTS.koolhydraten_g
+  const doelVet    = p.doel_vetten_g        || MACRO_DEFAULTS.vetten_g
 
   // Resterend tot dagdoel
   const restKcal  = doelKcal  ? Math.round(doelKcal  - totaal.kcal)  : null

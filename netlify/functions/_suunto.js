@@ -187,7 +187,7 @@ function parseWorkout(w) {
   }
 }
 
-export async function syncSuuntoForUser(sql, userId, accessToken) {
+export async function syncSuuntoForUser(sql, userId, accessToken, opts = {}) {
   const debug = {}
 
   const bestaand = await sql`
@@ -199,11 +199,16 @@ export async function syncSuuntoForUser(sql, userId, accessToken) {
   let overgeslagen = 0
   const nieuweRijen = []
 
-  // Suunto API gebruikt epoch ms voor since/until
+  // Suunto API gebruikt epoch ms voor since/until.
+  // - Achtergrond-sync geeft een klein venster (opts.sindsDagen) → past in het
+  //   functie-budget, geen afkap.
+  // - Handmatige sync: volledige backfill (alles bij eerste keer, anders 90 dagen).
   const heeftBestaande = bestaandeIds.size > 0
-  const sinceMs = heeftBestaande
-    ? Date.now() - 90 * 24 * 60 * 60 * 1000
-    : new Date(2015, 0, 1).getTime()
+  const sinceMs = opts.sindsDagen
+    ? Date.now() - opts.sindsDagen * 86400_000
+    : heeftBestaande
+      ? Date.now() - 90 * 24 * 60 * 60 * 1000
+      : new Date(2015, 0, 1).getTime()
 
   let nextUrl = `${SUUNTO_API_BASE}/v2/workouts?since=${sinceMs}&limit=100`
 
@@ -458,6 +463,28 @@ function aggregateRecovery(entries) {
   return out
 }
 
+// Daily-activity-statistics rollups → per dag stappen/kcal/rust-HR.
+// Defensief: Suunto varieert veldnamen per firmware, dus meerdere fallbacks.
+function aggregateDagStats(entries) {
+  const out = new Map()
+  for (const e of entries || []) {
+    const d = e?.entryData || e
+    if (!d) continue
+    const datum = localDate(d.Date || d.date || d.Day || e?.timestamp)
+    if (!datum) continue
+    const stappen = d.Steps ?? d.StepCount ?? d.TotalSteps ?? null
+    const kcal    = d.EnergyConsumption ?? d.Energy ?? d.Calories ?? d.TotalCalories ?? null
+    const restHr  = d.RestingHR ?? d.RestHR ?? d.MinHR ?? d.RestingHeartRate ?? null
+    out.set(datum, {
+      stappen:       stappen != null ? Math.round(parseFloat(stappen)) : null,
+      // Suunto levert energie vaak in joules; >50k ⇒ joules → kcal
+      kcal_actief:   kcal != null ? Math.round(parseFloat(kcal) > 50000 ? parseFloat(kcal) / 4184 : parseFloat(kcal)) : null,
+      rust_hartslag: restHr != null && restHr > 20 ? Math.round(parseFloat(restHr)) : null,
+    })
+  }
+  return out
+}
+
 export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenTerug = 28) {
   const debug = {}
   // Suunto API max interval = 28 dagen
@@ -499,9 +526,22 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   try { recovery = await fetch247(`/247samples/recovery?from=${from}&to=${to}`, accessToken) }
   catch (e) { debug.recovery_error = e.message }
 
+  // Daily activity statistics: dagelijkse rollups (stappen, calorieën, rust-HR).
+  // Betrouwbaarder dan het optellen van losse samples; endpoint werkt met ISO-data.
+  let dagStats = []
+  try {
+    const sd = new Date(from).toISOString().slice(0, 10)
+    const ed = new Date(to).toISOString().slice(0, 10)
+    dagStats = await fetch247(`/247samples/daily-activity-statistics?startdate=${sd}&enddate=${ed}`, accessToken)
+  } catch (e) { debug.dagstats_error = e.message }
+
   debug.sleep_entries    = sleep.length
   debug.activity_entries = activity.length
   debug.recovery_entries = recovery.length
+  debug.dagstats_entries = Array.isArray(dagStats) ? dagStats.length : 0
+  // Debug: ruwe veldnamen zodat de exacte mapping te bevestigen is via Diagnose
+  const eersteStat = (Array.isArray(dagStats) ? dagStats[0] : null)
+  if (eersteStat) debug.dagstats_sample_keys = Object.keys(eersteStat.entryData || eersteStat)
 
   // Debug: welke HRV-velden zitten er in de recovery entries?
   const recoveryHrvVelden = { HRV: 0, Hrv: 0, HrvValue: 0, AverageHRV: 0, DailyHRV: 0, geen: 0 }
@@ -535,6 +575,7 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   const slaapMap    = aggregateSleep(sleep)
   const activityMap = aggregateActivity(activity)
   const recoveryMap = aggregateRecovery(recovery)
+  const dagStatsMap = aggregateDagStats(dagStats)
 
   // Debug: HRV per dag (sleep vs recovery bron)
   const vandaag = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
@@ -547,12 +588,13 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   }))
 
   // Unie van alle datums
-  const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys()])
+  const allDates = new Set([...slaapMap.keys(), ...activityMap.keys(), ...recoveryMap.keys(), ...dagStatsMap.keys()])
   const rows = []
   for (const datum of allDates) {
     const s = slaapMap.get(datum)    || {}
     const a = activityMap.get(datum) || {}
     const r = recoveryMap.get(datum) || {}
+    const ds = dagStatsMap.get(datum) || {}
     rows.push({
       user_id:          userId,
       datum,
@@ -568,10 +610,11 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
       hrv_laatste_tijd: r.hrv_laatste_tijd ?? null,
       herstel_balans:   r.herstel_balans   ?? null,
       stress_pct:       r.stress_pct       ?? null,
-      rust_hartslag:    s.rust_hartslag    ?? a.rust_hartslag ?? null,
+      // Daily-stats rollup heeft voorrang; sample-aggregatie als fallback
+      rust_hartslag:    s.rust_hartslag    ?? ds.rust_hartslag ?? a.rust_hartslag ?? null,
       min_hartslag_dag: a.min_hartslag_dag ?? null,
-      stappen:          a.stappen          ?? null,
-      kcal_actief:      a.kcal_actief      ?? null,
+      stappen:          ds.stappen         ?? a.stappen        ?? null,
+      kcal_actief:      ds.kcal_actief     ?? a.kcal_actief    ?? null,
       hulpbronnen_pct:  r.hulpbronnen_pct  ?? null,
       bron:             'suunto',
     })
@@ -594,9 +637,9 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
         rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
         lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
-        hrv_ochtend      = EXCLUDED.hrv_ochtend,
-        hrv_laatste      = EXCLUDED.hrv_laatste,
-        hrv_laatste_tijd = EXCLUDED.hrv_laatste_tijd,
+        hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
+        hrv_laatste      = COALESCE(EXCLUDED.hrv_laatste,      dagelijkse_wellness.hrv_laatste),
+        hrv_laatste_tijd = COALESCE(EXCLUDED.hrv_laatste_tijd, dagelijkse_wellness.hrv_laatste_tijd),
         herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
         stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
         rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
@@ -606,11 +649,58 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
         hulpbronnen_pct  = COALESCE(EXCLUDED.hulpbronnen_pct,  dagelijkse_wellness.hulpbronnen_pct),
         bron             = EXCLUDED.bron,
         updated_at       = NOW()
-      RETURNING datum
+      RETURNING (xmax = 0) AS nieuw
     `.catch(err => { debug.upsert_error = err.message; return [] })
   ))
-  const opgeslagen = upsertResultaten.reduce((s, r) => s + r.length, 0)
+  // Eerlijke telling: onderscheid nieuwe dagen van bijgewerkte (xmax = 0 → INSERT)
+  let nieuw = 0, bijgewerkt = 0
+  for (const r of upsertResultaten) for (const row of r) row.nieuw ? nieuw++ : bijgewerkt++
 
-  return { wellness_dagen: opgeslagen, debug }
+  // Volledige API-fout onderscheiden van "geen nieuwe data": als alle drie de
+  // 247-endpoints faalden, is dit een echte mislukking (geen stille success).
+  const alleApiFout = !!(debug.sleep_error && debug.activity_error && debug.recovery_error)
+
+  return {
+    wellness_dagen: nieuw + bijgewerkt, // totaal verwerkt (backward compat)
+    wellness_nieuw: nieuw,
+    wellness_bijgewerkt: bijgewerkt,
+    wellness_mislukt: alleApiFout,
+    debug,
+  }
+}
+
+// ─── Gedeelde achtergrond-sync (één waarheid voor dashboard + coach) ───────
+// Rate-limit via user_profile.suunto_laatste_sync — gezet NÁ succes, zodat een
+// afgekapte/mislukte run niet 5 min lang blokkeert. Klein venster (14d workouts,
+// 3d wellness) zodat het binnen het functie-budget past; de volledige backfill
+// zit uitsluitend in de handmatige sync (Instellingen).
+export async function autoSyncSuunto(sql, userId, { maxMs = 8000 } = {}) {
+  try {
+    await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_laatste_sync TIMESTAMPTZ`
+  } catch { /* kolom bestaat al of geen rechten — doorgaan */ }
+
+  const [p] = await sql`SELECT suunto_laatste_sync FROM user_profile WHERE user_id = ${userId}`.catch(() => [])
+  const laatste = p?.suunto_laatste_sync ? new Date(p.suunto_laatste_sync).getTime() : 0
+  if (Date.now() - laatste < 5 * 60 * 1000) return { skipped: 'recent' }
+
+  const token = await getValidToken(sql, userId).catch(() => null)
+  if (!token) return { skipped: 'geen_token' }
+
+  // De grendel wordt pas na volledige voltooiing gezet. Wint de timeout, dan
+  // blijft de grendel ongezet → een volgende request maakt idempotent af
+  // (workout-inserts zijn ON CONFLICT DO NOTHING, wellness is COALESCE-upsert).
+  const doSync = (async () => {
+    await syncSuuntoForUser(sql, userId, token, { sindsDagen: 14 })
+    if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
+      await syncSuuntoWellnessForUser(sql, userId, token, 3)
+    }
+    await sql`UPDATE user_profile SET suunto_laatste_sync = NOW() WHERE user_id = ${userId}`
+  })()
+
+  await Promise.race([
+    doSync.catch(() => {}),
+    new Promise(res => setTimeout(res, maxMs)),
+  ])
+  return { ok: true }
 }
 

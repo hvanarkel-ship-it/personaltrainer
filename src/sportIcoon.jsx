@@ -23,6 +23,19 @@ export const SPORT_LABEL = {
   voetbal: 'Voetbal', hyrox: 'Hyrox', overig: 'Overig', herstel: 'Herstel',
 }
 
+// Eén canonieke, thema-bewuste accentkleur per sport (voor balken/randen).
+// Gebruikt door Dashboard én Training — geen lokale kopieën meer.
+export const SPORT_ACCENT = {
+  hardlopen: 'var(--blue)',   fietsen:    'var(--amber)',
+  wielrennen: 'var(--amber)', fitness:    'var(--green)',
+  zwemmen:   '#5eb8ff',       padel:      '#c084fc',
+  tennis:    '#c084fc',       wandelen:   'var(--green)',
+  yoga:      '#f472b6',       voetbal:    'var(--blue)',
+  hyrox:     'var(--red)',    herstel:    'var(--text-3)',
+  overig:    'var(--text-3)',
+}
+export const sportAccent = sport => SPORT_ACCENT[sport] || 'var(--text-3)'
+
 // Corrigeert duur_min die per abuis in seconden is opgeslagen.
 // Heuristiek: als waarde > 720 (>12 uur) én na /60 realistisch is (<= 720 min),
 // dan behandelen we het als seconden.

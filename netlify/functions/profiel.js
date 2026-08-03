@@ -16,12 +16,24 @@ export const handler = async (event) => {
           p.geboortejaar, p.lengte_cm, p.gewicht_kg,
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
-          p.updated_at,
+          p.updated_at, p.suunto_laatste_sync,
           CASE WHEN p.suunto_access_token IS NOT NULL THEN true ELSE false END AS suunto_verbonden
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
-      `
+      `.catch(async () => {
+        // Kolom bestaat nog niet (nooit gesynct) → migreer en probeer opnieuw
+        await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_laatste_sync TIMESTAMPTZ`.catch(() => {})
+        return sql`
+          SELECT u.id, u.email, u.name, u.created_at,
+            p.geboortejaar, p.lengte_cm, p.gewicht_kg,
+            p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
+            p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
+            p.updated_at, p.suunto_laatste_sync,
+            CASE WHEN p.suunto_access_token IS NOT NULL THEN true ELSE false END AS suunto_verbonden
+          FROM users u LEFT JOIN user_profile p ON p.user_id = u.id WHERE u.id = ${userId}
+        `
+      })
       return cors(row || {})
     }
 

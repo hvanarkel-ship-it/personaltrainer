@@ -18,17 +18,23 @@ export const handler = async (event) => {
     }
 
     const accessToken = await getValidToken(sql, userId)
+    // Handmatige sync = volledige backfill (geen sindsDagen-venster)
     const workouts = await syncSuuntoForUser(sql, userId, accessToken)
 
-    // Wellness data parallel — alleen als subscription key beschikbaar is
-    let wellness = { wellness_dagen: 0, debug: { skipped: 'no subscription key' } }
+    // Wellness — alleen als subscription key beschikbaar is
+    let wellness = { wellness_dagen: 0, wellness_nieuw: 0, wellness_bijgewerkt: 0, geen_subscription_key: true }
     if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
       try {
         wellness = await syncSuuntoWellnessForUser(sql, userId, accessToken, 28)
       } catch (err) {
-        wellness = { wellness_dagen: 0, debug: { error: err.message } }
+        wellness = { wellness_dagen: 0, wellness_mislukt: true, debug: { error: err.message } }
       }
     }
+
+    // Grendel-tijdstip bijwerken zodat de achtergrond-sync niet direct opnieuw draait
+    await sql`
+      UPDATE user_profile SET suunto_laatste_sync = NOW() WHERE user_id = ${userId}
+    `.catch(() => {})
 
     return cors({ success: true, ...workouts, wellness })
   } catch (err) {

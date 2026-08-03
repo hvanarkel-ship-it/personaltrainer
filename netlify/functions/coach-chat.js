@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
-import { getValidToken, syncSuuntoWellnessForUser } from './_suunto.js'
+import { autoSyncSuunto } from './_suunto.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
@@ -210,26 +210,8 @@ export const handler = async (event) => {
       extractiePromise = detecteerMaaltijdTekst(sql, userId, bericht)
     }
 
-    // ── Suunto wellness bijwerken (max 1x per 5 min), hard begrensd op 6s ──
-    // De functie heeft een totaalbudget van 26s; een trage Suunto API mag het
-    // AI-antwoord niet in de timeout duwen. Dashboard-load synct toch al volledig.
-    try {
-      const [laatste] = await sql`
-        SELECT updated_at FROM dagelijkse_wellness
-        WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
-      `
-      const ouderDan5Min = !laatste?.updated_at ||
-        (Date.now() - new Date(laatste.updated_at).getTime()) > 5 * 60 * 1000
-      if (ouderDan5Min) {
-        const token = await getValidToken(sql, userId).catch(() => null)
-        if (token) {
-          await Promise.race([
-            syncSuuntoWellnessForUser(sql, userId, token, 2),
-            new Promise(res => setTimeout(res, 6000)),
-          ])
-        }
-      }
-    } catch { /* geen Suunto of sync mislukt — doorgaan met bestaande data */ }
+    // ── Achtergrond-sync (gedeelde helper, 6s budget zodat het AI-antwoord vlot blijft) ──
+    await autoSyncSuunto(sql, userId, { maxMs: 6000 }).catch(() => { /* doorgaan met bestaande data */ })
 
     // ── Alle data parallel ophalen ──
     const vandaag = vandaagAms()

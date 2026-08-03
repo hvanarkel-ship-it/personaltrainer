@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { api, datumStr, datumNl as datumNlApi } from '../api.js'
-import SportIcoon, { normMin } from '../sportIcoon.jsx'
+import { api, datumStr, datumNl as datumNlApi, MACRO_DEFAULTS } from '../api.js'
+import SportIcoon, { normMin, SPORT_ACCENT } from '../sportIcoon.jsx'
 import Ring from './ui/Ring.jsx'
 import Card from './ui/Card.jsx'
 import Sheet from './ui/Sheet.jsx'
@@ -48,16 +48,8 @@ function zoneInfo(score) {
   }
 }
 
-// ── Sport colour (dark theme) ──────────────────────────────────────────────
-
-const SPORT_COLOR = {
-  hardlopen: 'var(--blue)',   fietsen: 'var(--amber)',
-  fitness: 'var(--green)',    zwemmen: '#5eb8ff',
-  padel: '#c084fc',           tennis: '#c084fc',
-  wandelen: 'var(--green)',   yoga: '#f472b6',
-  voetbal: 'var(--blue)',     hyrox: 'var(--red)',
-  overig: 'var(--text-3)',
-}
+// Sport-accentkleur: canonieke map uit sportIcoon.jsx (één waarheid)
+const SPORT_COLOR = SPORT_ACCENT
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -136,7 +128,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
   // Nutrition
   const training_kcal = v.training_kcal || 0
-  const doel_kcal     = (p.doel_kcal || 2400) + training_kcal
+  const doel_kcal     = (p.doel_kcal || MACRO_DEFAULTS.kcal) + training_kcal
   const kcalPct  = Math.min(100, Math.round(((v.kcal || 0) / doel_kcal) * 100))
   const eiwitPct = p.doel_eiwit_g       ? Math.min(100, Math.round(((v.eiwit||0)        / p.doel_eiwit_g)       * 100)) : 0
   const khPct    = p.doel_koolhydraten_g ? Math.min(100, Math.round(((v.koolhydraten||0) / p.doel_koolhydraten_g) * 100)) : 0
@@ -461,9 +453,9 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
         {/* Macro trio */}
         <div className="form-grid-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', gap: 'var(--space-2)' }}>
-          <MacroBar label="Eiwit"  val={Math.round(v.eiwit||0)}        doel={p.doel_eiwit_g||160}        pct={eiwitPct} color="var(--green)" />
-          <MacroBar label="Koolh." val={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||250} pct={khPct}    color="var(--blue)" />
-          <MacroBar label="Vet"    val={Math.round(v.vetten||0)}       doel={p.doel_vetten_g||80}        pct={vetPct}   color="var(--amber)" />
+          <MacroBar label="Eiwit"  val={Math.round(v.eiwit||0)}        doel={p.doel_eiwit_g||MACRO_DEFAULTS.eiwit_g}        pct={eiwitPct} color="var(--green)" />
+          <MacroBar label="Koolh." val={Math.round(v.koolhydraten||0)} doel={p.doel_koolhydraten_g||MACRO_DEFAULTS.koolhydraten_g} pct={khPct}    color="var(--blue)" />
+          <MacroBar label="Vet"    val={Math.round(v.vetten||0)}       doel={p.doel_vetten_g||MACRO_DEFAULTS.vetten_g}        pct={vetPct}   color="var(--amber)" />
         </div>
 
         {/* Meal list */}

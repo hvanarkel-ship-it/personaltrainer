@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api, datumNl } from '../api.js'
-import SportIcoon, { SPORT_LABEL, normMin } from '../sportIcoon.jsx'
+import SportIcoon, { SPORT_LABEL, normMin, SPORT_ACCENT } from '../sportIcoon.jsx'
 import Card from './ui/Card.jsx'
 import Sheet from './ui/Sheet.jsx'
 import Chip from './ui/Chip.jsx'
@@ -11,14 +11,8 @@ const SPORTEN = ['hyrox','hardlopen','fitness','fietsen','zwemmen','padel','tenn
 const MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
 const DAGEN   = ['Ma','Di','Wo','Do','Vr','Za','Zo']
 
-const SPORT_COLOR = {
-  hardlopen: 'var(--blue)',    fietsen:   'var(--amber)',
-  fitness:   'var(--green)',   zwemmen:   '#5eb8ff',
-  padel:     '#c084fc',        tennis:    '#c084fc',
-  wandelen:  'var(--green)',   yoga:      '#f472b6',
-  voetbal:   'var(--blue)',    hyrox:     'var(--red)',
-  overig:    'var(--text-3)',  wielrennen: 'var(--amber)',
-}
+// Sport-accentkleur: canonieke map uit sportIcoon.jsx (één waarheid)
+const SPORT_COLOR = SPORT_ACCENT
 
 const BRON_COLOR = { suunto: 'blue', handmatig: 'muted' }
 const BRON_LABEL = { suunto: 'Suunto', handmatig: 'Handmatig' }

@@ -104,9 +104,25 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
     setSuuntoSyncing(true)
     try {
       const res = await api.post(reset ? '/suunto-sync?reset=1' : '/suunto-sync', {})
-      const wellnessDagen = res.wellness?.wellness_dagen ?? 0
-      setSuuntoLaatste({ nieuw: res.nieuweActiviteiten || [], overgeslagen: res.overgeslagen, wellnessDagen, tijdstip: new Date() })
-      showToast(`${res.gesynchroniseerd} nieuwe workouts${wellnessDagen > 0 ? ` + ${wellnessDagen} slaap/HRV dagen` : ''}`)
+      const w = res.wellness || {}
+      const nieuweWorkouts = res.gesynchroniseerd ?? 0
+      const wNieuw = w.wellness_nieuw ?? 0
+      setSuuntoLaatste({
+        nieuw: res.nieuweActiviteiten || [],
+        nieuweWorkouts,
+        wellnessNieuw: wNieuw,
+        wellnessBijgewerkt: w.wellness_bijgewerkt ?? 0,
+        wellnessMislukt: !!w.wellness_mislukt,
+        tijdstip: new Date(),
+      })
+      if (w.wellness_mislukt) {
+        showToast(`${nieuweWorkouts} nieuwe workouts · gezondheidsdata kon niet worden opgehaald`, 'error')
+      } else {
+        const delen = [`${nieuweWorkouts} nieuwe workout${nieuweWorkouts === 1 ? '' : 's'}`]
+        if (wNieuw > 0) delen.push(`${wNieuw} nieuwe dag${wNieuw === 1 ? '' : 'en'} gezondheidsdata`)
+        showToast(nieuweWorkouts === 0 && wNieuw === 0 ? 'Alles was al up-to-date' : delen.join(' · '))
+      }
+      setProfiel(p => ({ ...p, suunto_laatste_sync: new Date().toISOString() }))
       onDataVernieuwd?.()
     } catch (err) { showToast('Suunto sync mislukt: ' + err.message, 'error') }
     finally { setSuuntoSyncing(false) }
@@ -416,7 +432,15 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
           >
             {profiel.suunto_verbonden ? (
               <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
-                <p className="t-sm t-muted">Workouts worden direct vanuit de Suunto cloud gesynchroniseerd.</p>
+                <p className="t-sm t-muted">
+                  Workouts én gezondheidsdata (slaap, HRV, herstel, stappen) worden vanuit de Suunto cloud gesynchroniseerd.
+                </p>
+                {profiel.suunto_laatste_sync && (
+                  <p className="t-xs t-muted">
+                    Laatst gesynchroniseerd:{' '}
+                    {new Date(profiel.suunto_laatste_sync).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" style={{ flex: '1 1 140px' }} onClick={() => syncSuunto(false)} disabled={suuntoSyncing}>
                     {suuntoSyncing ? '...' : '↻ Synchroniseren'}
@@ -526,12 +550,15 @@ function IntegratieCard({ logo, logoStyle, naam, subtitel, verbonden, badge, chi
 }
 
 function SyncResultaat({ resultaat }) {
+  const kleur = resultaat.wellnessMislukt ? 'var(--amber)' : 'var(--green)'
   return (
     <Card variant="inset">
-      <p className="t-sm" style={{ fontWeight: 600, color: 'var(--green)', marginBottom: resultaat.nieuw.length ? 'var(--space-2)' : 0 }}>
+      <p className="t-sm" style={{ fontWeight: 600, color: kleur, marginBottom: resultaat.nieuw.length ? 'var(--space-2)' : 0 }}>
         {resultaat.tijdstip.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-        {' — '}{resultaat.nieuw.length} nieuw, {resultaat.overgeslagen} al bekend
-        {resultaat.wellnessDagen > 0 && ` — ${resultaat.wellnessDagen} dagen slaap/HRV`}
+        {' — '}{resultaat.nieuweWorkouts} nieuwe workout{resultaat.nieuweWorkouts === 1 ? '' : 's'}
+        {resultaat.wellnessNieuw > 0 && ` · ${resultaat.wellnessNieuw} nieuwe dag${resultaat.wellnessNieuw === 1 ? '' : 'en'} gezondheidsdata`}
+        {resultaat.wellnessBijgewerkt > 0 && resultaat.wellnessNieuw === 0 && ` · ${resultaat.wellnessBijgewerkt} dagen gecontroleerd`}
+        {resultaat.wellnessMislukt && ' · gezondheidsdata mislukt'}
       </p>
       {resultaat.nieuw.length > 0 ? (
         <div className="section-gap" style={{ gap: 4 }}>
