@@ -264,7 +264,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
         {/* Metrics row */}
         {heeftData && (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${h.hrv_laatste ? 4 : 3}, 1fr)`, gap: 'var(--space-2)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${h.hrv_laatste ? 4 : 3}, 1fr)`, gap: 'var(--space-2)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--hairline)' }}>
             <div style={{ textAlign: 'center' }}>
               <MetricHero
                 value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : null}
@@ -282,7 +282,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               )}
             </div>
             {h.hrv_laatste && (
-              <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)' }}>
                 <MetricHero
                   value={Math.round(h.hrv_laatste)}
                   unit="ms"
@@ -291,7 +291,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 />
               </div>
             )}
-            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-2)' }}>
+            <div style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)' }}>
               <MetricHero
                 value={h.slaap_uur ? parseFloat(h.slaap_uur).toFixed(1) : null}
                 unit={h.slaap_uur ? 'u' : ''}
@@ -299,7 +299,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 color={h.slaap_uur >= 7.5 ? 'var(--green)' : h.slaap_uur >= 6 ? 'var(--amber)' : h.slaap_uur ? 'var(--red)' : undefined}
               />
             </div>
-            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 'var(--space-2)' }}>
+            <div style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)' }}>
               <MetricHero
                 value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : null}
                 label="Balans"
@@ -382,7 +382,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               </div>
               <div className="metric-label">{echteTrainingen.length === 1 ? 'sessie' : 'sessies'}</div>
             </div>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <div style={{ width: 1, background: 'var(--hairline)' }} />
             <div>
               <div className="metric-row">
                 <span className="metric-value" style={{ fontSize: 'var(--t-xl)' }}>
@@ -395,7 +395,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             </div>
             {weekKcal > 0 && (
               <>
-                <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+                <div style={{ width: 1, background: 'var(--hairline)' }} />
                 <div>
                   <div className="metric-row">
                     <span className="metric-value" style={{ fontSize: 'var(--t-xl)' }}>{weekKcal}</span>
@@ -468,7 +468,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
         {/* Meal list */}
         {v.maaltijden_lijst?.length > 0 && (
-          <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 'var(--space-3)' }}>
+          <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid var(--hairline)', paddingTop: 'var(--space-3)' }}>
             {v.maaltijden_lijst.map((m, i) => (
               <div key={i} className="list-item">
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -570,7 +570,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                     padding: '10px 4px',
                     background: oForm.stemming == i+1 ? 'var(--bg-surface)' : 'var(--bg-raised)',
-                    border: oForm.stemming == i+1 ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                    border: oForm.stemming == i+1 ? '1px solid var(--border-active)' : '1px solid transparent',
                     borderRadius: 'var(--r-sm)',
                     cursor: 'pointer',
                     transition: 'border-color var(--dur-fast)',
@@ -617,7 +617,7 @@ function MacroBar({ label, val, doel, pct, color }) {
 function TrendChart({ days }) {
   const maxSlaap = 9
   return (
-    <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--hairline)' }}>
       <span className="t-label" style={{ marginBottom: 'var(--space-3)', display: 'block' }}>7 dagen HRV & slaap</span>
       <div style={{ display: 'flex', gap: 4, height: 80, alignItems: 'flex-end' }}>
         {days.map(d => {

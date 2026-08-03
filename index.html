@@ -8,6 +8,18 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0A0A0C" />
 
+    <!-- Thema vóór render toepassen (voorkomt flikkering) -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('apex_theme') || 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', t === 'light' ? '#EEF0F3' : '#0A0A0C');
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- iOS PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

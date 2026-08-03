@@ -6,6 +6,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Splits React/vendor van app-code: vendor verandert zelden en blijft
+    // zo gecached over deploys heen (snellere herhaalbezoeken na een update).
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

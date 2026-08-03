@@ -494,7 +494,7 @@ function MaandOverzicht({ trainingen }) {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 gap: 2, borderRadius: 'var(--r-xs)',
                 background: isVandaag ? 'var(--bg-surface)' : dagsessies.length > 0 ? 'var(--bg-raised)' : 'transparent',
-                border: isVandaag ? '1px solid rgba(255,255,255,0.15)' : dagsessies.length > 0 ? `1px solid ${color}33` : '1px solid transparent',
+                border: isVandaag ? '1px solid var(--border-active)' : dagsessies.length > 0 ? `1px solid ${color}33` : '1px solid transparent',
                 position: 'relative',
               }}
             >
@@ -521,19 +521,19 @@ function MaandOverzicht({ trainingen }) {
 
       {/* Month stats */}
       {sessies > 0 ? (
-        <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--hairline)' }}>
           <div>
             <div className="metric-value" style={{ fontSize: 'var(--t-lg)' }}>{sessies}</div>
             <div className="metric-label">sessies</div>
           </div>
-          <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+          <div style={{ width: 1, background: 'var(--hairline)' }} />
           <div>
             <div className="metric-value" style={{ fontSize: 'var(--t-lg)' }}>{fmtMin(totaalMin)}</div>
             <div className="metric-label">totaal</div>
           </div>
           {Math.round(totaalLoad) > 0 && (
             <>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ width: 1, background: 'var(--hairline)' }} />
               <div>
                 <div className="metric-value" style={{ fontSize: 'var(--t-lg)' }}>{Math.round(totaalLoad)}</div>
                 <div className="metric-label">load</div>
@@ -542,7 +542,7 @@ function MaandOverzicht({ trainingen }) {
           )}
           {topSport && (
             <>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ width: 1, background: 'var(--hairline)' }} />
               <div>
                 <div style={{ color: SPORT_COLOR[topSport] || 'var(--text-2)', fontWeight: 600, fontSize: 'var(--t-sm)' }}>
                   {SPORT_LABEL[topSport] || topSport}
@@ -667,7 +667,7 @@ function FilterChip({ label, active, color, onClick }) {
         display: 'inline-flex', alignItems: 'center',
         padding: '5px 12px', borderRadius: 'var(--r-xs)',
         background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
-        border: active ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+        border: active ? '1px solid var(--border-active)' : '1px solid transparent',
         color: active ? 'var(--text)' : 'var(--text-3)',
         fontSize: 'var(--t-xs)', fontWeight: 700,
         letterSpacing: '0.04em', textTransform: 'uppercase',

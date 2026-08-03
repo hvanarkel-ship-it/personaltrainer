@@ -167,7 +167,7 @@ export default function Onboarding({ user, onKlaar }) {
                   <button key={d.id} type="button" onClick={() => kiesDoel(d.id)} style={{
                     textAlign: 'left', padding: 'var(--space-3) var(--space-4)',
                     background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
-                    border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                    border: active ? '1px solid var(--border-active)' : '1px solid transparent',
                     borderRadius: 'var(--r-sm)', cursor: 'pointer', fontFamily: 'inherit',
                     transition: 'border-color var(--dur-fast)',
                   }}>
@@ -184,7 +184,7 @@ export default function Onboarding({ user, onKlaar }) {
                   const active = form.trainingsDagen === n
                   return (
                     <button key={n} type="button" onClick={() => upd('trainingsDagen', n)} style={{
-                      flex: 1, height: 40, border: active ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                      flex: 1, height: 40, border: active ? '1px solid var(--border-active)' : '1px solid transparent',
                       borderRadius: 'var(--r-xs)', background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
                       color: active ? 'var(--text)' : 'var(--text-3)', fontWeight: 700, fontSize: 'var(--t-sm)',
                       cursor: 'pointer', fontFamily: 'inherit', transition: 'border-color var(--dur-fast)',

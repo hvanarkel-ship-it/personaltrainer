@@ -1,4 +1,4 @@
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, Component, lazy, Suspense } from 'react'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { fout: null } }
@@ -29,9 +29,10 @@ import Doelen from './components/Doelen.jsx'
 import Settings from './components/Settings.jsx'
 import Statistieken from './components/Statistieken.jsx'
 import DbStatus from './components/DbStatus.jsx'
-import Styleguide from './components/Styleguide.jsx'
+// Dev-only stijlgids: lazy zodat hij niet in de hoofdbundle zit
+const Styleguide = lazy(() => import('./components/Styleguide.jsx'))
 
-const APP_VERSION = 'v2026.07-5'
+const APP_VERSION = 'v2026.08-1'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },
@@ -175,7 +176,13 @@ export default function App() {
     }
   }, [suuntoStatus, user])
 
-  if (isStyleguide) return <ErrorBoundary><Styleguide /></ErrorBoundary>
+  if (isStyleguide) return (
+    <ErrorBoundary>
+      <Suspense fallback={<div className="loading-screen"><div className="spinner" /></div>}>
+        <Styleguide />
+      </Suspense>
+    </ErrorBoundary>
+  )
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (resetToken) return (
     <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {

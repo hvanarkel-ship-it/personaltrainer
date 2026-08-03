@@ -33,6 +33,16 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
   const [suuntoSyncing, setSuuntoSyncing]     = useState(false)
   const [suuntoLaatste, setSuuntoLaatste]     = useState(null)
 
+  // Thema (dark/light)
+  const [thema, setThema] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark')
+  function kiesThema(t) {
+    setThema(t)
+    try { localStorage.setItem('apex_theme', t) } catch { /* private mode */ }
+    document.documentElement.setAttribute('data-theme', t)
+    const m = document.querySelector('meta[name="theme-color"]')
+    if (m) m.setAttribute('content', t === 'light' ? '#EEF0F3' : '#0A0A0C')
+  }
+
   useEffect(() => { laadProfiel() }, [])
 
   // Navigate to koppelingen tab after Suunto OAuth callback
@@ -158,7 +168,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
               flexShrink: 0,
               padding: '8px 16px',
               background: tab === t.id ? 'var(--bg-surface)' : 'transparent',
-              border: tab === t.id ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent',
+              border: tab === t.id ? '1px solid var(--border-soft)' : '1px solid transparent',
               borderRadius: 'var(--r-xs)',
               color: tab === t.id ? 'var(--text)' : 'var(--text-3)',
               fontSize: 'var(--t-sm)', fontWeight: 600, cursor: 'pointer',
@@ -168,6 +178,30 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
           >{t.label}</button>
         ))}
       </div>
+
+      {/* ── Weergave / thema ──────────────────────────────────────────── */}
+      <Card>
+        <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>Weergave</span>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          {[{ id: 'dark', label: '🌙 Donker' }, { id: 'light', label: '☀️ Licht' }].map(o => {
+            const active = thema === o.id
+            return (
+              <button
+                key={o.id} type="button"
+                onClick={() => kiesThema(o.id)}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 'var(--r-sm)',
+                  background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
+                  border: active ? '1px solid var(--border-active)' : '1px solid transparent',
+                  color: active ? 'var(--text)' : 'var(--text-3)',
+                  fontSize: 'var(--t-sm)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'border-color var(--dur-fast), color var(--dur-fast)',
+                }}
+              >{o.label}</button>
+            )
+          })}
+        </div>
+      </Card>
 
       {/* ── PROFIEL ───────────────────────────────────────────────────── */}
       {tab === 'profiel' && profiel && (
@@ -223,7 +257,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                         padding: '10px 4px',
                         background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
-                        border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                        border: active ? '1px solid var(--border-active)' : '1px solid transparent',
                         borderRadius: 'var(--r-sm)', cursor: 'pointer',
                         color: active ? 'var(--text)' : 'var(--text-3)',
                         transition: 'border-color var(--dur-fast), color var(--dur-fast)',
@@ -271,7 +305,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                       style={{
                         textAlign: 'left', padding: 'var(--space-3) var(--space-4)',
                         background: active ? 'var(--bg-surface)' : 'var(--bg-raised)',
-                        border: active ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                        border: active ? '1px solid var(--border-active)' : '1px solid transparent',
                         borderRadius: 'var(--r-sm)', cursor: 'pointer',
                         color: active ? 'var(--text)' : 'var(--text-3)',
                         fontSize: 'var(--t-sm)', fontWeight: active ? 600 : 400,
