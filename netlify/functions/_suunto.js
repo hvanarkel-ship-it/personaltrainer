@@ -480,8 +480,10 @@ function aggregateDagStats(metrieken) {
   for (const metriek of Array.isArray(metrieken) ? metrieken : []) {
     const naam = String(metriek?.Name || '').toLowerCase()
     let veld = null
-    if (naam.includes('step'))                              veld = 'stappen'
-    else if (naam.includes('energy') || naam.includes('calor')) veld = 'kcal_actief'
+    let inJoules = false
+    if (naam.includes('step'))                    veld = 'stappen'
+    else if (naam.includes('energy'))           { veld = 'kcal_actief'; inJoules = true }  // energyconsumption = joules
+    else if (naam.includes('calor'))              veld = 'kcal_actief'                       // reeds kcal
     else if (naam.includes('rest') && (naam.includes('hr') || naam.includes('heart'))) veld = 'rust_hartslag'
     if (!veld) continue
 
@@ -492,7 +494,7 @@ function aggregateDagStats(metrieken) {
         let val = parseFloat(s.Value)
         const cur = perDag.get(datum) || {}
         if (veld === 'kcal_actief') {
-          if (val > 50000) val = val / 4184 // joules → kcal
+          if (inJoules) val = val / 4184 // energyconsumption is joules → kcal
           cur[veld] = saneKcal(val)
         } else {
           cur[veld] = Math.round(val)
