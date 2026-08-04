@@ -238,13 +238,9 @@ export async function syncSuuntoForUser(sql, userId, accessToken, opts = {}) {
       }
 
       if (bestaandeIds.has(parsed.suunto_id)) {
-        // Zelfherstellend: corrigeer de sport van al geïmporteerde workouts
-        // als de mapping inmiddels verbeterd is
-        await sql`
-          UPDATE trainingen SET sport = ${parsed.sport}
-          WHERE user_id = ${userId} AND suunto_id = ${parsed.suunto_id}
-            AND sport IS DISTINCT FROM ${parsed.sport}
-        `
+        // Al geïmporteerd — NIET de sport overschrijven: dat zou een handmatige
+        // correctie ongedaan maken. Her-mappen gebeurt alleen bij 'Volledig
+        // opnieuw' (die wist en herimporteert).
         overgeslagen++
         continue
       }

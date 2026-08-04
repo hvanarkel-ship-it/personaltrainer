@@ -32,7 +32,7 @@ import DbStatus from './components/DbStatus.jsx'
 // Dev-only stijlgids: lazy zodat hij niet in de hoofdbundle zit
 const Styleguide = lazy(() => import('./components/Styleguide.jsx'))
 
-const APP_VERSION = 'v2026.08-7'
+const APP_VERSION = 'v2026.08-8'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },
