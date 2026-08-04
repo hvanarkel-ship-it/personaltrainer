@@ -463,26 +463,33 @@ function aggregateRecovery(entries) {
   return out
 }
 
-// Daily-activity-statistics rollups → per dag stappen/kcal/rust-HR.
-// Defensief: Suunto varieert veldnamen per firmware, dus meerdere fallbacks.
-function aggregateDagStats(entries) {
-  const out = new Map()
-  for (const e of entries || []) {
-    const d = e?.entryData || e
-    if (!d) continue
-    const datum = localDate(d.Date || d.date || d.Day || e?.timestamp)
-    if (!datum) continue
-    const stappen = d.Steps ?? d.StepCount ?? d.TotalSteps ?? null
-    const kcal    = d.EnergyConsumption ?? d.Energy ?? d.Calories ?? d.TotalCalories ?? null
-    const restHr  = d.RestingHR ?? d.RestHR ?? d.MinHR ?? d.RestingHeartRate ?? null
-    out.set(datum, {
-      stappen:       stappen != null ? Math.round(parseFloat(stappen)) : null,
-      // Suunto levert energie vaak in joules; >50k ⇒ joules → kcal
-      kcal_actief:   kcal != null ? Math.round(parseFloat(kcal) > 50000 ? parseFloat(kcal) / 4184 : parseFloat(kcal)) : null,
-      rust_hartslag: restHr != null && restHr > 20 ? Math.round(parseFloat(restHr)) : null,
-    })
+// Daily-activity-statistics: array van metriek-objecten, elk met
+// { Name, Aggregation, Sources:[{ Samples:[{ TimeISO8601, Value }] }] }.
+// Geverifieerd tegen de live API (o.a. Name: "stepcount"). We bouwen per dag
+// een rollup van de metrieken die we herkennen (stappen/kcal/rust-HR).
+function aggregateDagStats(metrieken) {
+  const perDag = new Map() // datum → { stappen, kcal_actief, rust_hartslag }
+  for (const metriek of Array.isArray(metrieken) ? metrieken : []) {
+    const naam = String(metriek?.Name || '').toLowerCase()
+    let veld = null
+    if (naam.includes('step'))                              veld = 'stappen'
+    else if (naam.includes('energy') || naam.includes('calor')) veld = 'kcal_actief'
+    else if (naam.includes('rest') && (naam.includes('hr') || naam.includes('heart'))) veld = 'rust_hartslag'
+    if (!veld) continue
+
+    for (const bron of metriek?.Sources || []) {
+      for (const s of bron?.Samples || []) {
+        const datum = localDate(s?.TimeISO8601)
+        if (!datum || s?.Value == null) continue
+        let val = parseFloat(s.Value)
+        if (veld === 'kcal_actief' && val > 50000) val = val / 4184 // joules → kcal
+        const cur = perDag.get(datum) || {}
+        cur[veld] = Math.round(val)
+        perDag.set(datum, cur)
+      }
+    }
   }
-  return out
+  return perDag
 }
 
 export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenTerug = 28) {
@@ -539,9 +546,8 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
   debug.activity_entries = activity.length
   debug.recovery_entries = recovery.length
   debug.dagstats_entries = Array.isArray(dagStats) ? dagStats.length : 0
-  // Debug: ruwe veldnamen zodat de exacte mapping te bevestigen is via Diagnose
-  const eersteStat = (Array.isArray(dagStats) ? dagStats[0] : null)
-  if (eersteStat) debug.dagstats_sample_keys = Object.keys(eersteStat.entryData || eersteStat)
+  // Debug: welke metriek-namen levert de daily-activity-statistics op?
+  if (Array.isArray(dagStats)) debug.dagstats_metrieken = dagStats.map(m => m?.Name).filter(Boolean)
 
   // Debug: welke HRV-velden zitten er in de recovery entries?
   const recoveryHrvVelden = { HRV: 0, Hrv: 0, HrvValue: 0, AverageHRV: 0, DailyHRV: 0, geen: 0 }
