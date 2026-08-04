@@ -128,11 +128,14 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
     finally { setSuuntoSyncing(false) }
   }
 
+  const [diagnose, setDiagnose] = useState(null)
   async function diagnoseSuunto() {
     try {
       const res = await api.get('/suunto-debug')
-      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' })
-      window.open(URL.createObjectURL(blob), '_blank')
+      const tekst = JSON.stringify(res, null, 2)
+      setDiagnose(tekst)
+      try { await navigator.clipboard?.writeText(tekst); showToast('Diagnose gekopieerd naar klembord') }
+      catch { showToast('Diagnose opgehaald — tik op het vak om te kopiëren') }
     } catch (err) { showToast('Diagnose mislukt: ' + err.message, 'error') }
   }
 
@@ -452,6 +455,20 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                   <button className="btn btn-ghost btn-sm" onClick={ontkoppelSuunto}>Ontkoppelen</button>
                 </div>
                 {suuntoLaatste && <SyncResultaat resultaat={suuntoLaatste} />}
+                {diagnose && (
+                  <div className="section-gap" style={{ gap: 'var(--space-2)' }}>
+                    <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}
+                      onClick={() => { navigator.clipboard?.writeText(diagnose); showToast('Gekopieerd') }}>
+                      ⧉ Kopieer diagnose
+                    </button>
+                    <textarea
+                      readOnly value={diagnose}
+                      onFocus={e => e.target.select()}
+                      className="input"
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: 11, height: 220, resize: 'vertical', whiteSpace: 'pre' }}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="section-gap" style={{ gap: 'var(--space-3)' }}>
