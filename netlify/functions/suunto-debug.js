@@ -45,6 +45,25 @@ export const handler = async (event) => {
       }
     }
 
+    // Specifieke samenvatting van de daily-activity-statistics metrieken
+    let dagstatsMetrieken = null
+    try {
+      const url = `${SUUNTO_API_BASE}/247samples/daily-activity-statistics?startdate=${new Date(from).toISOString()}&enddate=${new Date(to).toISOString()}`
+      const arr = await fetch(url, { headers: suuntoHeaders(accessToken) }).then(r => r.json())
+      if (Array.isArray(arr)) {
+        dagstatsMetrieken = arr.map(m => {
+          const samples = m?.Sources?.[0]?.Samples || []
+          return {
+            naam: m?.Name,
+            aggregatie: m?.Aggregation,
+            aantal_samples: samples.length,
+            eerste: samples[0] || null,
+            laatste: samples[samples.length - 1] || null,
+          }
+        })
+      }
+    } catch (e) { dagstatsMetrieken = [{ error: e.message }] }
+
     // Wat staat er ná de sync daadwerkelijk in de database? (verificatie-lus)
     let opgeslagen = []
     try {
@@ -67,6 +86,7 @@ export const handler = async (event) => {
       heeftSubscriptionKey: heeftKey,
       hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
       laatste_sync: laatsteSync,
+      dagstats_metrieken: dagstatsMetrieken,
       opgeslagen_in_db: opgeslagen,
       results,
     })

@@ -392,12 +392,20 @@ function aggregateActivity(entries) {
   for (const [datum, v] of perDag) {
     out.set(datum, {
       stappen:           v.stappen   > 0 ? v.stappen : null,
-      kcal_actief:       v.joules    > 0 ? Math.round(v.joules / 4184) : null,
+      kcal_actief:       saneKcal(v.joules > 0 ? v.joules / 4184 : null),
       rust_hartslag:     v.hrSlaap.length > 0 ? Math.round(Math.min(...v.hrSlaap)) : null,
       min_hartslag_dag:  v.hrDag.length   > 0 ? Math.round(Math.min(...v.hrDag))   : null,
     })
   }
   return out
+}
+
+// Actieve calorieën: fysiologische bovengrens ~8000 kcal/dag. Hogere waarden
+// duiden op onbetrouwbare/provisorische samples (bv. lopende dag) → null.
+function saneKcal(k) {
+  if (k == null) return null
+  const v = Math.round(parseFloat(k))
+  return v > 0 && v <= 8000 ? v : null
 }
 
 // Recovery: balance + stress + HRV + hulpbronnen per dag
@@ -482,9 +490,13 @@ function aggregateDagStats(metrieken) {
         const datum = localDate(s?.TimeISO8601)
         if (!datum || s?.Value == null) continue
         let val = parseFloat(s.Value)
-        if (veld === 'kcal_actief' && val > 50000) val = val / 4184 // joules → kcal
         const cur = perDag.get(datum) || {}
-        cur[veld] = Math.round(val)
+        if (veld === 'kcal_actief') {
+          if (val > 50000) val = val / 4184 // joules → kcal
+          cur[veld] = saneKcal(val)
+        } else {
+          cur[veld] = Math.round(val)
+        }
         perDag.set(datum, cur)
       }
     }
