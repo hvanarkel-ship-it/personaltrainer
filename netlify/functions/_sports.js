@@ -1,17 +1,15 @@
 // Centrale sport-categorisatie voor alle sync-bronnen
 
 // ── Suunto: numeric activityId → sport ─────────────────────────────────────
+// Alleen expliciete, betrouwbare mappings; al het overige valt via suuntoSport()
+// terug op fitness (gebruikersvoorkeur). Zo verschijnt "overig" niet meer.
 const SUUNTO_SPORT_MAP = {
-  0:   'overig',    1:   'wandelen',  2:   'fietsen',   3:   'overig',
-  5:   'fitness',   6:   'overig',    10:  'overig',     11:  'fietsen',
-  12:  'wandelen',  13:  'overig',    14:  'overig',     15:  'overig',
-  16:  'overig',    17:  'overig',    18:  'fitness',    20:  'overig',
-  21:  'fitness',   22:  'zwemmen',   23:  'fitness',    24:  'fitness',
-  25:  'wandelen',  29:  'overig',    30:  'overig',     31:  'overig',
-  33:  'fitness',   34:  'voetbal',   35:  'tennis',     37:  'overig',   148: 'padel',
-  53:  'hardlopen', 56:  'fitness',   58:  'yoga',       75:  'fitness',
-  82:  'hardlopen', 91:  'hardlopen', 108: 'fietsen',    109: 'zwemmen',
-  112: 'fitness',   130: 'yoga',
+  1:   'wandelen',  2:   'fietsen',   11:  'fietsen',   12:  'wandelen',
+  18:  'fitness',   21:  'fitness',   22:  'zwemmen',   23:  'fitness',
+  24:  'fitness',   25:  'wandelen',  33:  'fitness',   34:  'voetbal',
+  35:  'tennis',    53:  'hardlopen', 56:  'fitness',   58:  'yoga',
+  75:  'fitness',   82:  'hardlopen', 91:  'hardlopen', 108: 'fietsen',
+  109: 'zwemmen',   112: 'fitness',   130: 'yoga',      148: 'padel',
 }
 
 const SUUNTO_ACTIVITY_NAMES = {
@@ -27,11 +25,12 @@ const SUUNTO_ACTIVITY_NAMES = {
 }
 
 export function suuntoSport(activityId) {
-  return SUUNTO_SPORT_MAP[activityId] || 'overig'
+  // Onbekende activityId's → fitness (gebruikersvoorkeur: "overig is ook fitness").
+  return SUUNTO_SPORT_MAP[activityId] || 'fitness'
 }
 
 export function suuntoActivityTitle(activityId) {
-  return SUUNTO_ACTIVITY_NAMES[activityId] || `Suunto activiteit ${activityId}`
+  return SUUNTO_ACTIVITY_NAMES[activityId] || 'Training'
 }
 
 // Leid onze sport-categorie af uit een vrije activiteitsnaam (Suunto's eigen
