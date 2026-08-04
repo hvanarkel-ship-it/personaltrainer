@@ -45,9 +45,29 @@ export const handler = async (event) => {
       }
     }
 
+    // Wat staat er ná de sync daadwerkelijk in de database? (verificatie-lus)
+    let opgeslagen = []
+    try {
+      opgeslagen = await sql`
+        SELECT datum, stappen, kcal_actief, rust_hartslag, min_hartslag_dag,
+               hrv_ochtend, hrv_laatste, slaap_uur, herstel_balans, stress_pct, updated_at
+        FROM dagelijkse_wellness
+        WHERE user_id = ${userId}
+        ORDER BY datum DESC LIMIT 7
+      `
+    } catch (e) { opgeslagen = [{ error: e.message }] }
+
+    let laatsteSync = null
+    try {
+      const [p] = await sql`SELECT suunto_laatste_sync FROM user_profile WHERE user_id = ${userId}`
+      laatsteSync = p?.suunto_laatste_sync ?? null
+    } catch { /* kolom bestaat mogelijk nog niet */ }
+
     return cors({
       heeftSubscriptionKey: heeftKey,
       hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
+      laatste_sync: laatsteSync,
+      opgeslagen_in_db: opgeslagen,
       results,
     })
   } catch (err) {
