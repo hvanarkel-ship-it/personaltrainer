@@ -1,6 +1,7 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 import { getValidToken, suuntoHeaders, SUUNTO_API_BASE } from './_suunto.js'
+import { suuntoSport, suuntoActivityTitle, sportUitNaam } from './_sports.js'
 
 // Test de Suunto 247samples API (sleep, activity, recovery)
 // Vereist SUUNTO_SUBSCRIPTION_KEY in env vars
@@ -82,11 +83,30 @@ export const handler = async (event) => {
       laatsteSync = p?.suunto_laatste_sync ?? null
     } catch { /* kolom bestaat mogelijk nog niet */ }
 
+    // Ruwe workouts: welke activityId/activityName levert Suunto, en wat maken wij ervan?
+    let workouts = null
+    try {
+      const wUrl = `${SUUNTO_API_BASE}/v2/workouts?since=${to - 30 * 86400_000}&limit=15`
+      const wData = await fetch(wUrl, { headers: suuntoHeaders(accessToken) }).then(r => r.json())
+      const lijst = Array.isArray(wData?.payload) ? wData.payload : Array.isArray(wData) ? wData : (wData?.workouts || [])
+      workouts = lijst.slice(0, 15).map(w => {
+        const naam = w.activityName || w.activityType || w.workoutName || null
+        return {
+          activityId: w.activityId,
+          activityName: naam,
+          onze_sport: sportUitNaam(naam) || suuntoSport(parseInt(w.activityId, 10)),
+          via_naam: !!sportUitNaam(naam),
+          id_tabel_zou_geven: suuntoSport(parseInt(w.activityId, 10)) + ' / ' + suuntoActivityTitle(parseInt(w.activityId, 10)),
+        }
+      })
+    } catch (e) { workouts = [{ error: e.message }] }
+
     return cors({
       heeftSubscriptionKey: heeftKey,
       hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
       laatste_sync: laatsteSync,
       dagstats_metrieken: dagstatsMetrieken,
+      workouts,
       opgeslagen_in_db: opgeslagen,
       results,
     })

@@ -34,3 +34,23 @@ export function suuntoActivityTitle(activityId) {
   return SUUNTO_ACTIVITY_NAMES[activityId] || `Suunto activiteit ${activityId}`
 }
 
+// Leid onze sport-categorie af uit een vrije activiteitsnaam (Suunto's eigen
+// activityName is betrouwbaarder dan onze activityId-tabel). Volgorde telt:
+// specifieke termen eerst, zodat bv. "trail running" → hardlopen en niet
+// per ongeluk iets anders. Retourneert null als niets matcht.
+export function sportUitNaam(naam) {
+  const n = String(naam || '').toLowerCase()
+  if (!n) return null
+  if (/hyrox|hyro x/.test(n))                              return 'hyrox'
+  if (/padel/.test(n))                                     return 'padel'
+  if (/tennis|squash|badminton/.test(n))                   return 'tennis'
+  if (/voetbal|soccer|football/.test(n))                   return 'voetbal'
+  if (/gym|fitness|strength|kracht|weight|functional|crossfit|indoor training|circuit|hiit|bootcamp/.test(n)) return 'fitness'
+  if (/swim|zwem|pool|open water/.test(n))                 return 'zwemmen'
+  if (/cycl|bike|biking|fiets|ride|mtb|mountainbik|spinning|wielren/.test(n)) return 'fietsen'
+  if (/yoga|pilates|stretch|mobility/.test(n))             return 'yoga'
+  if (/walk|wandel|hike|hik|nordic|trekking/.test(n))      return 'wandelen'
+  if (/run|hardloop|hardlopen|loop|jog|trail/.test(n))     return 'hardlopen'
+  return null
+}
+

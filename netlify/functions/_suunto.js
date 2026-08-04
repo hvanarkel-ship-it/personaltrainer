@@ -2,7 +2,7 @@
 // Docs: https://cloudapi.suunto.com
 // Response-structuur geverifieerd via /v2/workouts in mei 2026
 
-import { suuntoSport, suuntoActivityTitle } from './_sports.js'
+import { suuntoSport, suuntoActivityTitle, sportUitNaam } from './_sports.js'
 
 export const SUUNTO_AUTH_URL   = 'https://cloudapi-oauth.suunto.com/oauth/authorize'
 export const SUUNTO_TOKEN_URL  = 'https://cloudapi-oauth.suunto.com/oauth/token'
@@ -125,22 +125,16 @@ function parseWorkout(w) {
   const tss = parseFloat(w.tss?.trainingStressScore) || 0
   const tssRound = tss > 0 ? Math.round(tss) : null
 
-  // Sport en titel — eerst op naam/omschrijving (vangt sportmodi waarvan het
-  // activityId niet in onze map staat), daarna op activityId
+  // Sport en titel. Suunto's eigen activityName is de betrouwbaarste bron
+  // (matcht wat de Suunto-app toont); onze activityId-tabel is slechts fallback.
   const activityId = parseInt(w.activityId, 10)
-  const naamTekst = [w.workoutName, w.name, w.description, summary?.description]
-    .filter(Boolean).join(' ').toLowerCase()
-  let sport = suuntoSport(activityId)
-  let titel = suuntoActivityTitle(activityId)
-  const naamSport =
-    /padel/.test(naamTekst)                    ? 'padel' :
-    /hyrox|hyro x/.test(naamTekst)             ? 'hyrox' :
-    /squash|badminton|tennis/.test(naamTekst)  ? 'tennis' :
-    /voetbal|soccer/.test(naamTekst)           ? 'voetbal' : null
-  if (naamSport && sport !== naamSport) {
-    sport = naamSport
-    titel = naamSport.charAt(0).toUpperCase() + naamSport.slice(1)
-  }
+  const suuntoNaam = w.activityName || w.activityType || w.workoutName || null
+  const naamTekst = [suuntoNaam, w.name, w.description, summary?.description]
+    .filter(Boolean).join(' ')
+  // Titel: toon Suunto's eigen naam als die er is, anders onze id-tabel
+  let titel = suuntoNaam || suuntoActivityTitle(activityId)
+  // Sport-categorie: eerst uit de naam afleiden (betrouwbaar), anders id-tabel
+  const sport = sportUitNaam(naamTekst) || suuntoSport(activityId)
 
   // Pace voor hardlopen: totaalSec / 1000 / distM = sec per meter → omkeren naar min/km
   let pace = null
@@ -184,6 +178,7 @@ function parseWorkout(w) {
     _hoogte: hoogte,
     _tss: tssRound,
     _activityId: activityId,
+    _activityName: suuntoNaam,
   }
 }
 
@@ -239,7 +234,7 @@ export async function syncSuuntoForUser(sql, userId, accessToken, opts = {}) {
       // zodat foute mappings (bijv. padel → fitness) traceerbaar zijn
       if (!debug.sport_mapping) debug.sport_mapping = []
       if (debug.sport_mapping.length < 15) {
-        debug.sport_mapping.push({ datum: parsed.datum, activityId: parsed._activityId, sport: parsed.sport })
+        debug.sport_mapping.push({ datum: parsed.datum, activityId: parsed._activityId, activityName: parsed._activityName, sport: parsed.sport })
       }
 
       if (bestaandeIds.has(parsed.suunto_id)) {
