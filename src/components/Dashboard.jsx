@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, datumStr, datumNl as datumNlApi, MACRO_DEFAULTS } from '../api.js'
 import SportIcoon, { normMin, SPORT_ACCENT } from '../sportIcoon.jsx'
+import { hrvKleur, hrvScore } from '../../shared/health.js'
 import Ring from './ui/Ring.jsx'
 import Card from './ui/Card.jsx'
 import Sheet from './ui/Sheet.jsx'
@@ -13,8 +14,7 @@ function berekenGereedheid(h) {
   if (!h) return null
   const scores = []
   if (h.hrv_ochtend) {
-    const v = parseFloat(h.hrv_ochtend)
-    scores.push({ w: 50, v: v >= 70 ? 100 : v >= 55 ? 78 : v >= 40 ? 52 : 28 })
+    scores.push({ w: 50, v: hrvScore(h.hrv_ochtend) })
   }
   if (h.slaap_uur) {
     const v = parseFloat(h.slaap_uur)
@@ -262,7 +262,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : null}
                 unit={h.hrv_ochtend ? 'ms' : ''}
                 label="Nightly"
-                color={h.hrv_ochtend >= 60 ? 'var(--green)' : h.hrv_ochtend >= 45 ? 'var(--amber)' : h.hrv_ochtend ? 'var(--red)' : undefined}
+                color={h.hrv_ochtend ? hrvKleur(h.hrv_ochtend) : undefined}
               />
               {hrvDelta !== null && (
                 <div className="t-xs" style={{
@@ -279,7 +279,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                   value={Math.round(h.hrv_laatste)}
                   unit="ms"
                   label={h.hrv_laatste_tijd ? `HRV ${h.hrv_laatste_tijd}` : 'HRV nu'}
-                  color={h.hrv_laatste >= 60 ? 'var(--green)' : h.hrv_laatste >= 45 ? 'var(--amber)' : 'var(--red)'}
+                  color={hrvKleur(h.hrv_laatste)}
                 />
               </div>
             )}
@@ -618,10 +618,7 @@ function TrendChart({ days }) {
             : d.slaap >= 7.5 ? 'var(--green)'
             : d.slaap >= 6.5 ? 'var(--amber)'
             : 'var(--red)'
-          const hrvColor = !d.hrv ? 'var(--text-3)'
-            : d.hrv >= 60 ? 'var(--green)'
-            : d.hrv >= 45 ? 'var(--amber)'
-            : 'var(--red)'
+          const hrvColor = d.hrv ? hrvKleur(d.hrv) : 'var(--text-3)'
           return (
             <div key={d.datum} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <span style={{ fontSize: 9, fontWeight: 700, color: hrvColor, lineHeight: 1 }}>

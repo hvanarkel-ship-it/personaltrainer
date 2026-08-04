@@ -1,5 +1,6 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
+import { MACRO_DEFAULTS } from '../../shared/nutrition.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -63,8 +64,8 @@ export const handler = async (event) => {
         VALUES (
           ${userId},
           ${d.geboortejaar || null}, ${d.lengte_cm || null}, ${d.gewicht_kg || null},
-          ${d.doel_kcal || 2400}, ${d.doel_eiwit_g || 160},
-          ${d.doel_koolhydraten_g || 250}, ${d.doel_vetten_g || 80},
+          ${d.doel_kcal || MACRO_DEFAULTS.kcal}, ${d.doel_eiwit_g || MACRO_DEFAULTS.eiwit_g},
+          ${d.doel_koolhydraten_g || MACRO_DEFAULTS.koolhydraten_g}, ${d.doel_vetten_g || MACRO_DEFAULTS.vetten_g},
           ${d.sporten || ['fitness', 'padel', 'fietsen']},
           ${d.geslacht || null},
           ${d.coach_context || null},

@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 import { autoSyncSuunto } from './_suunto.js'
+import { berekenTDEE, MACRO_DEFAULTS } from '../../shared/nutrition.js'
+import { hrvBandTekst } from '../../shared/health.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
@@ -309,21 +311,19 @@ export const handler = async (event) => {
     let tdeeStr = ''
     let tdee = null
     if (profiel?.gewicht_kg && profiel?.lengte_cm) {
-      const bmr = profiel.geslacht?.toLowerCase() === 'vrouw'
-        ? (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijdVoorBMR) - 161
-        : (10 * profiel.gewicht_kg) + (6.25 * profiel.lengte_cm) - (5 * leeftijdVoorBMR) + 5
-      // Activiteitsfactor o.b.v. weektotaal trainingsminuten (fysiologisch correct: volume telt, niet sessies)
+      // Gedeelde TDEE-berekening (zelfde formule + activiteitsfactor als Onboarding)
       const echteT = weektraining.filter(t => t.sport !== 'herstel')
       const totaalMinW = echteT.reduce((s, t) => s + (t.duur_min || 0), 0)
-      const actFactor = totaalMinW >= 420 ? 1.725   // ≥7u/week — zware atleet
-                      : totaalMinW >= 240 ? 1.55    // ≥4u/week — actief
-                      : totaalMinW >= 120 ? 1.375   // ≥2u/week — licht actief
-                      : totaalMinW >= 30  ? 1.3
-                      : 1.2
-      tdee = Math.round(bmr * actFactor)
-      const balans = totVandaag.kcal ? totVandaag.kcal - tdee : null
+      tdee = berekenTDEE({
+        geslacht: profiel.geslacht,
+        gewicht_kg: profiel.gewicht_kg,
+        lengte_cm: profiel.lengte_cm,
+        leeftijd: leeftijdVoorBMR,
+        weekMinuten: totaalMinW,
+      })
+      const balans = totVandaag.kcal && tdee ? totVandaag.kcal - tdee : null
       const ouderwetsLabel = leeftijdGeschat ? ' (leeftijd 35 aangenomen — vul geboortejaar in voor exacte berekening)' : ''
-      tdeeStr = `Geschatte TDEE: ~${tdee} kcal/dag (BMR × ${actFactor}, ${totaalMinW}min training/week)${ouderwetsLabel}
+      tdeeStr = `Geschatte TDEE: ~${tdee} kcal/dag (${totaalMinW}min training/week)${ouderwetsLabel}
 Voedingsbalans vandaag: ${balans !== null ? `${balans > 0 ? '+' : ''}${balans} kcal` : 'onbekend'}${balans !== null ? ` (${balans > 400 ? 'grote surplus' : balans > 0 ? 'lichte surplus' : balans > -400 ? 'licht tekort' : 'groot tekort'})` : ''}
 Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toFixed(1) : '?'} g/kg`
     }
@@ -336,10 +336,10 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     }[profiel?.coach_stijl || 'direct'] || 'Wees direct en bondig.'
 
     // ── Voeding vandaag opbouwen ──
-    const dagdoelKcal = profiel?.doel_kcal || 2400
-    const dagdoelEiwit = profiel?.doel_eiwit_g || 160
-    const dagdoelKh = profiel?.doel_koolhydraten_g || 250
-    const dagdoelVet = profiel?.doel_vetten_g || 80
+    const dagdoelKcal = profiel?.doel_kcal || MACRO_DEFAULTS.kcal
+    const dagdoelEiwit = profiel?.doel_eiwit_g || MACRO_DEFAULTS.eiwit_g
+    const dagdoelKh = profiel?.doel_koolhydraten_g || MACRO_DEFAULTS.koolhydraten_g
+    const dagdoelVet = profiel?.doel_vetten_g || MACRO_DEFAULTS.vetten_g
     const restKcal = dagdoelKcal - totVandaag.kcal
     const restEiwit = dagdoelEiwit - totVandaag.eiwit
 
@@ -520,7 +520,7 @@ ROL: Combineer trainer, diëtist, fysioloog en coach. Geef altijd concreet, gepe
 ═══ PROACTIEVE COACHINGSINSTRUCTIES ═══
 Wacht NOOIT tot de gebruiker vraagt. Analyseer de data en reageer proactief:
 • HRV < 45ms of slaap < 6u → waarschuw direct: geen intensieve training, prioriteit herstel
-• HRV > 55ms + minder dan 2 trainingen/week → daag uit: "Je lichaam is klaar, wanneer ga je trainen?"
+• HRV ≥ 60ms + minder dan 2 trainingen/week → daag uit: "Je lichaam is klaar, wanneer ga je trainen?"
 • Kcal < TDEE − 400 op een trainingsdag → wijs op ondervoedering en herstelrisico
 • Eiwit < ${minEiwit}g/dag (${eiwitPerKg}g/kg, afgestemd op sportprofiel) → geef concreet plan om dit aan te vullen
 • Zone2-training < 60min/week → adviseer aerobe basis opbouwen voor vetverbranding en herstel
@@ -532,7 +532,7 @@ Geef altijd een concrete aanbeveling voor de VOLGENDE 24 uur als dat relevant is
 ── HRV-INTERPRETATIE & OPTIMALISATIE ──
 HRV meet parasympathische activiteit. Hoge HRV = goed hersteld zenuwstelsel. Suunto-waarden zijn nachtgemiddelden (betrouwbaarder dan ochtendprik).
 Absolute richtwaarden (individueel — trend telt zwaarder dan één meting):
-• >65ms → uitstekend | 55–65ms → goed | 45–55ms → matig | <45ms → herstel vereist
+• ${hrvBandTekst()} (herstel vereist bij laag)
 Trendanalyse (gebruik de 7-daagse data):
 • Dalende trend over 3+ dagen → accumulerende vermoeidheid, verhoog geen volume
 • HRV laag + slaap kort → gecombineerd signaal; intensieve training gecontra-indiceerd

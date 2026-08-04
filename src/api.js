@@ -1,8 +1,7 @@
 const BASE = '/api'
 
-// Eén waarheid voor de fallback-dagdoelen (als een profiel nog geen doelen heeft).
-// Zelfde waarden als de backend-defaults in profiel.js / coach-chat.js.
-export const MACRO_DEFAULTS = { kcal: 2400, eiwit_g: 160, koolhydraten_g: 250, vetten_g: 80 }
+// Fallback-dagdoelen: her-geëxporteerd uit de gedeelde bron (één waarheid).
+export { MACRO_DEFAULTS } from '../shared/nutrition.js'
 
 // Neon driver geeft DATE-kolommen terug als Date-object, niet als string.
 // Deze helper normaliseert altijd naar 'YYYY-MM-DD' (lokale tijd, niet UTC).

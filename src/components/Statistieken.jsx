@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, datumStr, datumNl } from '../api.js'
 import SportIcoon, { SPORT_KLEUR, SPORT_LABEL, normMin } from '../sportIcoon.jsx'
+import { hrvKleur } from '../../shared/health.js'
 
 const pad2 = n => String(n).padStart(2, '0')
 function normDatum(d) {
@@ -290,10 +291,7 @@ function HrvSparkline({ wellness }) {
     <div>
       <div className="hrv-sparkline">
         {days.map((d, i) => {
-          const kleur = !d.hrv ? 'var(--bg-surface)'
-            : d.hrv >= 60 ? 'var(--green)'
-            : d.hrv >= 45 ? 'var(--amber)'
-            : 'var(--red)'
+          const kleur = d.hrv ? hrvKleur(d.hrv) : 'var(--bg-surface)'
           const h = d.hrv ? Math.max(4, (d.hrv / maxHrv) * 56) : 3
           return (
             <div key={i} className="hrv-spark-col"

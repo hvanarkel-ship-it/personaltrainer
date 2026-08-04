@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api.js'
+import { berekenTDEE } from '../../shared/nutrition.js'
 import Card from './ui/Card.jsx'
 
 const DOELEN = [
@@ -14,12 +15,10 @@ const HYROX_SPORTEN = ['hyrox', 'hardlopen', 'fitness', 'fietsen']
 
 function berekenDoelen({ geboortejaar, geslacht, lengte_cm, gewicht_kg, trainingsDagen, doel }) {
   const leeftijd = new Date().getFullYear() - parseInt(geboortejaar)
-  const g = parseFloat(gewicht_kg), l = parseFloat(lengte_cm)
-  const bmr = geslacht === 'vrouw'
-    ? (10 * g) + (6.25 * l) - (5 * leeftijd) - 161
-    : (10 * g) + (6.25 * l) - (5 * leeftijd) + 5
-  const actFactor = trainingsDagen >= 6 ? 1.725 : trainingsDagen >= 4 ? 1.55 : trainingsDagen >= 2 ? 1.375 : 1.2
-  const tdee = Math.round(bmr * actFactor)
+  const g = parseFloat(gewicht_kg)
+  // Gedeelde TDEE-berekening; dagen → geschatte weekminuten (×75 min/sessie),
+  // zodat Onboarding en de coach exact dezelfde activiteitsfactor gebruiken.
+  const tdee = berekenTDEE({ geslacht, gewicht_kg, lengte_cm, leeftijd, weekMinuten: trainingsDagen * 75 })
   const d = DOELEN.find(x => x.id === doel) || DOELEN[4]
   const doel_kcal = Math.max(1400, Math.round(tdee + d.kcalDelta))
   const doel_eiwit_g = Math.round(g * d.eiwit)
