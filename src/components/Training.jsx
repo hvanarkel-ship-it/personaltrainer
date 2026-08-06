@@ -73,7 +73,7 @@ export default function Training({ onNavigeer }) {
   const [bronFilter, setBronFilter] = useState('alle')
 
   useEffect(() => {
-    api.get('/training?limit=2000')
+    api.get('/training?limit=600')
       .then(setTrainingen)
       .catch(e => setFout(e.message))
       .finally(() => setLaden(false))

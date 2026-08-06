@@ -686,11 +686,15 @@ export async function syncSuuntoWellnessForUser(sql, userId, accessToken, dagenT
 // 3d wellness) zodat het binnen het functie-budget past; de volledige backfill
 // zit uitsluitend in de handmatige sync (Instellingen).
 export async function autoSyncSuunto(sql, userId, { maxMs = 8000 } = {}) {
+  // Geen DDL in het hot path: de kolom bestaat al in productie. Alleen als de
+  // SELECT faalt (verse DB) migreren we eenmalig en laten de volgende request het oppakken.
+  let p
   try {
-    await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_laatste_sync TIMESTAMPTZ`
-  } catch { /* kolom bestaat al of geen rechten — doorgaan */ }
-
-  const [p] = await sql`SELECT suunto_laatste_sync FROM user_profile WHERE user_id = ${userId}`.catch(() => [])
+    [p] = await sql`SELECT suunto_laatste_sync FROM user_profile WHERE user_id = ${userId}`
+  } catch {
+    await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS suunto_laatste_sync TIMESTAMPTZ`.catch(() => {})
+    return { skipped: 'migratie' }
+  }
   const laatste = p?.suunto_laatste_sync ? new Date(p.suunto_laatste_sync).getTime() : 0
   if (Date.now() - laatste < 5 * 60 * 1000) return { skipped: 'recent' }
 

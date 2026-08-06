@@ -19,53 +19,44 @@ export const handler = async (event) => {
   await autoSyncSuunto(sql, userId).catch(() => { /* doorgaan met bestaande data */ })
 
   try {
-    const [profiel] = await sql`
-      SELECT u.name, p.* FROM users u
-      LEFT JOIN user_profile p ON p.user_id = u.id
-      WHERE u.id = ${userId}
-    `
-
-    const [recenteInbody] = await sql`
-      SELECT * FROM inbody_metingen WHERE user_id = ${userId}
-      ORDER BY datum DESC LIMIT 1
-    `
-
-    const vandaagMaaltijden = await sql`
-      SELECT id, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
-      FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag}
-      ORDER BY created_at ASC`
-
-    const weektrainingen = await sql`
-      SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, rpe
-      FROM trainingen WHERE user_id = ${userId}
-      AND datum >= (CURRENT_DATE - INTERVAL '7 days')
-      ORDER BY datum DESC
-    `
-
-    // Meest recente HRV/slaap uit handmatige logs (laatste 7 dagen)
-    const [recentTraining] = await sql`
-      SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, datum
-      FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
-      AND datum >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY datum DESC LIMIT 1
-    `
-
-    // Meest recente Suunto wellness rij (voor stappen, herstelbalans etc.)
-    const [recentWellness] = await sql`
-      SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, stress_pct,
+    // Alle onafhankelijke reads parallel (1 batch i.p.v. ~9 sequentiële round-trips)
+    const [
+      [profiel],
+      [recenteInbody],
+      vandaagMaaltijden,
+      weektrainingen,
+      [recentTraining],
+      [recentWellness],
+      [recentWellnessHrv],
+      actieveDoelen,
+      gewichtTrend,
+      recentDagen,
+    ] = await Promise.all([
+      sql`SELECT u.name, p.* FROM users u
+          LEFT JOIN user_profile p ON p.user_id = u.id WHERE u.id = ${userId}`,
+      sql`SELECT * FROM inbody_metingen WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 1`,
+      sql`SELECT id, maaltijd_type, beschrijving, kcal, eiwit_g, koolhydraten_g, vetten_g
+          FROM maaltijden WHERE user_id = ${userId} AND datum = ${vandaag} ORDER BY created_at ASC`,
+      sql`SELECT datum, sport, duur_min, kcal, hrv_ochtend, slaap_uur, slaap_score, herstel_balans, rpe
+          FROM trainingen WHERE user_id = ${userId}
+          AND datum >= (CURRENT_DATE - INTERVAL '7 days') ORDER BY datum DESC`,
+      sql`SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, datum
+          FROM trainingen WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
+          AND datum >= CURRENT_DATE - INTERVAL '7 days' ORDER BY datum DESC LIMIT 1`,
+      sql`SELECT hrv_ochtend, slaap_uur, slaap_score, herstel_balans, stress_pct,
              rust_hartslag, stappen, kcal_actief, datum
-      FROM dagelijkse_wellness WHERE user_id = ${userId}
-      ORDER BY datum DESC LIMIT 1
-    `.catch(() => [])
-
-    // Meest recente rij MET HRV — kan een andere datum zijn dan recentWellness
-    // (Suunto slaat slaap op onder de datum waarop je ging slapen, niet wakker werd)
-    const [recentWellnessHrv] = await sql`
-      SELECT hrv_ochtend, hrv_laatste, hrv_laatste_tijd, slaap_uur, slaap_score, datum
-      FROM dagelijkse_wellness WHERE user_id = ${userId}
-        AND hrv_ochtend IS NOT NULL
-      ORDER BY datum DESC LIMIT 1
-    `.catch(() => [])
+          FROM dagelijkse_wellness WHERE user_id = ${userId} ORDER BY datum DESC LIMIT 1`.catch(() => []),
+      sql`SELECT hrv_ochtend, hrv_laatste, hrv_laatste_tijd, slaap_uur, slaap_score, datum
+          FROM dagelijkse_wellness WHERE user_id = ${userId} AND hrv_ochtend IS NOT NULL
+          ORDER BY datum DESC LIMIT 1`.catch(() => []),
+      sql`SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE
+          ORDER BY deadline ASC NULLS LAST LIMIT 5`,
+      sql`SELECT datum, gewicht_kg FROM inbody_metingen
+          WHERE user_id = ${userId} AND gewicht_kg IS NOT NULL ORDER BY datum DESC LIMIT 8`,
+      sql`SELECT DISTINCT datum::date as datum FROM trainingen
+          WHERE user_id = ${userId} AND sport != 'herstel'
+          AND datum >= CURRENT_DATE - INTERVAL '30 days' ORDER BY datum DESC`,
+    ])
 
     // Merge op datum: recentste bron wint. Bij gelijke datum heeft Suunto voorrang
     const trainDatum    = recentTraining    ? String(recentTraining.datum).slice(0, 10)    : null
@@ -93,24 +84,7 @@ export const handler = async (event) => {
       }
     }
 
-    const actieveDoelen = await sql`
-      SELECT * FROM doelen WHERE user_id = ${userId} AND actief = TRUE
-      ORDER BY deadline ASC NULLS LAST LIMIT 5
-    `
-
-    const gewichtTrend = await sql`
-      SELECT datum, gewicht_kg FROM inbody_metingen
-      WHERE user_id = ${userId} AND gewicht_kg IS NOT NULL
-      ORDER BY datum DESC LIMIT 8
-    `
-
     // Trainingstreak
-    const recentDagen = await sql`
-      SELECT DISTINCT datum::date as datum FROM trainingen
-      WHERE user_id = ${userId} AND sport != 'herstel'
-      AND datum >= CURRENT_DATE - INTERVAL '30 days'
-      ORDER BY datum DESC
-    `
     const normalizeDate = d => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).slice(0, 10))
     const trainDagen = new Set(recentDagen.map(r => normalizeDate(r.datum)))
     let trainingStreak = 0

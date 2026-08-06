@@ -694,7 +694,10 @@ Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande da
 BELANGRIJK — LENGTE: houd antwoorden compact en mobiel-leesbaar: maximaal ~250 woorden. Kies de 2-3 belangrijkste inzichten in plaats van alles op te sommen. Alleen als de gebruiker expliciet om een uitgebreide analyse of volledig plan vraagt mag het langer zijn.`
 
     // ── Bouw user bericht op (afbeeldingen + tekst + geëxtraheerde context) ──
-    const userContent = bestandenNaarContent(bestanden || [])
+    // Is de foto al door een gestructureerde extractie verwerkt (opgeslagen), dan
+    // zit de data in de samenvatting — stuur de ruwe afbeelding niet nóg eens naar
+    // de hoofd-AI (halveert vision-tokens en upload bij InBody/Suunto/maaltijd-foto).
+    const userContent = opgeslagen ? [] : bestandenNaarContent(bestanden || [])
     let berichtTekst = bericht || ''
     if (opgeslagen?.samenvatting) {
       berichtTekst += `\n\n[Automatisch opgeslagen in logboek — geëxtraheerde data]\n${opgeslagen.samenvatting}`

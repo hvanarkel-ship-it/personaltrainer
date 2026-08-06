@@ -126,9 +126,9 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const weekMinuten = echteTrainingen.reduce((s, t) => s + normMin(t.duur_min), 0)
   const weekKcal    = echteTrainingen.reduce((s, t) => s + (t.kcal || 0), 0)
 
-  // Nutrition
-  const training_kcal = v.training_kcal || 0
-  const doel_kcal     = (p.doel_kcal || MACRO_DEFAULTS.kcal) + training_kcal
+  // Nutrition — vast, activiteit-gecorrigeerd doel (geen eat-back: de
+  // activiteitsfactor in de TDEE verrekent training al; consistent met Voeding).
+  const doel_kcal = p.doel_kcal || MACRO_DEFAULTS.kcal
   const kcalPct  = Math.min(100, Math.round(((v.kcal || 0) / doel_kcal) * 100))
   const eiwitPct = p.doel_eiwit_g       ? Math.min(100, Math.round(((v.eiwit||0)        / p.doel_eiwit_g)       * 100)) : 0
   const khPct    = p.doel_koolhydraten_g ? Math.min(100, Math.round(((v.koolhydraten||0) / p.doel_koolhydraten_g) * 100)) : 0
@@ -443,7 +443,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             <span className="t-sm">
               <span style={{ fontWeight: 700 }}>{v.kcal || 0}</span>
               <span className="t-muted"> / {doel_kcal} kcal</span>
-              {training_kcal > 0 && <span className="t-muted"> (+{training_kcal})</span>}
             </span>
           </div>
           <div className="progress-bar" style={{ height: 6 }}>
