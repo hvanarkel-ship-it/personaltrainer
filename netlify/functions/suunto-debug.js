@@ -91,12 +91,18 @@ export const handler = async (event) => {
       const lijst = Array.isArray(wData?.payload) ? wData.payload : Array.isArray(wData) ? wData : (wData?.workouts || [])
       workouts = lijst.slice(0, 15).map(w => {
         const naam = w.activityName || w.activityType || w.workoutName || null
+        const start = parseInt(w.startTime, 10)
+        const offset = parseInt(w.timeOffsetInMinutes, 10) || 0
+        const datum = start ? new Date(start + offset * 60000).toISOString().slice(0, 10) : null
+        const sec = parseFloat(w.totalTime) || 0
+        const distM = parseFloat(w.totalDistance) || 0
         return {
+          datum,
+          duur_min: sec > 0 ? Math.round(sec / 60) : null,
+          km: distM > 0 ? Math.round(distM / 100) / 10 : null,
           activityId: w.activityId,
           activityName: naam,
           onze_sport: sportUitNaam(naam) || suuntoSport(parseInt(w.activityId, 10)),
-          via_naam: !!sportUitNaam(naam),
-          id_tabel_zou_geven: suuntoSport(parseInt(w.activityId, 10)) + ' / ' + suuntoActivityTitle(parseInt(w.activityId, 10)),
         }
       })
     } catch (e) { workouts = [{ error: e.message }] }
