@@ -419,6 +419,7 @@ select.input { cursor: pointer; }
 /* ── Coach / Chat ──────────────────────────────────────────────────────── */
 .coach-page {
   flex: 1;
+  min-height: 0; /* laat de geneste scroll-area intern scrollen i.p.v. de pagina te laten groeien */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -434,6 +435,7 @@ select.input { cursor: pointer; }
 }
 .coach-scroll {
   flex: 1;
+  min-height: 0; /* cruciaal: anders groeit de flex-child mee met de berichten en scrollt de hele pagina */
   overflow-y: auto;
   padding: var(--space-3) var(--space-4);
   display: flex;

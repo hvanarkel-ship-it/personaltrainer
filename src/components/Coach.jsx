@@ -24,7 +24,7 @@ const SAVED_CFG = {
   maaltijd: { kleur: 'var(--amber)', label: 'Maaltijd opgeslagen' },
 }
 
-export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
+export default function Coach({ user, actief, coachTrigger, onCoachTriggerUsed }) {
   const [berichten, setBerichten]       = useState([])
   const [input, setInput]               = useState('')
   const [laden, setLaden]               = useState(false)
@@ -82,6 +82,17 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
       setNieuweMsg(false)
     }
   }, [berichten, nieuweMsg])
+
+  // Scroll naar het laatste bericht zodra de Coach zichtbaar wordt. Nodig omdat
+  // de Coach altijd gemount is (display:none); scrollIntoView werkt niet op een
+  // verborgen element, dus bij het openen zou hij anders bovenaan blijven staan.
+  useEffect(() => {
+    if (!actief) return
+    const id = requestAnimationFrame(() =>
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+    )
+    return () => cancelAnimationFrame(id)
+  }, [actief])
 
   // Close upload menu on outside click
   useEffect(() => {

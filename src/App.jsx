@@ -241,6 +241,7 @@ export default function App() {
         <Coach
           user={user}
           {...navProps}
+          actief={scherm === 'coach'}
           coachTrigger={coachTrigger}
           onCoachTriggerUsed={() => setCoachTrigger(null)}
         />
@@ -262,7 +263,7 @@ export default function App() {
         </Suspense>
       )}
 
-      <div className="app-versie">{APP_VERSION}</div>
+      {scherm !== 'coach' && <div className="app-versie">{APP_VERSION}</div>}
 
       <nav className="bottom-nav">
         {NAV.map(item => (
