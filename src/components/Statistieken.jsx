@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api, datumStr, datumNl } from '../api.js'
 import SportIcoon, { SPORT_KLEUR, SPORT_LABEL, normMin } from '../sportIcoon.jsx'
 import { hrvKleur } from '../../shared/health.js'
@@ -36,70 +36,66 @@ export default function Statistieken({ onNavigeer }) {
       .finally(() => setLaden(false))
   }, [periode])
 
+  // Zware afgeleide data memoïseren (vóór de early-returns i.v.m. hook-regels;
+  // herberekent alleen bij nieuwe data/periode, niet bij een week-klik).
+  const afgeleid = useMemo(() => {
+    const activiteiten = data?.activiteiten || []
+    const aantalWeken = Math.ceil(periode / 7)
+    const nu = new Date()
+    const maandag = new Date(nu)
+    maandag.setDate(nu.getDate() - ((nu.getDay() + 6) % 7))
+    maandag.setHours(0, 0, 0, 0)
+
+    const weken = Array.from({ length: aantalWeken }, (_, i) => {
+      const start = new Date(maandag)
+      start.setDate(maandag.getDate() - (aantalWeken - 1 - i) * 7)
+      const eind = new Date(start)
+      eind.setDate(start.getDate() + 7)
+      const weekActs = activiteiten.filter(a => {
+        const d = new Date(normDatum(a.datum) + 'T12:00:00')
+        return d >= start && d < eind
+      })
+      const sportMin = {}
+      for (const a of weekActs) sportMin[a.sport] = (sportMin[a.sport] || 0) + normMin(a.duur_min)
+      const totaalMin = Object.values(sportMin).reduce((s, m) => s + m, 0)
+      return {
+        start, label: start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+        activiteiten: weekActs, totaalMin, sportMin,
+        dominantSport: Object.entries(sportMin).sort((a, b) => b[1] - a[1])[0]?.[0],
+        sessies: weekActs.length,
+      }
+    })
+
+    const sportStats = {}
+    let z2 = 0, z3 = 0, z4 = 0, totMin = 0
+    for (const a of activiteiten) {
+      if (!sportStats[a.sport]) sportStats[a.sport] = { sessies: 0, minuten: 0 }
+      sportStats[a.sport].sessies++
+      sportStats[a.sport].minuten += normMin(a.duur_min)
+      z2 += a.zone2_min || 0; z3 += a.zone3_min || 0; z4 += a.zone4_min || 0
+      totMin += normMin(a.duur_min)
+    }
+    const sportLijst = Object.entries(sportStats).sort((a, b) => b[1].minuten - a[1].minuten)
+    const zTotaal = z2 + z3 + z4
+    return {
+      weken, sportLijst,
+      totaalMinuten: sportLijst.reduce((s, [, v]) => s + v.minuten, 0),
+      z2, z3, z4, zTotaal,
+      zone2Ratio: zTotaal > 0 ? Math.round((z2 / zTotaal) * 100) : null,
+      totSessies: activiteiten.length, totMin,
+      gemPerWeek: aantalWeken > 0 ? Math.round(totMin / aantalWeken) : 0,
+      maxWekMin: Math.max(...weken.map(w => w.totaalMin), 60),
+    }
+  }, [data, periode])
+
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return null
 
   const { activiteiten = [], wellness = [] } = data
-  const aantalWeken = Math.ceil(periode / 7)
-
-  // Build weekly groups starting from this week's Monday going back N weeks
-  const nu = new Date()
-  const maandag = new Date(nu)
-  maandag.setDate(nu.getDate() - ((nu.getDay() + 6) % 7))
-  maandag.setHours(0, 0, 0, 0)
-
-  const weken = Array.from({ length: aantalWeken }, (_, i) => {
-    const start = new Date(maandag)
-    start.setDate(maandag.getDate() - (aantalWeken - 1 - i) * 7)
-    const eind = new Date(start)
-    eind.setDate(start.getDate() + 7)
-
-    const weekActs = activiteiten.filter(a => {
-      const d = new Date(normDatum(a.datum) + 'T12:00:00')
-      return d >= start && d < eind
-    })
-
-    const sportMin = {}
-    for (const a of weekActs) {
-      sportMin[a.sport] = (sportMin[a.sport] || 0) + normMin(a.duur_min)
-    }
-    const totaalMin = Object.values(sportMin).reduce((s, m) => s + m, 0)
-    const dominantSport = Object.entries(sportMin).sort((a, b) => b[1] - a[1])[0]?.[0]
-
-    return {
-      start,
-      label: start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
-      activiteiten: weekActs,
-      totaalMin,
-      sportMin,
-      dominantSport,
-      sessies: weekActs.length,
-    }
-  })
-
-  // Sport breakdown totals
-  const sportStats = {}
-  for (const a of activiteiten) {
-    if (!sportStats[a.sport]) sportStats[a.sport] = { sessies: 0, minuten: 0 }
-    sportStats[a.sport].sessies++
-    sportStats[a.sport].minuten += normMin(a.duur_min)
-  }
-  const sportLijst = Object.entries(sportStats).sort((a, b) => b[1].minuten - a[1].minuten)
-  const totaalMinuten = sportLijst.reduce((s, [, v]) => s + v.minuten, 0)
-
-  // Zone totals
-  const z2 = activiteiten.reduce((s, a) => s + (a.zone2_min || 0), 0)
-  const z3 = activiteiten.reduce((s, a) => s + (a.zone3_min || 0), 0)
-  const z4 = activiteiten.reduce((s, a) => s + (a.zone4_min || 0), 0)
-  const zTotaal = z2 + z3 + z4
-  const zone2Ratio = zTotaal > 0 ? Math.round((z2 / zTotaal) * 100) : null
-
-  // Summary stats
-  const totSessies = activiteiten.length
-  const totMin = activiteiten.reduce((s, a) => s + normMin(a.duur_min), 0)
-  const gemPerWeek = aantalWeken > 0 ? Math.round(totMin / aantalWeken) : 0
-
-  const maxWekMin = Math.max(...weken.map(w => w.totaalMin), 60)
+  const {
+    weken, sportLijst, totaalMinuten, z2, z3, z4, zTotaal, zone2Ratio,
+    totSessies, totMin, gemPerWeek, maxWekMin,
+  } = afgeleid
   const gekozenWeekActs = geselecteerdeWeek !== null
     ? weken[geselecteerdeWeek].activiteiten
     : activiteiten.slice(0, 12)

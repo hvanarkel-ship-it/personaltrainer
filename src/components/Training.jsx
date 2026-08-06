@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api, datumNl } from '../api.js'
 import SportIcoon, { SPORT_LABEL, normMin, SPORT_ACCENT } from '../sportIcoon.jsx'
 import Card from './ui/Card.jsx'
@@ -128,35 +128,42 @@ export default function Training({ onNavigeer }) {
     } catch (err) { setFout('Verwijderen mislukt: ' + err.message) }
   }
 
-  // ── Week load chart ──────────────────────────────────────────────────────
+  // ── Week load chart (gememoïseerd: scant de volledige lijst) ──────────────
 
   const vandaag = vandaagStr()
-  const week = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    const ds = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
-    const dag = trainingen.filter(t => normDatum(t.datum) === ds && t.sport !== 'herstel')
-    const minuten = dag.reduce((s, t) => s + normMin(t.duur_min), 0)
-    const load = dag.reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+  const { week, maxVal, weekMin, weekSessies, weekLoad } = useMemo(() => {
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i))
+      const ds = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+      const dag = trainingen.filter(t => normDatum(t.datum) === ds && t.sport !== 'herstel')
+      const minuten = dag.reduce((s, t) => s + normMin(t.duur_min), 0)
+      const load = dag.reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+      return {
+        datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+        minuten, sessies: dag.length, load: Math.round(load), isVandaag: ds === vandaag,
+      }
+    })
     return {
-      datum: ds, label: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
-      minuten, sessies: dag.length, load: Math.round(load),
-      isVandaag: ds === vandaag,
+      week,
+      maxVal: Math.max(...week.map(d => d.load || d.minuten), 60),
+      weekMin: week.reduce((s, d) => s + d.minuten, 0),
+      weekSessies: week.reduce((s, d) => s + d.sessies, 0),
+      weekLoad: week.reduce((s, d) => s + d.load, 0),
     }
-  })
-  const maxVal = Math.max(...week.map(d => d.load || d.minuten), 60)
-  const weekMin     = week.reduce((s, d) => s + d.minuten, 0)
-  const weekSessies = week.reduce((s, d) => s + d.sessies, 0)
-  const weekLoad    = week.reduce((s, d) => s + d.load, 0)
+  }, [trainingen, vandaag])
 
-  // ── Filtered list ────────────────────────────────────────────────────────
+  // ── Filtered list (gememoïseerd) ──────────────────────────────────────────
 
-  const echte = trainingen.filter(t => t.sport !== 'herstel')
-  const gefilterd = bronFilter === 'alle' ? echte : echte.filter(t => (t.bron || 'handmatig') === bronFilter)
-  const bronTelling = echte.reduce((acc, t) => {
+  const echte = useMemo(() => trainingen.filter(t => t.sport !== 'herstel'), [trainingen])
+  const bronTelling = useMemo(() => echte.reduce((acc, t) => {
     const b = t.bron || 'handmatig'
     acc[b] = (acc[b] || 0) + 1
     return acc
-  }, {})
+  }, {}), [echte])
+  const gefilterd = useMemo(
+    () => bronFilter === 'alle' ? echte : echte.filter(t => (t.bron || 'handmatig') === bronFilter),
+    [echte, bronFilter]
+  )
   const meerdereBronnen = Object.keys(bronTelling).length > 1
 
   return (
@@ -416,31 +423,35 @@ function MaandOverzicht({ trainingen }) {
   }
 
   const isHuidig = jaar === vandaag.getFullYear() && maand === vandaag.getMonth()
-  const prefix   = `${jaar}-${pad2(maand + 1)}`
-  const maandT   = trainingen.filter(t => t.sport !== 'herstel' && normDatum(t.datum).startsWith(prefix))
-
-  const eersteVdMaand = new Date(jaar, maand, 1)
-  const dagVdWeek     = (eersteVdMaand.getDay() + 6) % 7
-  const aantalDagen   = new Date(jaar, maand + 1, 0).getDate()
-
-  const cellen = []
-  for (let i = 0; i < dagVdWeek; i++) cellen.push(null)
-  for (let d = 1; d <= aantalDagen; d++) cellen.push(d)
-
-  const perDag = {}
-  for (const t of maandT) {
-    const d = parseInt(normDatum(t.datum).slice(8, 10))
-    if (!perDag[d]) perDag[d] = []
-    perDag[d].push(t)
-  }
-
-  const sessies   = maandT.length
-  const totaalMin = maandT.reduce((s, t) => s + normMin(t.duur_min), 0)
-  const totaalLoad = maandT.reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
-  const sportTelling = {}
-  for (const t of maandT) sportTelling[t.sport] = (sportTelling[t.sport] || 0) + 1
-  const topSport = Object.entries(sportTelling).sort((a, b) => b[1] - a[1])[0]?.[0]
   const vandaagDag = isHuidig ? vandaag.getDate() : null
+
+  // Maandberekeningen memoïseren: scant de volledige lijst, alleen afhankelijk
+  // van de lijst en de gekozen maand — niet van andere parent-re-renders.
+  const { cellen, perDag, sessies, totaalMin, totaalLoad, topSport } = useMemo(() => {
+    const prefix = `${jaar}-${pad2(maand + 1)}`
+    const maandT = trainingen.filter(t => t.sport !== 'herstel' && normDatum(t.datum).startsWith(prefix))
+
+    const dagVdWeek   = (new Date(jaar, maand, 1).getDay() + 6) % 7
+    const aantalDagen = new Date(jaar, maand + 1, 0).getDate()
+    const cellen = []
+    for (let i = 0; i < dagVdWeek; i++) cellen.push(null)
+    for (let d = 1; d <= aantalDagen; d++) cellen.push(d)
+
+    const perDag = {}
+    const sportTelling = {}
+    let totaalMin = 0, totaalLoad = 0
+    for (const t of maandT) {
+      const d = parseInt(normDatum(t.datum).slice(8, 10))
+      ;(perDag[d] ||= []).push(t)
+      totaalMin += normMin(t.duur_min)
+      totaalLoad += normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10)
+      sportTelling[t.sport] = (sportTelling[t.sport] || 0) + 1
+    }
+    return {
+      cellen, perDag, sessies: maandT.length, totaalMin, totaalLoad,
+      topSport: Object.entries(sportTelling).sort((a, b) => b[1] - a[1])[0]?.[0],
+    }
+  }, [trainingen, jaar, maand])
 
   return (
     <Card>

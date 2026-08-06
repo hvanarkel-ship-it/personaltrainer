@@ -18,21 +18,21 @@ class ErrorBoundary extends Component {
   }
 }
 import Login from './components/Login.jsx'
-import Onboarding from './components/Onboarding.jsx'
-import WachtwoordReset from './components/WachtwoordReset.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Coach from './components/Coach.jsx'
-import Training from './components/Training.jsx'
-import Voeding from './components/Voeding.jsx'
-import Lichaam from './components/Lichaam.jsx'
-import Doelen from './components/Doelen.jsx'
-import Settings from './components/Settings.jsx'
-import Statistieken from './components/Statistieken.jsx'
 import DbStatus from './components/DbStatus.jsx'
-// Dev-only stijlgids: lazy zodat hij niet in de hoofdbundle zit
-const Styleguide = lazy(() => import('./components/Styleguide.jsx'))
+// Overige schermen lazy: kleinere initiële bundel (Login + Dashboard + Coach eager)
+const Onboarding      = lazy(() => import('./components/Onboarding.jsx'))
+const WachtwoordReset = lazy(() => import('./components/WachtwoordReset.jsx'))
+const Training        = lazy(() => import('./components/Training.jsx'))
+const Voeding         = lazy(() => import('./components/Voeding.jsx'))
+const Lichaam         = lazy(() => import('./components/Lichaam.jsx'))
+const Doelen          = lazy(() => import('./components/Doelen.jsx'))
+const Settings        = lazy(() => import('./components/Settings.jsx'))
+const Statistieken    = lazy(() => import('./components/Statistieken.jsx'))
+const Styleguide      = lazy(() => import('./components/Styleguide.jsx'))
 
-const APP_VERSION = 'v2026.08-13'
+const APP_VERSION = 'v2026.08-14'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },
@@ -185,18 +185,22 @@ export default function App() {
   )
   if (laden) return <div className="loading-screen"><div className="spinner" /></div>
   if (resetToken) return (
-    <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {
-      window.history.replaceState({}, '', window.location.pathname)
-      setResetToken(null)
-      inloggen(token, userData)
-    }} />
+    <Suspense fallback={<div className="loading-screen"><div className="spinner" /></div>}>
+      <WachtwoordReset token={resetToken} onInloggen={(token, userData) => {
+        window.history.replaceState({}, '', window.location.pathname)
+        setResetToken(null)
+        inloggen(token, userData)
+      }} />
+    </Suspense>
   )
   if (!user) return <Login onInloggen={inloggen} />
   if (toonOnboarding) return (
-    <Onboarding user={user} onKlaar={() => {
-      localStorage.setItem(`apex_onboarding_${user.id}`, '1')
-      setToonOnboarding(false)
-    }} />
+    <Suspense fallback={<div className="loading-screen"><div className="spinner" /></div>}>
+      <Onboarding user={user} onKlaar={() => {
+        localStorage.setItem(`apex_onboarding_${user.id}`, '1')
+        setToonOnboarding(false)
+      }} />
+    </Suspense>
   )
 
   const schermen = {
@@ -242,18 +246,20 @@ export default function App() {
         />
       </div>
 
-      {/* Alle andere schermen mounten/unmounten normaal */}
+      {/* Alle andere schermen mounten/unmounten normaal (lazy → Suspense) */}
       {Scherm && scherm !== 'coach' && (
-        <Scherm
-          key={scherm === 'dashboard' ? dashboardKey : scherm}
-          user={user}
-          {...navProps}
-          {...(scherm === 'settings' ? {
-            suuntoStatus,
-            onSuuntoStatusClear: () => setSuuntoStatus(null),
-            onDataVernieuwd: () => setDashboardKey(k => k + 1),
-          } : {})}
-        />
+        <Suspense fallback={<div className="page" style={{ alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}>
+          <Scherm
+            key={scherm === 'dashboard' ? dashboardKey : scherm}
+            user={user}
+            {...navProps}
+            {...(scherm === 'settings' ? {
+              suuntoStatus,
+              onSuuntoStatusClear: () => setSuuntoStatus(null),
+              onDataVernieuwd: () => setDashboardKey(k => k + 1),
+            } : {})}
+          />
+        </Suspense>
       )}
 
       <div className="app-versie">{APP_VERSION}</div>
