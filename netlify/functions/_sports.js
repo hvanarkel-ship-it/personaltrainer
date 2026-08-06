@@ -8,7 +8,7 @@ const SUUNTO_SPORT_MAP = {
   18:  'fitness',   21:  'fitness',   22:  'zwemmen',   23:  'fitness',
   24:  'fitness',   25:  'wandelen',  33:  'fitness',   34:  'voetbal',
   35:  'tennis',    53:  'hardlopen', 56:  'fitness',   58:  'yoga',
-  75:  'fitness',   82:  'hardlopen', 91:  'hardlopen', 108: 'fietsen',
+  75:  'padel',     82:  'hardlopen', 91:  'hardlopen', 108: 'fietsen',
   109: 'zwemmen',   112: 'fitness',   130: 'yoga',      148: 'padel',
 }
 
@@ -19,7 +19,7 @@ const SUUNTO_ACTIVITY_NAMES = {
   23: 'Training',        24: 'Gym',               25: 'Nordic walking',
   30: 'Klimmen',         33: 'Fitness class',     34: 'Voetbal',
   35: 'Tennis',          53: 'Hardlopen',         56: 'Krachttraining',
-  58: 'Yoga',            75: 'Functional training', 82: 'Trailrun',
+  58: 'Yoga',            75: 'Padel',             82: 'Trailrun',
   91: 'Trailrun',        108: 'Indoor fietsen',   109: 'Open water zwemmen',
   130: 'Pilates',          148: 'Padel',
 }
