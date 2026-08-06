@@ -139,6 +139,18 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
     } catch (err) { showToast('Diagnose mislukt: ' + err.message, 'error') }
   }
 
+  const [opschonen, setOpschonen] = useState(false)
+  async function opschonenBronnen() {
+    if (!confirm('Alle workouts van Strava, Intervals en Runalyze verwijderen? Suunto en handmatige logs blijven staan.')) return
+    setOpschonen(true)
+    try {
+      const res = await api.post('/opschonen', {})
+      showToast(`${res.verwijderd ?? 0} oude workout(s) verwijderd`)
+      onDataVernieuwd?.()
+    } catch (err) { showToast('Opschonen mislukt: ' + err.message, 'error') }
+    finally { setOpschonen(false) }
+  }
+
   async function ontkoppelSuunto() {
     try {
       await api.put('/profiel', { ontkoppel_suunto: true })
@@ -517,6 +529,18 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
               </button>
             </div>
           </IntegratieCard>
+
+          {/* Onderhoud: oude koppelingsdata opruimen */}
+          <Card>
+            <span className="t-label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Onderhoud</span>
+            <p className="t-sm t-muted" style={{ marginBottom: 'var(--space-3)' }}>
+              Verwijder oude workouts van verwijderde koppelingen (Strava, Intervals, Runalyze). Suunto en handmatige logs blijven staan.
+            </p>
+            <button className="btn btn-ghost btn-sm" onClick={opschonenBronnen} disabled={opschonen}
+              style={{ color: 'var(--red)' }}>
+              {opschonen ? 'Bezig...' : '🗑 Strava & Intervals verwijderen'}
+            </button>
+          </Card>
 
         </div>
       )}
