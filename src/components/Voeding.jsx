@@ -248,9 +248,9 @@ export default function Voeding({ onNavigeer }) {
   }), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
 
   const p = profiel || {}
-  const basisKcal  = p.doel_kcal            || MACRO_DEFAULTS.kcal
-  // Trainingscalorieën van deze dag worden bij het kcal-doel opgeteld (eat-back)
-  const doelKcal   = basisKcal + trainingKcal
+  // Vast doel (TDEE bevat de activiteit al): trainingscalorieën worden apart
+  // getoond, niet bij het doel opgeteld — geen dubbeltelling.
+  const doelKcal   = p.doel_kcal            || MACRO_DEFAULTS.kcal
   const doelEiwit  = p.doel_eiwit_g         || MACRO_DEFAULTS.eiwit_g
   const doelKh     = p.doel_koolhydraten_g  || MACRO_DEFAULTS.koolhydraten_g
   const doelVet    = p.doel_vetten_g        || MACRO_DEFAULTS.vetten_g
@@ -331,8 +331,8 @@ export default function Voeding({ onNavigeer }) {
             </p>
           )}
           {trainingKcal > 0 && (
-            <p className="t-xs t-muted" style={{ marginTop: 'var(--space-1)', textAlign: 'center', textTransform: 'none', letterSpacing: 0 }}>
-              Doel {doelKcal} kcal = {basisKcal} basis + {trainingKcal} training
+            <p className="t-xs" style={{ marginTop: 'var(--space-1)', textAlign: 'center', textTransform: 'none', letterSpacing: 0, color: 'var(--amber)', fontWeight: 600 }}>
+              🔥 {trainingKcal} kcal verbrand met training (apart, niet in het doel)
             </p>
           )}
         </Card>

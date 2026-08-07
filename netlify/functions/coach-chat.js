@@ -336,12 +336,12 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     }[profiel?.coach_stijl || 'direct'] || 'Wees direct en bondig.'
 
     // ── Voeding vandaag opbouwen ──
-    // Trainingscalorieën van vandaag worden bij het kcal-doel opgeteld (eat-back,
-    // consistent met Dashboard/Voeding).
+    // Vast doel (TDEE bevat de activiteit al): trainingscalorieën worden apart
+    // vermeld, niet bij het doel opgeteld — geen dubbeltelling.
     const trainingKcalVandaag = weektraining
       .filter(t => String(t.datum).slice(0, 10) === vandaag && t.sport !== 'herstel')
       .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
-    const dagdoelKcal = (profiel?.doel_kcal || MACRO_DEFAULTS.kcal) + trainingKcalVandaag
+    const dagdoelKcal = profiel?.doel_kcal || MACRO_DEFAULTS.kcal
     const dagdoelEiwit = profiel?.doel_eiwit_g || MACRO_DEFAULTS.eiwit_g
     const dagdoelKh = profiel?.doel_koolhydraten_g || MACRO_DEFAULTS.koolhydraten_g
     const dagdoelVet = profiel?.doel_vetten_g || MACRO_DEFAULTS.vetten_g
@@ -659,7 +659,8 @@ ${profiel?.coach_context ? `Persoonlijke context: ${profiel.coach_context}` : ''
 ═══ VOEDING VANDAAG (${vandaag}) ═══
 ${maaltijdRegels}
 Dagtotaal: ${Math.round(totVandaag.kcal)}kcal | ${Math.round(totVandaag.eiwit)}g eiwit | ${Math.round(totVandaag.kh)}g kh | ${Math.round(totVandaag.vet)}g vet
-Resterend: ${Math.round(restKcal)}kcal | ${Math.round(restEiwit)}g eiwit
+Resterend t.o.v. doel: ${Math.round(restKcal)}kcal | ${Math.round(restEiwit)}g eiwit
+${trainingKcalVandaag > 0 ? `Vandaag met training verbrand: ${trainingKcalVandaag}kcal (het dagdoel bevat de activiteit al — niet apart bijtellen, tenzij de gebruiker om extra intake vraagt voor zware belasting).` : ''}
 ${gisterMeals.length ? `Gisteren: ${Math.round(totGister.kcal)}kcal | ${Math.round(totGister.eiwit)}g eiwit` : ''}
 
 ═══ SUUNTO MEETMETHODE — VERPLICHT BEGRIJPEN ═══
