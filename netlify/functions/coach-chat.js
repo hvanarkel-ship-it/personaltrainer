@@ -336,7 +336,12 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     }[profiel?.coach_stijl || 'direct'] || 'Wees direct en bondig.'
 
     // ── Voeding vandaag opbouwen ──
-    const dagdoelKcal = profiel?.doel_kcal || MACRO_DEFAULTS.kcal
+    // Trainingscalorieën van vandaag worden bij het kcal-doel opgeteld (eat-back,
+    // consistent met Dashboard/Voeding).
+    const trainingKcalVandaag = weektraining
+      .filter(t => String(t.datum).slice(0, 10) === vandaag && t.sport !== 'herstel')
+      .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
+    const dagdoelKcal = (profiel?.doel_kcal || MACRO_DEFAULTS.kcal) + trainingKcalVandaag
     const dagdoelEiwit = profiel?.doel_eiwit_g || MACRO_DEFAULTS.eiwit_g
     const dagdoelKh = profiel?.doel_koolhydraten_g || MACRO_DEFAULTS.koolhydraten_g
     const dagdoelVet = profiel?.doel_vetten_g || MACRO_DEFAULTS.vetten_g

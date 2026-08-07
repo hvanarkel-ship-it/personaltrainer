@@ -15,8 +15,14 @@ export const handler = async (event) => {
       const params = event.queryStringParameters || {}
       const limit = Math.min(parseInt(params.limit) || 500, 2000)
       const sport = params.sport
+      const datum = params.datum
       let rows
-      if (sport) {
+      if (datum) {
+        rows = await sql`
+          SELECT * FROM trainingen WHERE user_id = ${userId} AND datum = ${datum}
+          ORDER BY created_at DESC
+        `
+      } else if (sport) {
         rows = await sql`
           SELECT * FROM trainingen WHERE user_id = ${userId} AND sport = ${sport}
           ORDER BY datum DESC LIMIT ${limit}

@@ -54,6 +54,7 @@ export default function Voeding({ onNavigeer }) {
   const [schat, setSchat]         = useState(false)
   const [opslaan, setOpslaan]     = useState(false)
   const [recent, setRecent]       = useState([])
+  const [trainingKcal, setTrainingKcal] = useState(0)
   const fotoRef = useRef(null)
 
   // Edit sheet
@@ -84,13 +85,19 @@ export default function Voeding({ onNavigeer }) {
   }
   useEffect(() => { laadRecent() }, [])
 
-  // Fetch meals when date changes
+  // Fetch meals + training-calorieën van deze dag (voor eat-back doel)
   useEffect(() => {
     setLaden(true)
-    api.get(`/maaltijd?datum=${datum}`)
-      .then(setMaaltijden)
-      .catch(e => setFout(e.message))
-      .finally(() => setLaden(false))
+    Promise.all([
+      api.get(`/maaltijd?datum=${datum}`).catch(e => { setFout(e.message); return [] }),
+      api.get(`/training?datum=${datum}`).catch(() => []),
+    ]).then(([mealsRes, trainRes]) => {
+      setMaaltijden(mealsRes || [])
+      const tkcal = (trainRes || [])
+        .filter(t => t.sport !== 'herstel')
+        .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
+      setTrainingKcal(tkcal)
+    }).finally(() => setLaden(false))
   }, [datum])
 
   function navigeerDag(delta) {
@@ -241,7 +248,9 @@ export default function Voeding({ onNavigeer }) {
   }), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
 
   const p = profiel || {}
-  const doelKcal   = p.doel_kcal            || MACRO_DEFAULTS.kcal
+  const basisKcal  = p.doel_kcal            || MACRO_DEFAULTS.kcal
+  // Trainingscalorieën van deze dag worden bij het kcal-doel opgeteld (eat-back)
+  const doelKcal   = basisKcal + trainingKcal
   const doelEiwit  = p.doel_eiwit_g         || MACRO_DEFAULTS.eiwit_g
   const doelKh     = p.doel_koolhydraten_g  || MACRO_DEFAULTS.koolhydraten_g
   const doelVet    = p.doel_vetten_g        || MACRO_DEFAULTS.vetten_g
@@ -319,6 +328,11 @@ export default function Voeding({ onNavigeer }) {
               {restEiwit !== null && (restEiwit > 0
                 ? <> · nog <strong style={{ color: 'var(--green)' }}>{restEiwit}g</strong> eiwit</>
                 : <> · eiwitdoel gehaald ✓</>)}
+            </p>
+          )}
+          {trainingKcal > 0 && (
+            <p className="t-xs t-muted" style={{ marginTop: 'var(--space-1)', textAlign: 'center', textTransform: 'none', letterSpacing: 0 }}>
+              Doel {doelKcal} kcal = {basisKcal} basis + {trainingKcal} training
             </p>
           )}
         </Card>
