@@ -43,7 +43,7 @@ export default function Ring({ score = 0, baseline = null, size = 240, label = '
     <div style={{ position: 'relative', width: size, height: size, filter: `drop-shadow(0 0 26px ${glow})` }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
         {/* Track */}
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={strokeW} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--hairline)" strokeWidth={strokeW} />
         {/* Baseline (7d) — subtiele markering */}
         {baselineOffset != null && (
           <circle cx={cx} cy={cx} r={r} fill="none" stroke={kleur} strokeOpacity={0.22}

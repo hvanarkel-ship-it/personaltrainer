@@ -3,6 +3,7 @@ import { api, datumStr, datumNl as datumNlApi, MACRO_DEFAULTS } from '../api.js'
 import SportIcoon, { normMin, SPORT_ACCENT } from '../sportIcoon.jsx'
 import { hrvKleur, hrvScore } from '../../shared/health.js'
 import Ring from './ui/Ring.jsx'
+import MetricRing from './ui/MetricRing.jsx'
 import Card from './ui/Card.jsx'
 import Sheet from './ui/Sheet.jsx'
 import Chip from './ui/Chip.jsx'
@@ -186,6 +187,25 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   ].filter(f => f.min > 0) : []
   const fasesTotaal = fases.reduce((s, f) => s + f.min, 0)
 
+  // ── WHOOP-metrieken: Belasting (Strain 0-21) en Slaap-prestatie ──
+  const trainingenVandaag = echteTrainingen.filter(t => datumStr(t.datum) === vandaag)
+  const trainingLoadVandaag = trainingenVandaag.reduce(
+    (s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+  const stappenVandaag = wellnessByDatum.get(vandaag)?.stappen || 0
+  const stapStrain = Math.min(6, stappenVandaag / 2500)
+  const strain = Math.min(21, Math.round(Math.max(stapStrain, trainingLoadVandaag / 3.2) * 10) / 10)
+  const strainLabel = strain >= 18 ? 'All-out' : strain >= 14 ? 'Zwaar' : strain >= 10 ? 'Matig' : 'Licht'
+
+  // Slaap-prestatie t.o.v. behoefte (~8u)
+  const slaapUur = h.slaap_uur ? parseFloat(h.slaap_uur) : null
+  const slaapPerf = slaapUur != null ? Math.min(100, Math.round((slaapUur / 8) * 100)) : null
+
+  // WHOOP-advies: doelbelasting op basis van herstel
+  const strainAdvies = gereedheid == null ? null
+    : gereedheid >= 67 ? { tekst: 'Goed hersteld — je kunt vandaag flink belasten.', doel: 'Streef naar 14–18', kleur: '#16EC5E' }
+    : gereedheid >= 34 ? { tekst: 'Matig herstel — houd de belasting gematigd.', doel: 'Streef naar 8–13', kleur: '#FFD54A' }
+    : { tekst: 'Laag herstel — prioriteer rust en herstel.', doel: 'Houd het licht (< 8)', kleur: '#FF3B5C' }
+
   // Extra Suunto metrics — gebruik meest recente rij per veld
   const laatste = wellness[0] || null
   const extraMetrics = [
@@ -242,7 +262,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           ) : (
             <div style={{ width: 244, height: 244, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
               <svg width="244" height="244" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="122" cy="122" r="113" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="18" />
+                <circle cx="122" cy="122" r="113" fill="none" stroke="var(--hairline)" strokeWidth="18" />
               </svg>
               <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <span className="t-xl t-muted">—</span>
@@ -259,6 +279,41 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
             }}>{zone.label}</span>
           )}
         </div>
+
+        {/* WHOOP-kernmetrieken: Belasting (Strain) + Slaap */}
+        {heeftData && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-8)', marginTop: 'var(--space-5)' }}>
+            <MetricRing
+              value={strain} max={21} decimals={1}
+              kleur="#0093E7" glow="rgba(0,147,231,0.42)"
+              grootLabel="/21" subLabel="Belasting"
+            />
+            {slaapPerf != null && (
+              <MetricRing
+                value={slaapPerf} max={100}
+                kleur="#B388FF" glow="rgba(179,136,255,0.40)"
+                grootLabel="%" subLabel="Slaap"
+              />
+            )}
+          </div>
+        )}
+
+        {/* Strain-label + advies (WHOOP-coaching) */}
+        {heeftData && (
+          <p className="t-xs" style={{ textAlign: 'center', marginTop: 'var(--space-2)', textTransform: 'none', letterSpacing: 0, color: '#0093E7', fontWeight: 600 }}>
+            Belasting: {strainLabel}{slaapUur != null ? ` · ${slaapUur.toFixed(1)}u geslapen` : ''}
+          </p>
+        )}
+        {strainAdvies && (
+          <div style={{
+            marginTop: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
+            background: 'var(--bg-raised)', borderRadius: 'var(--r-sm)',
+            borderLeft: `3px solid ${strainAdvies.kleur}`,
+          }}>
+            <p className="t-sm" style={{ color: 'var(--text-2)' }}>{strainAdvies.tekst}</p>
+            <p className="t-sm" style={{ color: strainAdvies.kleur, fontWeight: 700, marginTop: 2 }}>{strainAdvies.doel}</p>
+          </div>
+        )}
 
         {/* Metrics row */}
         {heeftData && (
@@ -333,12 +388,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </p>
         )}
 
-        {/* Advisory text */}
-        {zone && (
-          <p className="t-sm t-muted" style={{ marginTop: 'var(--space-3)', textAlign: 'center' }}>
-            {zone.advies}
-          </p>
-        )}
 
         {/* Extra Suunto stats */}
         {extraMetrics.length > 0 && (
