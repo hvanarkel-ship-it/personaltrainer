@@ -4,6 +4,7 @@ import { requireAuth, cors } from './_auth.js'
 import { autoSyncSuunto } from './_suunto.js'
 import { berekenTDEE, MACRO_DEFAULTS } from '../../shared/nutrition.js'
 import { hrvBandTekst } from '../../shared/health.js'
+import { schatInstructie, parseJson, verzoenMacros } from './_voeding.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
@@ -105,21 +106,21 @@ Let op:
 async function extractMaaltijdFoto(sql, userId, bestanden) {
   const content = [
     ...bestandenNaarContent(bestanden),
-    { type: 'text', text: `Analyseer deze maaltijdfoto nauwkeurig. Identificeer alle ingrediënten en schat de porties realistisch.
-Geef UITSLUITEND geldig JSON:
-{"beschrijving":"naam van de maaltijd","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0,"foto_analyse":"korte beschrijving wat je ziet","ai_notities":"kort voedingsadvies in context van sport NL"}` }
+    { type: 'text', text: schatInstructie({ metFoto: true }) },
   ]
-  const res = await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content }] })
-  const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
+  const res = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 700, messages: [{ role: 'user', content }] })
+  const geparsed = parseJson(res.content[0].text)
+  if (!geparsed) return null
+  const d = verzoenMacros(geparsed)
   const vandaag = vandaagAms()
-  const maaltijdType = getMaaltijdType()
+  const maaltijdType = d.maaltijd_type || getMaaltijdType()
 
   const [row] = await sql`
     INSERT INTO maaltijden (user_id, datum, maaltijd_type, beschrijving, kcal,
-      eiwit_g, koolhydraten_g, vetten_g, foto_analyse, ai_notities)
+      eiwit_g, koolhydraten_g, vetten_g, ai_notities)
     VALUES (${userId}, ${vandaag}, ${maaltijdType}, ${d.beschrijving||'Maaltijd'},
       ${d.kcal||null}, ${d.eiwit_g||null}, ${d.koolhydraten_g||null}, ${d.vetten_g||null},
-      ${d.foto_analyse||null}, ${d.ai_notities||null})
+      ${d.ai_notities||null})
     RETURNING id`
   return {
     type: 'maaltijd', id: row.id, data: d, label: `${d.beschrijving || 'Maaltijd'} (${maaltijdType})`,
@@ -136,24 +137,22 @@ async function detecteerMaaltijdTekst(sql, userId, bericht) {
   if (!eetPatroon.test(bericht)) return null
 
   const res = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 500,
+    model: 'claude-sonnet-4-6',
+    max_tokens: 700,
     messages: [{
       role: 'user',
-      content: `Is dit bericht een beschrijving van wat iemand daadwerkelijk gegeten of gedronken heeft (niet een vraag, recept, of gesprek over eten)?
-
-Als JA: bereken de macro's zo nauwkeurig mogelijk op basis van standaard portiegroottes.
-Keuze maaltijd_type: ontbijt | lunch | diner | snack | pre-workout | post-workout
-Geef UITSLUITEND geldig JSON:
-{"is_voeding":true,"maaltijd_type":"snack","beschrijving":"korte naam","kcal":0,"eiwit_g":0.0,"koolhydraten_g":0.0,"vetten_g":0.0,"ai_notities":"kort voedingsadvies NL"}
-Als NEE: {"is_voeding":false}
+      content: `Bepaal eerst of dit bericht beschrijft wat iemand DAADWERKELIJK heeft gegeten of gedronken (dus niet een vraag, recept, plan of algemeen gesprek over eten).
+Zo NEE: geef UITSLUITEND {"is_voeding":false}
+Zo JA: ${schatInstructie()}
+en voeg aan datzelfde JSON-object het veld "is_voeding":true toe.
 
 Bericht: "${bericht.slice(0, 800)}"`
     }]
   })
 
-  const d = JSON.parse(res.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim())
-  if (!d.is_voeding) return null
+  const geparsed = parseJson(res.content[0].text)
+  if (!geparsed || !geparsed.is_voeding) return null
+  const d = verzoenMacros(geparsed)
 
   const vandaag = vandaagAms()
   const maaltijdType = d.maaltijd_type || getMaaltijdType()

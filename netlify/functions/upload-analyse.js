@@ -1,13 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
+import { schatInstructie, verzoenMacros } from './_voeding.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
 
 const UPLOAD_PROMPTS = {
-  maaltijd: `Analyseer deze maaltijdfoto. Identificeer alle ingrediënten, schat de portiegroottes en bereken de macronutriënten.
-Geef je antwoord ALLEEN als JSON:
-{"beschrijving":"...", "kcal":0, "eiwit_g":0, "koolhydraten_g":0, "vetten_g":0, "foto_analyse":"...", "ai_notities":"kort advies in context van dagdoel"}`,
+  maaltijd: schatInstructie({ metFoto: true }),
 
   suunto: `Lees alle data van deze Suunto schermafbeelding. Extraheer: activiteitstype, duur (minuten), calorieën, gemiddelde hartslag, max hartslag, hartslagzones (zone 2/3/4 minuten), HRV, slaap_score, herstel_balans, slaap uren.
 Geef je antwoord ALLEEN als JSON:
@@ -69,7 +68,9 @@ export const handler = async (event) => {
 
     const raw = response.content[0].text.trim()
     try {
-      const parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+      let parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+      // Maaltijd: kcal met de macro's verzoenen (interne consistentie)
+      if (upload_type === 'maaltijd') parsed = verzoenMacros(parsed)
       return cors({ succes: true, data: parsed, upload_type })
     } catch {
       return cors({ succes: false, error: 'Kon data niet parsen', raw })
