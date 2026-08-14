@@ -235,24 +235,29 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       {/* ── Readiness card ─────────────────────────────────────────────── */}
       <Card>
 
-        {/* Ring */}
+        {/* Herstel-ring (WHOOP-stijl hero) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', paddingTop: 'var(--space-2)' }}>
           {heeftData && gereedheid !== null ? (
-            <Ring score={gereedheid} baseline={baseline7d} size={200} />
+            <Ring score={gereedheid} baseline={baseline7d} size={244} label="Herstel" />
           ) : (
-            <div style={{ width: 200, height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-              <svg width="200" height="200" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="100" cy="100" r="87" fill="none" stroke="var(--bg-surface)" strokeWidth="13" />
+            <div style={{ width: 244, height: 244, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+              <svg width="244" height="244" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="122" cy="122" r="113" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="18" />
               </svg>
               <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <span className="t-xl t-muted">—</span>
-                <span className="t-label">Gereedheid</span>
+                <span className="t-label">Herstel</span>
               </div>
             </div>
           )}
 
-          {/* Zone chip */}
-          {zone && <Chip label={zone.label} color={zone.chip} dot />}
+          {/* Zone-tekst WHOOP-stijl */}
+          {zone && (
+            <span style={{
+              fontSize: 'var(--t-xs)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
+              color: zone.chip === 'green' ? '#16EC5E' : zone.chip === 'amber' ? '#FFD54A' : '#FF3B5C',
+            }}>{zone.label}</span>
+          )}
         </div>
 
         {/* Metrics row */}
