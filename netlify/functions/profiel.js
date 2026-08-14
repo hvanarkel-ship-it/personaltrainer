@@ -17,7 +17,9 @@ export const handler = async (event) => {
           p.doel_kcal, p.doel_eiwit_g, p.doel_koolhydraten_g, p.doel_vetten_g,
           p.sporten, p.geslacht, p.coach_context, p.coach_naam, p.coach_stijl,
           p.intervals_athlete_id, p.updated_at,
-          CASE WHEN p.runalyze_api_token IS NOT NULL THEN true ELSE false END AS runalyze_verbonden
+          p.garmin_display_name, p.garmin_last_sync,
+          CASE WHEN p.runalyze_api_token IS NOT NULL THEN true ELSE false END AS runalyze_verbonden,
+          CASE WHEN p.garmin_oauth_token IS NOT NULL THEN true ELSE false END AS garmin_verbonden
         FROM users u
         LEFT JOIN user_profile p ON p.user_id = u.id
         WHERE u.id = ${userId}
@@ -47,6 +49,18 @@ export const handler = async (event) => {
         await sql`
           UPDATE user_profile SET
             runalyze_api_token = NULL,
+            updated_at = NOW()
+          WHERE user_id = ${userId}
+        `
+        return cors({ success: true })
+      }
+
+      if (d.ontkoppel_garmin) {
+        await sql`
+          UPDATE user_profile SET
+            garmin_oauth_token = NULL,
+            garmin_display_name = NULL,
+            garmin_last_sync = NULL,
             updated_at = NOW()
           WHERE user_id = ${userId}
         `

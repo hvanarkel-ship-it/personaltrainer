@@ -28,24 +28,24 @@ function berekenGereedheid(h) {
 
 function gereedheidsInfo(score) {
   if (score >= 75) return {
-    kleur: '#16a34a', bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-    border: '#bbf7d0', ringFrom: '#22c55e', ringTo: '#16a34a',
+    kleur: '#16E38A', bg: 'radial-gradient(130% 130% at 0% 0%, rgba(22,227,138,0.18) 0%, rgba(22,227,138,0) 60%), var(--card)',
+    border: 'rgba(22,227,138,0.35)', ringFrom: '#16E38A', ringTo: '#16E38A',
     label: 'Klaar voor intensief',
     advies: 'Je lichaam is goed hersteld. Ideaal voor een zware training of nieuwe prikkel.',
     aangeraden: 'Interval, krachttraining of hoge intensiteit',
     badge: 'GO',
   }
   if (score >= 50) return {
-    kleur: '#b45309', bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-    border: '#fcd34d', ringFrom: '#fbbf24', ringTo: '#d97706',
+    kleur: '#FACC15', bg: 'radial-gradient(130% 130% at 0% 0%, rgba(250,204,21,0.16) 0%, rgba(250,204,21,0) 60%), var(--card)',
+    border: 'rgba(250,204,21,0.32)', ringFrom: '#FACC15', ringTo: '#FB9B3C',
     label: 'Matige intensiteit',
     advies: 'Zone 2 duurtraining of techniekwerk aanbevolen.',
     aangeraden: 'Zone 2 duurtraining of mobiliteit (45–60 min)',
     badge: 'OK',
   }
   return {
-    kleur: '#dc2626', bg: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-    border: '#fca5a5', ringFrom: '#f87171', ringTo: '#dc2626',
+    kleur: '#FF5C6C', bg: 'radial-gradient(130% 130% at 0% 0%, rgba(255,92,108,0.16) 0%, rgba(255,92,108,0) 60%), var(--card)',
+    border: 'rgba(255,92,108,0.33)', ringFrom: '#FF5C6C', ringTo: '#FF5C6C',
     label: 'Herstel aanbevolen',
     advies: 'Intensief trainen vertraagt je herstel. Prioriteer slaap en voeding.',
     aangeraden: 'Actief herstel: wandelen, yoga of volledige rust',
@@ -63,10 +63,10 @@ function GereedheidsRing({ score, gInfo }) {
   return (
     <div className="gereedheid-ring-wrap">
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
         <circle
           cx={size/2} cy={size/2} r={r} fill="none"
-          stroke={gInfo.ringFrom} strokeWidth={stroke}
+          stroke={gInfo.ringFrom} strokeWidth={stroke} color={gInfo.ringFrom}
           strokeDasharray={`${dash} ${circ}`}
           strokeLinecap="round"
           style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(0.4,0,0.2,1)' }}

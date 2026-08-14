@@ -22,6 +22,9 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
   const [runalyzeForm, setRunalyzeForm] = useState({ api_token: '' })
   const [runalyzeConnecting, setRunalyzeConnecting] = useState(false)
   const [runalyzeSyncing, setRunalyzeSyncing] = useState(false)
+  const [garminForm, setGarminForm] = useState({ email: '', wachtwoord: '' })
+  const [garminConnecting, setGarminConnecting] = useState(false)
+  const [garminSyncing, setGarminSyncing] = useState(false)
 
   useEffect(() => { laadProfiel() }, [])
 
@@ -45,6 +48,9 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
         intervals_verbonden: !!data.intervals_athlete_id,
         intervals_athlete_id: data.intervals_athlete_id || null,
         runalyze_verbonden: !!data.runalyze_verbonden,
+        garmin_verbonden: !!data.garmin_verbonden,
+        garmin_display_name: data.garmin_display_name || null,
+        garmin_last_sync: data.garmin_last_sync || null,
       })
     } catch {
       setMelding({ type: 'error', tekst: 'Kan profiel niet laden' })
@@ -145,6 +151,48 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       await api.put('/profiel', { ontkoppel_runalyze: true })
       setProfiel(p => ({ ...p, runalyze_verbonden: false }))
       setMelding({ type: 'success', tekst: 'Runalyze ontkoppeld.' })
+    } catch {
+      setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
+    }
+  }
+
+  async function verbindGarmin() {
+    setGarminConnecting(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/garmin-connect', garminForm)
+      setProfiel(p => ({ ...p, garmin_verbonden: true, garmin_display_name: res.display_name || null }))
+      setGarminForm({ email: '', wachtwoord: '' })
+      setMelding({ type: 'success', tekst: `✓ Garmin gekoppeld${res.display_name ? ` als ${res.display_name}` : ''}` })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Verbinding mislukt: ' + err.message })
+    } finally {
+      setGarminConnecting(false)
+    }
+  }
+
+  async function syncGarmin() {
+    setGarminSyncing(true)
+    setMelding(null)
+    try {
+      const res = await api.post('/garmin-sync', {})
+      const errorInfo = res.debug?.activities_error ? ` ⚠️ ${res.debug.activities_error}` : ''
+      setMelding({
+        type: res.gesynchroniseerd > 0 || res.wellness > 0 ? 'success' : 'error',
+        tekst: `↻ ${res.gesynchroniseerd} training${res.gesynchroniseerd !== 1 ? 'en' : ''} + ${res.wellness} herstel-dagen gesynchroniseerd (${res.overgeslagen} overgeslagen)${errorInfo}`,
+      })
+    } catch (err) {
+      setMelding({ type: 'error', tekst: 'Garmin sync mislukt: ' + err.message })
+    } finally {
+      setGarminSyncing(false)
+    }
+  }
+
+  async function ontkoppelGarmin() {
+    try {
+      await api.put('/profiel', { ontkoppel_garmin: true })
+      setProfiel(p => ({ ...p, garmin_verbonden: false, garmin_display_name: null }))
+      setMelding({ type: 'success', tekst: 'Garmin ontkoppeld.' })
     } catch {
       setMelding({ type: 'error', tekst: 'Fout bij ontkoppelen' })
     }
@@ -304,6 +352,75 @@ export default function Settings({ user, onNavigeer, onUitloggen }) {
       {/* ── INTEGRATIES ── */}
       {tab === 'integraties' && (
         <div className="lijst">
+
+          {/* Garmin Connect */}
+          <div className="card integratie-card">
+            <div className="integratie-header">
+              <div className="integratie-logo" style={{ background: '#000', fontSize: '0.62rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2 L20 12 L12 22 L4 12 Z" /><path d="M12 7 L16 12 L12 17 L8 12 Z" />
+                </svg>
+              </div>
+              <div className="integratie-info">
+                <strong>Garmin Connect</strong>
+                <span>Activiteiten, HRV, slaap & Body Battery</span>
+              </div>
+              <span className={`integratie-badge ${profiel.garmin_verbonden ? 'badge-verbonden' : 'badge-uit'}`}>
+                {profiel.garmin_verbonden ? '✓ Verbonden' : 'Niet verbonden'}
+              </span>
+            </div>
+            {profiel.garmin_verbonden ? (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Garmin is gekoppeld{profiel.garmin_display_name ? ` als ${profiel.garmin_display_name}` : ''}. Trainingen worden geïmporteerd en je ochtenddata (HRV, slaap, Body Battery, rusthartslag) voedt automatisch de gereedheidsscore.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={syncGarmin} disabled={garminSyncing}>
+                    {garminSyncing ? '...' : '↻ Nu synchroniseren'}
+                  </button>
+                  <button className="btn btn-ghost" onClick={ontkoppelGarmin}>Ontkoppelen</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="integratie-beschrijving" style={{ marginTop: '10px' }}>
+                  Log in met je Garmin Connect-account voor directe import van je activiteiten én dagelijkse herstelmetingen: HRV, slaap, Body Battery, rusthartslag en stappen — zoals in de Whoop-stijl gereedheidsring.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Garmin e-mailadres</label>
+                    <input
+                      type="email"
+                      value={garminForm.email}
+                      onChange={e => setGarminForm(f => ({ ...f, email: e.target.value }))}
+                      placeholder="jij@voorbeeld.nl"
+                      autoCapitalize="none"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Garmin wachtwoord</label>
+                    <input
+                      type="password"
+                      value={garminForm.wachtwoord}
+                      onChange={e => setGarminForm(f => ({ ...f, wachtwoord: e.target.value }))}
+                      placeholder="••••••••••••••••"
+                    />
+                  </div>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>
+                    Je inloggegevens worden alleen gebruikt om een sessie-token op te halen en niet in leesbare vorm bewaard. Accounts met tweestapsverificatie (MFA) moeten die tijdelijk uitschakelen om te koppelen.
+                  </p>
+                  <button
+                    className="btn btn-full"
+                    onClick={verbindGarmin}
+                    disabled={garminConnecting || !garminForm.email || !garminForm.wachtwoord}
+                    style={{ background: '#000', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}
+                  >
+                    {garminConnecting ? 'Verbinden...' : 'Verbinden met Garmin'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Intervals.icu */}
           <div className="card integratie-card">

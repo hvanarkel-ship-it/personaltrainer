@@ -1,31 +1,37 @@
-/* ===== APEX Coach v2 — Light Design System ===== */
+/* ===== APEX Coach v2 — Dark Performance System (Whoop / Sonar stijl) ===== */
 :root {
-  --primary: #1D9E75;
-  --primary-dark: #168a63;
-  --primary-light: #e8f7f2;
-  --primary-bg: rgba(29, 158, 117, 0.08);
+  --primary: #16C088;
+  --primary-dark: #0FA372;
+  --primary-light: rgba(22, 192, 136, 0.14);
+  --primary-bg: rgba(22, 192, 136, 0.18);
 
-  --bg: #F5F5F5;
-  --card: #FFFFFF;
-  --border: #E5E7EB;
-  --border-light: #F3F4F6;
+  /* Near-black canvas met licht opgetilde kaarten — de premium wearable-look */
+  --bg: #0A0B0D;
+  --bg-elev: #101216;
+  --card: #15181D;
+  --card-2: #1B1F26;
+  --border: #262B33;
+  --border-light: #1E222A;
 
-  --text: #111827;
-  --text-2: #4B5563;
-  --text-3: #9CA3AF;
+  --text: #F3F5F8;
+  --text-2: #A6AEBB;
+  --text-3: #6C7480;
 
-  --green: #22c55e;
-  --blue: #3b82f6;
-  --orange: #f97316;
-  --red: #ef4444;
-  --yellow: #eab308;
+  /* Data-accenten — helder zodat ze op zwart oplichten */
+  --recovery: #16E38A;   /* herstel / groen */
+  --strain: #3BA9FF;     /* inspanning / blauw */
+  --green: #16E38A;
+  --blue: #3BA9FF;
+  --orange: #FB9B3C;
+  --red: #FF5C6C;
+  --yellow: #FACC15;
 
   --nav-h: 64px;
   --header-h: 56px;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 4px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 10px 30px rgba(0,0,0,0.55);
 
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
@@ -1198,3 +1204,123 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
   .rpe-btn { width: 26px; height: 26px; font-size: 0.75rem; }
   .form-rij { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
 }
+
+/* ============================================================================
+   WHOOP / SONAR DARK THEME — surface & accent overrides
+   Alle light-hardcoded vlakken worden hier omgezet naar donkere "glass chips"
+   zodat de hele app als één donker performance-dashboard aanvoelt.
+   ========================================================================== */
+
+body { background: var(--bg); }
+
+/* App-chrome */
+.bottom-nav {
+  background: rgba(12, 14, 17, 0.82);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.03), 0 -12px 30px rgba(0,0,0,0.5);
+}
+.nav-btn.active::before { background: var(--primary-bg); }
+.loading-screen, .db-popover-inner, .upload-menu, .install-banner, .ios-hint-sheet { background: var(--card); }
+
+/* Kaarten krijgen een subtiele highlight-rand bovenaan (Sonar-detail) */
+.card { background: var(--card); border-color: var(--border); }
+
+/* Forms — donkere velden met heldere focus-glow */
+.form-group input, .form-group select, .form-group textarea,
+.datum-input, .chat-input, .doel-update-input {
+  background: var(--bg-elev); border-color: var(--border); color: var(--text);
+}
+.form-group input::placeholder, .form-group textarea::placeholder, .chat-input::placeholder { color: var(--text-3); }
+.form-group select option { background: var(--card); color: var(--text); }
+
+/* Alerts */
+.alert-error { background: rgba(255,92,108,0.12); border-color: rgba(255,92,108,0.35); color: #ffb3ba; }
+.alert-success { background: rgba(22,227,138,0.12); border-color: rgba(22,227,138,0.32); color: #7dedb7; }
+
+/* Buttons */
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--text-2); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--text-3); color: var(--text); background: rgba(255,255,255,0.03); }
+.btn-primary { box-shadow: 0 2px 14px rgba(22,192,136,0.28); }
+
+/* Glass "info chips" — vervangen alle pastel light-tags */
+.suunto-ochtend-btn, .week-load-badge, .stat-badge--load, .zone-tip, .act-icu-badge,
+.dag-context--rust, .dash-dag-badge--rust, .zone-tip {
+  background: rgba(59,169,255,0.12); border-color: rgba(59,169,255,0.3); color: #9fd2ff;
+}
+.dag-context--training, .dash-dag-badge--training, .hrv-waarschuwing, .stale-warning {
+  background: rgba(251,155,60,0.12); border-color: rgba(251,155,60,0.3); color: #ffc98a;
+}
+.stat-badge { background: var(--bg-elev); border-color: var(--border); color: var(--text-2); }
+
+/* Macro-blokjes → donkere glas-tegels met gekleurde cijfers */
+.macro-blok, .dash-macro-blok { background: var(--bg-elev); }
+.macro-blok--groen, .dash-macro-groen { background: rgba(22,227,138,0.12); }
+.macro-blok--blauw, .dash-macro-blauw { background: rgba(59,169,255,0.12); }
+.macro-blok--oranje, .dash-macro-oranje { background: rgba(251,155,60,0.12); }
+.macro-blok--groen strong, .dash-macro-groen .dash-macro-val { color: var(--recovery); }
+.macro-blok--blauw strong, .dash-macro-blauw .dash-macro-val { color: var(--strain); }
+.macro-blok--oranje strong, .dash-macro-oranje .dash-macro-val { color: var(--orange); }
+.eiwit-tag { color: var(--recovery) !important; background: rgba(22,227,138,0.12); }
+.macro-tag { background: var(--bg-elev); color: var(--text-2); }
+
+/* Integratie-badges */
+.badge-verbonden { background: rgba(22,227,138,0.12); color: var(--recovery); border-color: rgba(22,227,138,0.32); }
+.badge-uit { background: var(--bg-elev); color: var(--text-3); border-color: var(--border); }
+.badge-upload { background: rgba(251,155,60,0.12); color: #ffc98a; border-color: rgba(251,155,60,0.3); }
+
+/* RPE-knoppen */
+.rpe-btn--licht { background: rgba(59,169,255,0.14); border-color: rgba(59,169,255,0.3); color: #9fd2ff; }
+.rpe-btn--matig { background: rgba(250,204,21,0.14); border-color: rgba(250,204,21,0.3); color: #f4e07a; }
+.rpe-btn--zwaar { background: rgba(251,155,60,0.14); border-color: rgba(251,155,60,0.3); color: #ffc98a; }
+.rpe-btn--max   { background: rgba(255,92,108,0.14); border-color: rgba(255,92,108,0.3); color: #ffb3ba; }
+
+/* Zone-ratio badges */
+.zone-ratio--goed { background: rgba(22,227,138,0.14); color: var(--recovery); }
+.zone-ratio--matig { background: rgba(251,155,60,0.14); color: #ffc98a; }
+.zone-ratio--laag { background: rgba(255,92,108,0.14); color: #ffb3ba; }
+
+/* Coach */
+.coach-header { background: var(--card); border-color: var(--border); }
+.bericht-bubble { background: var(--card-2); border-color: var(--border); }
+.bericht--fout .bericht-bubble { background: rgba(255,92,108,0.12); border-color: rgba(255,92,108,0.3); }
+.coach-tabel tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.coach-tabel th { background: var(--bg-elev); }
+.chat-invoer, .upload-previews { background: var(--card); border-color: var(--border); }
+.upload-btn, .mic-btn { background: var(--bg-elev); border-color: var(--border); }
+
+/* Settings / sport-tegels donker */
+.settings-tab, .sport-check, .sport-btn, .onboarding-doel-btn, .onboarding-dag-btn,
+.type-btn, .voorbeeld-btn, .stemming-btn, .actie-btn, .snelle-vraag-btn, .week-sport-pill {
+  background: var(--bg-elev);
+}
+
+/* ── Dashboard hero: van fel-groen blok → donker premium paneel met glow ── */
+.dash-hero {
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(22,192,136,0.22) 0%, rgba(22,192,136,0) 55%),
+    linear-gradient(180deg, #14181E 0%, #0C0E12 100%);
+  border-bottom: 1px solid var(--border);
+}
+.dash-hero-dag { color: var(--text-3); }
+.dash-streak-pill { background: rgba(255,255,255,0.08); color: #ffc98a; }
+.dash-logout-btn { color: var(--text-2) !important; background: rgba(255,255,255,0.06) !important; }
+
+/* Gereedheids-card metrics op donkere ondergrond */
+.dash-metric-pill { background: rgba(255,255,255,0.04); border-color: var(--border); }
+.dash-gereedheid-advies { background: rgba(255,255,255,0.04); color: var(--text); }
+.dash-coach-link { background: rgba(255,255,255,0.04); border-color: var(--border); color: var(--text-2); }
+.dash-coach-link:active { background: rgba(255,255,255,0.08); }
+.dash-sport-chip { background: var(--bg-elev); border-color: var(--border); }
+
+/* Progressiebalken glimmen licht op */
+.dash-macro-bar--primary { background: var(--primary); box-shadow: 0 0 12px rgba(22,192,136,0.5); }
+
+/* Recovery-ring Whoop-glow (svg krijgt drop-shadow via klasse in JS) */
+.gereedheid-ring-wrap svg circle:last-child { filter: drop-shadow(0 0 6px currentColor); }
+
+/* Scrollbar subtieler op zwart */
+::-webkit-scrollbar-thumb { background: var(--border); }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+
