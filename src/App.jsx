@@ -32,7 +32,7 @@ const Settings        = lazy(() => import('./components/Settings.jsx'))
 const Statistieken    = lazy(() => import('./components/Statistieken.jsx'))
 const Styleguide      = lazy(() => import('./components/Styleguide.jsx'))
 
-const APP_VERSION = 'v2026.08-19'
+const APP_VERSION = 'v2026.08-20'
 
 const NAV = [
   { id: 'dashboard', label: 'Home' },

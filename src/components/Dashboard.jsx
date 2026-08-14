@@ -200,6 +200,20 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const slaapUur = h.slaap_uur ? parseFloat(h.slaap_uur) : null
   const slaapPerf = slaapUur != null ? Math.min(100, Math.round((slaapUur / 8) * 100)) : null
 
+  // 7-daags overzicht: belasting (strain) + herstel per dag (WHOOP-weekgrafiek)
+  const weekOverzicht = hrv7.map(d => {
+    const load = echteTrainingen
+      .filter(t => datumStr(t.datum) === d.datum)
+      .reduce((s, t) => s + normMin(t.duur_min) * ((t.rpe ? parseInt(t.rpe) : 5) / 10), 0)
+    return {
+      label: d.label,
+      isVandaag: d.isVandaag,
+      strain: Math.min(21, Math.round((load / 3.2) * 10) / 10),
+      recovery: berekenGereedheid({ hrv_ochtend: d.hrv, slaap_uur: d.slaap }),
+    }
+  })
+  const heeftWeek = weekOverzicht.some(d => d.strain > 0 || d.recovery != null)
+
   // WHOOP-advies: doelbelasting op basis van herstel
   const strainAdvies = gereedheid == null ? null
     : gereedheid >= 67 ? { tekst: 'Goed hersteld — je kunt vandaag flink belasten.', doel: 'Streef naar 14–18', kleur: '#16EC5E' }
@@ -361,26 +375,6 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </div>
         )}
 
-        {/* Sleep phase breakdown */}
-        {fasesTotaal > 0 && (
-          <div style={{ marginTop: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
-              {fases.map(f => (
-                <div key={f.label} style={{ flex: f.min, background: f.color, borderRadius: 2 }}
-                  title={`${f.label}: ${fmtSlaapMin(f.min)}`} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-              {fases.map(f => (
-                <span key={f.label} className="t-xs" style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'none', letterSpacing: 0 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: f.color, display: 'inline-block' }} />
-                  {f.label} {fmtSlaapMin(f.min)}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Staleness warning */}
         {herstelDagen > 1 && (
           <p className="t-sm t-muted" style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
@@ -414,6 +408,22 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           </button>
         </div>
       </Card>
+
+      {/* ── WHOOP-weekgrafiek: Belasting vs Herstel ───────────────────────── */}
+      {heeftWeek && (
+        <Card>
+          <div className="card-header">
+            <span className="t-lg">Belasting &amp; herstel</span>
+            <span className="t-xs t-muted">7 dagen</span>
+          </div>
+          <WeekStrainRecovery data={weekOverzicht} />
+        </Card>
+      )}
+
+      {/* ── WHOOP-slaapkaart ──────────────────────────────────────────────── */}
+      {slaapUur != null && (
+        <SlaapKaart uur={slaapUur} perf={slaapPerf} fases={fases} fasesTotaal={fasesTotaal} score={h.slaap_score} />
+      )}
 
       {/* ── Training week ───────────────────────────────────────────────── */}
       {echteTrainingen.length > 0 && (
@@ -660,6 +670,90 @@ function MacroBar({ label, val, doel, pct, color }) {
       </div>
       <div className="t-xs t-muted" style={{ marginTop: 2, textAlign: 'right' }}>/ {doel}g</div>
     </div>
+  )
+}
+
+// WHOOP-weekgrafiek: blauwe belasting-staven + gekleurde herstel-stippen per dag
+function WeekStrainRecovery({ data }) {
+  const H = 120
+  const recKleur = r => r == null ? 'var(--text-3)' : r >= 67 ? '#16EC5E' : r >= 34 ? '#FFD54A' : '#FF3B5C'
+  return (
+    <div>
+      <div style={{ position: 'relative', height: H, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+        {data.map((d, i) => {
+          const barH = Math.max(3, (d.strain / 21) * H * 0.82)
+          const kleur = recKleur(d.recovery)
+          return (
+            <div key={i} style={{ flex: 1, position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              {d.recovery != null && (
+                <div style={{
+                  position: 'absolute', left: '50%', transform: 'translate(-50%, -50%)',
+                  top: `${H - (d.recovery / 100) * H}px`, width: 11, height: 11, borderRadius: '50%',
+                  background: kleur, boxShadow: `0 0 8px ${kleur}`, zIndex: 2,
+                }} title={`Herstel ${d.recovery}%`} />
+              )}
+              <div style={{ width: '100%', height: barH, background: '#0093E7', opacity: d.isVandaag ? 1 : 0.5, borderRadius: 4 }}
+                title={`Belasting ${d.strain}`} />
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+        {data.map((d, i) => (
+          <span key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: d.isVandaag ? 700 : 400, color: d.isVandaag ? 'var(--text)' : 'var(--text-3)' }}>{d.label}</span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', marginTop: 'var(--space-3)' }}>
+        <span className="t-xs" style={{ display: 'flex', alignItems: 'center', gap: 5, textTransform: 'none', letterSpacing: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#0093E7' }} /> Belasting
+        </span>
+        <span className="t-xs" style={{ display: 'flex', alignItems: 'center', gap: 5, textTransform: 'none', letterSpacing: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16EC5E' }} /> Herstel
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// WHOOP-slaapkaart: prestatie-%, uren vs behoefte, slaaptekort en fases
+function SlaapKaart({ uur, perf, fases, fasesTotaal, score }) {
+  const behoefte = 8
+  const tekortMin = Math.round((behoefte - uur) * 60)
+  const perfKleur = perf >= 85 ? '#16EC5E' : perf >= 70 ? '#FFD54A' : '#FF3B5C'
+  return (
+    <Card>
+      <div className="card-header">
+        <span className="t-lg">Slaap</span>
+        <span style={{ color: perfKleur, fontWeight: 800, fontSize: 'var(--t-lg)' }}>{perf}%</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <div>
+          <span style={{ fontSize: 'var(--t-xl)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{uur.toFixed(1)}</span>
+          <span className="t-sm t-muted"> / {behoefte}u behoefte</span>
+        </div>
+        <span className="t-sm" style={{ color: tekortMin > 20 ? 'var(--amber)' : 'var(--green)', fontWeight: 600 }}>
+          {tekortMin > 20 ? `${tekortMin} min tekort` : 'Slaapdoel gehaald ✓'}
+        </span>
+        {score ? <span className="t-sm t-muted">· score {score}</span> : null}
+      </div>
+      {fasesTotaal > 0 && (
+        <>
+          <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', gap: 1, marginTop: 'var(--space-3)' }}>
+            {fases.map(f => (
+              <div key={f.label} style={{ flex: f.min, background: f.color, borderRadius: 2 }} title={`${f.label}: ${fmtSlaapMin(f.min)}`} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+            {fases.map(f => (
+              <span key={f.label} className="t-xs" style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'none', letterSpacing: 0 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: f.color, display: 'inline-block' }} />
+                {f.label} {fmtSlaapMin(f.min)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
 
