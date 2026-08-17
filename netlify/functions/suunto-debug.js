@@ -1,10 +1,10 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 import { getValidToken, suuntoHeaders, SUUNTO_API_BASE } from './_suunto.js'
-import { suuntoSport, suuntoActivityTitle, sportUitNaam } from './_sports.js'
+import { suuntoSport, sportUitNaam } from './_sports.js'
 
-// Test de Suunto 247samples API (sleep, activity, recovery)
-// Vereist SUUNTO_SUBSCRIPTION_KEY in env vars
+// Diagnose voor de Suunto-koppeling.
+// Gezondheidsdata (24/7) komt via webhooks (zie suunto-webhook.js); workouts via pull.
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
   const auth = requireAuth(event)
@@ -17,55 +17,18 @@ export const handler = async (event) => {
   try {
     const accessToken = await getValidToken(sql, userId)
     const to = Date.now()
-    const from = to - 14 * 86400_000 // laatste 14 dagen
-
-    const endpoints = [
-      `/247samples/sleep?from=${from}&to=${to}`,
-      `/247samples/activity?from=${from}&to=${to}`,
-      `/247samples/recovery?from=${from}&to=${to}`,
-      `/247samples/daily-activity-statistics?startdate=${new Date(from).toISOString()}&enddate=${new Date(to).toISOString()}`,
-    ]
-
     const heeftKey = !!process.env.SUUNTO_SUBSCRIPTION_KEY
-    const results = []
-    for (const path of endpoints) {
-      const url = `${SUUNTO_API_BASE}${path}`
-      try {
-        const res = await fetch(url, { headers: suuntoHeaders(accessToken) })
-        const txt = await res.text()
-        let body
-        try { body = JSON.parse(txt) } catch { body = txt.slice(0, 200) }
-        results.push({
-          path,
-          status: res.status,
-          ok: res.ok,
-          preview: typeof body === 'string' ? body : JSON.stringify(body).slice(0, 800),
-        })
-      } catch (err) {
-        results.push({ path, error: err.message })
-      }
-    }
 
-    // Specifieke samenvatting van de daily-activity-statistics metrieken
-    let dagstatsMetrieken = null
+    // Koppelingsstatus (o.a. of de webhook je kan koppelen via suunto_username)
+    let laatsteSync = null
+    let suuntoUsername = null
     try {
-      const url = `${SUUNTO_API_BASE}/247samples/daily-activity-statistics?startdate=${new Date(from).toISOString()}&enddate=${new Date(to).toISOString()}`
-      const arr = await fetch(url, { headers: suuntoHeaders(accessToken) }).then(r => r.json())
-      if (Array.isArray(arr)) {
-        dagstatsMetrieken = arr.map(m => {
-          const samples = m?.Sources?.[0]?.Samples || []
-          return {
-            naam: m?.Name,
-            aggregatie: m?.Aggregation,
-            aantal_samples: samples.length,
-            eerste: samples[0] || null,
-            laatste: samples[samples.length - 1] || null,
-          }
-        })
-      }
-    } catch (e) { dagstatsMetrieken = [{ error: e.message }] }
+      const [p] = await sql`SELECT suunto_laatste_sync, suunto_username FROM user_profile WHERE user_id = ${userId}`
+      laatsteSync = p?.suunto_laatste_sync ?? null
+      suuntoUsername = p?.suunto_username ?? null
+    } catch { /* kolom bestaat mogelijk nog niet */ }
 
-    // Wat staat er ná de sync daadwerkelijk in de database? (verificatie-lus)
+    // Wat staat er in de database (gezondheidsdata via webhooks)? Verificatie-lus.
     let opgeslagen = []
     try {
       opgeslagen = await sql`
@@ -76,14 +39,6 @@ export const handler = async (event) => {
         ORDER BY datum DESC LIMIT 7
       `
     } catch (e) { opgeslagen = [{ error: e.message }] }
-
-    let laatsteSync = null
-    let suuntoUsername = null
-    try {
-      const [p] = await sql`SELECT suunto_laatste_sync, suunto_username FROM user_profile WHERE user_id = ${userId}`
-      laatsteSync = p?.suunto_laatste_sync ?? null
-      suuntoUsername = p?.suunto_username ?? null
-    } catch { /* kolom bestaat mogelijk nog niet */ }
 
     // Ruwe workouts: welke activityId/activityName levert Suunto, en wat maken wij ervan?
     let workouts = null
@@ -111,14 +66,13 @@ export const handler = async (event) => {
 
     return cors({
       heeftSubscriptionKey: heeftKey,
-      hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
+      hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify',
       webhook_klaar: !!suuntoUsername,
       suunto_username: suuntoUsername,
+      gezondheidsdata_bron: 'webhook (24/7 push-API)',
       laatste_sync: laatsteSync,
-      dagstats_metrieken: dagstatsMetrieken,
       workouts,
       opgeslagen_in_db: opgeslagen,
-      results,
     })
   } catch (err) {
     return cors({ error: err.message }, 500)

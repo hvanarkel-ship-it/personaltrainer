@@ -68,6 +68,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [oForm, setOForm]       = useState({ hrv_ochtend: '', slaap_uur: '', slaap_score: '', herstel_balans: '', stemming: '' })
   const [oOpslaan, setOOpslaan] = useState(false)
+  const [info, setInfo]         = useState(null)   // welke metric-uitleg open is
 
   function laadData() {
     setLaden(true)
@@ -230,6 +231,111 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
     { val: laatste?.kcal_actief, unit: 'kcal', label: 'Actief' },
   ].filter(x => x.val)
 
+  // ── Interactieve metric-uitleg (tik op een metric) ────────────────────────
+  const kleurVoorScore = s => s >= 67 ? '#16EC5E' : s >= 34 ? '#FFD54A' : '#FF3B5C'
+  const stress = laatste?.stress_pct ?? h.stress_pct ?? null
+  const infoSheet = (() => {
+    if (!info) return null
+    if (info === 'herstel') return {
+      title: `Herstel ${gereedheid ?? '—'}`,
+      body: (
+        <div className="section-gap">
+          <p className="t-sm t-muted">Je herstelscore combineert HRV (50%), slaap (30%) en herstelbalans (20%) tot één cijfer: hoe klaar je lichaam is voor belasting vandaag.</p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <InfoStat label="HRV" value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : '—'} sub="50%" />
+            <InfoStat label="Slaap" value={h.slaap_uur ? `${parseFloat(h.slaap_uur).toFixed(1)}u` : '—'} sub="30%" />
+            <InfoStat label="Balans" value={h.herstel_balans != null ? Math.round(h.herstel_balans) : '—'} sub="20%" />
+          </div>
+          {zone && <Advies kleur={kleurVoorScore(gereedheid)}>{zone.advies}</Advies>}
+          {strainAdvies && <Advies kleur={strainAdvies.kleur}>{strainAdvies.tekst} {strainAdvies.doel}.</Advies>}
+        </div>
+      ),
+    }
+    if (info === 'belasting') return {
+      title: `Belasting ${strain}/21`,
+      body: (
+        <div className="section-gap">
+          <p className="t-sm t-muted">Belasting (0–21) weegt je trainingsintensiteit én dagelijkse activiteit (stappen). Stem 'm af op hoe goed je hersteld bent.</p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <InfoStat label="Vandaag" value={strain} sub={strainLabel} />
+            <InfoStat label="Herstel" value={gereedheid ?? '—'} />
+          </div>
+          {strainAdvies
+            ? <Advies kleur={strainAdvies.kleur}>{strainAdvies.tekst} {strainAdvies.doel}.</Advies>
+            : <Advies>Log je training met een RPE (ervaren zwaarte) voor een nauwkeurigere belasting.</Advies>}
+        </div>
+      ),
+    }
+    if (info === 'slaap') return {
+      title: slaapUur != null ? `Slaap ${slaapUur.toFixed(1)}u` : 'Slaap',
+      body: (
+        <div className="section-gap">
+          <p className="t-sm t-muted">Slaap is de motor van herstel. Streef naar ~8u; vaste bed- en wektijden verhogen je HRV en herstel.</p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <InfoStat label="Uren" value={slaapUur != null ? slaapUur.toFixed(1) : '—'} />
+            <InfoStat label="Prestatie" value={slaapPerf != null ? `${slaapPerf}%` : '—'} />
+            {h.slaap_score ? <InfoStat label="Score" value={h.slaap_score} /> : null}
+          </div>
+          {fasesTotaal > 0 && (
+            <p className="t-xs t-muted" style={{ textTransform: 'none', letterSpacing: 0 }}>
+              Fases — {fases.map(f => `${f.label} ${fmtSlaapMin(f.min)}`).join(' · ')}
+            </p>
+          )}
+          {slaapUur != null && (
+            <Advies kleur={slaapUur >= 7.5 ? '#16EC5E' : slaapUur >= 6.5 ? '#FFD54A' : '#FF3B5C'}>
+              {slaapUur >= 7.5
+                ? 'Goede nacht — je herstel heeft hier baat bij. Houd dit ritme vast.'
+                : slaapUur >= 6.5
+                  ? 'Redelijk, maar onder je optimum. Probeer 30–60 min eerder naar bed.'
+                  : 'Kort geslapen — houd de trainingsintensiteit vandaag laag en plan vanavond extra slaap.'}
+            </Advies>
+          )}
+        </div>
+      ),
+    }
+    if (info === 'hrv') return {
+      title: h.hrv_ochtend ? `HRV ${Math.round(h.hrv_ochtend)} ms` : 'HRV',
+      body: (
+        <div className="section-gap">
+          <p className="t-sm t-muted">HRV (hartslagvariatie) is je beste dagelijkse herstelsignaal. Hoger = beter hersteld. Een flinke daling t.o.v. je gemiddelde wijst op vermoeidheid, stress, alcohol of ziekte.</p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <InfoStat label="Nu" value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : '—'} />
+            <InfoStat label="7d gem." value={hrvGem7 ?? '—'} />
+            <InfoStat label="Verschil" value={hrvDelta != null ? `${hrvDelta >= 0 ? '+' : ''}${hrvDelta}` : '—'} />
+          </div>
+          {hrvDelta != null && (
+            <Advies kleur={hrvDelta >= 0 ? '#16EC5E' : hrvDelta <= -8 ? '#FF3B5C' : '#FFD54A'}>
+              {hrvDelta >= 0
+                ? 'Op of boven je gemiddelde — je lichaam is klaar voor intensiteit.'
+                : hrvDelta <= -8
+                  ? 'Flink onder je gemiddelde — kies vandaag rust of rustige zone 2.'
+                  : 'Iets onder je gemiddelde — houd de belasting gematigd.'}
+            </Advies>
+          )}
+        </div>
+      ),
+    }
+    if (info === 'balans') return {
+      title: 'Herstelbalans',
+      body: (
+        <div className="section-gap">
+          <p className="t-sm t-muted">De herstelbalans weegt stress tegen herstel over je dag en nacht. Hoog/positief = je herstelt goed; laag = je staat onder druk.</p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <InfoStat label="Balans" value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : '—'} />
+            <InfoStat label="Stress" value={stress != null ? `${stress}%` : '—'} />
+            <InfoStat label="Rust-HR" value={laatste?.rust_hartslag ?? '—'} sub="bpm" />
+          </div>
+          <Advies>
+            {h.herstel_balans != null && Math.round(h.herstel_balans) >= 60
+              ? 'Je herstelt goed — een normale tot zware dag past prima.'
+              : 'Je herstel loopt achter op je belasting. Bouw rust in en let op slaap en voeding.'}
+          </Advies>
+        </div>
+      ),
+    }
+    return null
+  })()
+
   return (
     <div className="page">
 
@@ -269,8 +375,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
       {/* ── Readiness card ─────────────────────────────────────────────── */}
       <Card>
 
-        {/* Herstel-ring (WHOOP-stijl hero) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', paddingTop: 'var(--space-2)' }}>
+        {/* Herstel-ring (WHOOP-stijl hero) — tikbaar voor uitleg */}
+        <div
+          onClick={heeftData && gereedheid !== null ? () => setInfo('herstel') : undefined}
+          role={heeftData && gereedheid !== null ? 'button' : undefined}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', paddingTop: 'var(--space-2)', cursor: heeftData && gereedheid !== null ? 'pointer' : 'default' }}
+        >
           {heeftData && gereedheid !== null ? (
             <Ring score={gereedheid} baseline={baseline7d} size={244} label="Herstel" />
           ) : (
@@ -292,22 +402,29 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
               color: zone.chip === 'green' ? '#16EC5E' : zone.chip === 'amber' ? '#FFD54A' : '#FF3B5C',
             }}>{zone.label}</span>
           )}
+          {heeftData && gereedheid !== null && (
+            <span className="t-xs t-muted" style={{ textTransform: 'none', letterSpacing: 0 }}>ⓘ Tik voor uitleg &amp; advies</span>
+          )}
         </div>
 
         {/* WHOOP-kernmetrieken: Belasting (Strain) + Slaap */}
         {heeftData && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-8)', marginTop: 'var(--space-5)' }}>
-            <MetricRing
-              value={strain} max={21} decimals={1}
-              kleur="#0093E7" glow="rgba(0,147,231,0.42)"
-              grootLabel="/21" subLabel="Belasting"
-            />
-            {slaapPerf != null && (
+            <div onClick={() => setInfo('belasting')} role="button" style={{ cursor: 'pointer' }}>
               <MetricRing
-                value={slaapPerf} max={100}
-                kleur="#B388FF" glow="rgba(179,136,255,0.40)"
-                grootLabel="%" subLabel="Slaap"
+                value={strain} max={21} decimals={1}
+                kleur="#0093E7" glow="rgba(0,147,231,0.42)"
+                grootLabel="/21" subLabel="Belasting"
               />
+            </div>
+            {slaapPerf != null && (
+              <div onClick={() => setInfo('slaap')} role="button" style={{ cursor: 'pointer' }}>
+                <MetricRing
+                  value={slaapPerf} max={100}
+                  kleur="#B388FF" glow="rgba(179,136,255,0.40)"
+                  grootLabel="%" subLabel="Slaap"
+                />
+              </div>
             )}
           </div>
         )}
@@ -332,7 +449,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         {/* Metrics row */}
         {heeftData && (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${h.hrv_laatste ? 4 : 3}, 1fr)`, gap: 'var(--space-2)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--hairline)' }}>
-            <div style={{ textAlign: 'center' }}>
+            <div onClick={() => setInfo('hrv')} role="button" style={{ textAlign: 'center', cursor: 'pointer' }}>
               <MetricHero
                 value={h.hrv_ochtend ? Math.round(h.hrv_ochtend) : null}
                 unit={h.hrv_ochtend ? 'ms' : ''}
@@ -358,7 +475,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 />
               </div>
             )}
-            <div style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)' }}>
+            <div onClick={() => setInfo('slaap')} role="button" style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)', cursor: 'pointer' }}>
               <MetricHero
                 value={h.slaap_uur ? parseFloat(h.slaap_uur).toFixed(1) : null}
                 unit={h.slaap_uur ? 'u' : ''}
@@ -366,7 +483,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
                 color={h.slaap_uur >= 7.5 ? 'var(--green)' : h.slaap_uur >= 6 ? 'var(--amber)' : h.slaap_uur ? 'var(--red)' : undefined}
               />
             </div>
-            <div style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)' }}>
+            <div onClick={() => setInfo('balans')} role="button" style={{ textAlign: 'center', borderLeft: '1px solid var(--hairline)', paddingLeft: 'var(--space-2)', cursor: 'pointer' }}>
               <MetricHero
                 value={h.herstel_balans != null ? `${Math.round(h.herstel_balans)}${Math.abs(h.herstel_balans) > 20 ? '%' : ''}` : null}
                 label="Balans"
@@ -422,7 +539,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
 
       {/* ── WHOOP-slaapkaart ──────────────────────────────────────────────── */}
       {slaapUur != null && (
-        <SlaapKaart uur={slaapUur} perf={slaapPerf} fases={fases} fasesTotaal={fasesTotaal} score={h.slaap_score} />
+        <SlaapKaart uur={slaapUur} perf={slaapPerf} fases={fases} fasesTotaal={fasesTotaal} score={h.slaap_score} onClick={() => setInfo('slaap')} />
       )}
 
       {/* ── Training week ───────────────────────────────────────────────── */}
@@ -652,6 +769,34 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
       </Sheet>
 
+      {/* ── Metric-uitleg + advies ───────────────────────────────────────── */}
+      <Sheet open={!!infoSheet} onClose={() => setInfo(null)} title={infoSheet?.title}>
+        {infoSheet?.body}
+        <button className="btn btn-ghost btn-full" style={{ marginTop: 'var(--space-4)' }} onClick={() => { setInfo(null); onNavigeer('coach') }}>
+          Vraag de coach hierover →
+        </button>
+      </Sheet>
+
+    </div>
+  )
+}
+
+// Kleine stat-tegel voor de uitleg-sheets
+function InfoStat({ label, value, sub }) {
+  return (
+    <div className="card-inset" style={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
+      <div className="t-lg" style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      <div className="t-xs t-muted" style={{ marginTop: 2 }}>{label}</div>
+      {sub && <div className="t-xs t-muted" style={{ marginTop: 1, textTransform: 'none', letterSpacing: 0 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// Advies-blok met gekleurde rand
+function Advies({ kleur = 'var(--blue)', children }) {
+  return (
+    <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--bg-raised)', borderRadius: 'var(--r-sm)', borderLeft: `3px solid ${kleur}` }}>
+      <p className="t-sm" style={{ color: 'var(--text-2)' }}>{children}</p>
     </div>
   )
 }
@@ -716,12 +861,12 @@ function WeekStrainRecovery({ data }) {
 }
 
 // WHOOP-slaapkaart: prestatie-%, uren vs behoefte, slaaptekort en fases
-function SlaapKaart({ uur, perf, fases, fasesTotaal, score }) {
+function SlaapKaart({ uur, perf, fases, fasesTotaal, score, onClick }) {
   const behoefte = 8
   const tekortMin = Math.round((behoefte - uur) * 60)
   const perfKleur = perf >= 85 ? '#16EC5E' : perf >= 70 ? '#FFD54A' : '#FF3B5C'
   return (
-    <Card>
+    <Card onClick={onClick} style={onClick ? { cursor: 'pointer' } : undefined}>
       <div className="card-header">
         <span className="t-lg">Slaap</span>
         <span style={{ color: perfKleur, fontWeight: 800, fontSize: 'var(--t-lg)' }}>{perf}%</span>

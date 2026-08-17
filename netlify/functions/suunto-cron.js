@@ -1,7 +1,9 @@
 import { getDb } from './_db.js'
-import { getValidToken, syncSuuntoForUser, syncSuuntoWellnessForUser } from './_suunto.js'
+import { getValidToken, syncSuuntoForUser } from './_suunto.js'
 
-// Dagelijkse Suunto sync — workouts + wellness (slaap/HRV/recovery)
+// Dagelijkse Suunto sync — workouts via pull.
+// Gezondheidsdata (24/7: slaap/HRV/herstel/activiteit) komt via webhooks
+// (zie suunto-webhook.js), niet meer via een pull-sync.
 export const handler = async () => {
   const sql = getDb()
   const users = await sql`
@@ -14,17 +16,8 @@ export const handler = async () => {
     try {
       const token = await getValidToken(sql, user_id)
       const workouts = await syncSuuntoForUser(sql, user_id, token)
-      let wellness = { wellness_nieuw: 0 }
-      if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
-        wellness = await syncSuuntoWellnessForUser(sql, user_id, token, 28)
-      }
       await sql`UPDATE user_profile SET suunto_laatste_sync = NOW() WHERE user_id = ${user_id}`.catch(() => {})
-      samenvatting.push({
-        user_id,
-        workouts: workouts.gesynchroniseerd,
-        wellness_nieuw: wellness.wellness_nieuw,
-        wellness_bijgewerkt: wellness.wellness_bijgewerkt,
-      })
+      samenvatting.push({ user_id, workouts: workouts.gesynchroniseerd })
     } catch (err) {
       samenvatting.push({ user_id, error: err.message })
     }
