@@ -482,8 +482,41 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     if (heeftKracht && totaalMinWeek >= 60) eiwitPerKg = 1.6
     if (heeftKracht && tdee && totVandaag.kcal && totVandaag.kcal < tdee - 300) eiwitPerKg = 2.0
     const minEiwit = profiel?.gewicht_kg ? Math.round(profiel.gewicht_kg * eiwitPerKg) : 100
-    const recentHrv = recentHerstel.hrv || null
-    const recentSlaap = recentHerstel.slaap || null
+    // ── Huidige status: meest recente NIET-lege waarde per metric (zoals het
+    //    dashboard), zodat coach en dashboard exact dezelfde cijfers tonen ──
+    const laatsteNietLeeg = (key) => {
+      for (const m of mergedHerstel) if (m[key] != null) return m[key]
+      return null
+    }
+    const sHrv    = laatsteNietLeeg('hrv')
+    const sSlaap  = laatsteNietLeeg('slaap')
+    const sScore  = laatsteNietLeeg('slaap_score')
+    const sBalans = laatsteNietLeeg('herstel_balans')
+    const sStress = laatsteNietLeeg('stress_pct')
+    const sRust   = laatsteNietLeeg('rust_hartslag')
+    const sStappen = laatsteNietLeeg('stappen')
+    const statusDatum = recentHerstel.datum || null
+    const statusIsVandaag = statusDatum === vandaag
+    // HRV vs 7-daags gemiddelde (exclusief de meest recente meting)
+    const hrvReeks = mergedHerstel.map(m => m.hrv).filter(v => v != null)
+    const hrv7Avg = hrvReeks.length >= 3
+      ? Math.round(hrvReeks.slice(1).reduce((a, b) => a + b, 0) / (hrvReeks.length - 1))
+      : null
+    const hrvDeltaCoach = hrv7Avg != null && sHrv != null ? Math.round(sHrv) - hrv7Avg : null
+
+    const huidigeStatusBlok = (sHrv != null || sSlaap != null || sBalans != null)
+      ? [
+          sHrv != null ? `• HRV (nacht): ${Math.round(sHrv)}ms${hrvDeltaCoach != null ? ` (${hrvDeltaCoach >= 0 ? '+' : ''}${hrvDeltaCoach} t.o.v. 7d-gem ${hrv7Avg}ms)` : ''}` : null,
+          sSlaap != null ? `• Slaap: ${sSlaap}u${sScore != null ? ` (score ${sScore})` : ''}` : null,
+          sBalans != null ? `• Herstelbalans: ${Math.round(sBalans)}${Math.abs(sBalans) > 20 ? '%' : ''}` : null,
+          sStress != null ? `• Stress: ${sStress}%` : null,
+          sRust != null ? `• Rusthartslag: ${sRust}bpm` : null,
+          sStappen != null ? `• Stappen: ${sStappen.toLocaleString('nl-NL')}` : null,
+        ].filter(Boolean).join('\n')
+      : '• Nog geen recente Suunto-meting beschikbaar.'
+
+    const recentHrv = sHrv
+    const recentSlaap = sSlaap
 
     const heeftHyrox = profiel?.sporten?.includes('hyrox')
     const hyroxKennis = heeftHyrox ? `
@@ -657,6 +690,10 @@ Dagdoelen: ${dagdoelKcal}kcal | ${dagdoelEiwit}g eiwit | ${dagdoelKh}g koolhyd |
 ${tdeeStr ? `\n${tdeeStr}` : ''}
 ${profiel?.coach_context ? `Persoonlijke context: ${profiel.coach_context}` : ''}
 
+═══ HUIDIGE STATUS${statusDatum ? ` (${statusDatum}${statusIsVandaag ? ' — vandaag' : ', meest recente meting'})` : ''} ═══
+Dit zijn de MEEST ACTUELE wellness-waarden — identiek aan wat de gebruiker nu op het dashboard ziet. Gebruik EXACT deze getallen wanneer je over "vandaag", "nu" of "mijn herstel" praat. Verwar ze niet met oudere dagen uit de 14-daagse lijst hieronder.
+${huidigeStatusBlok}
+
 ═══ VOEDING VANDAAG (${vandaag}) ═══
 ${maaltijdRegels}
 Dagtotaal: ${Math.round(totVandaag.kcal)}kcal | ${Math.round(totVandaag.eiwit)}g eiwit | ${Math.round(totVandaag.kh)}g kh | ${Math.round(totVandaag.vet)}g vet
@@ -696,7 +733,7 @@ ${inbodyRegels}
 ═══ ACTIEVE DOELEN ═══
 ${doelenRegels}
 ${hyroxKennis}
-Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), begin dan daarmee voordat je de vraag van de gebruiker beantwoordt.
+Spreek altijd Nederlands. ${stijlInstructie} Verwijs actief naar bovenstaande data. Begin je antwoord met een korte beoordeling van de HUIDIGE STATUS (herstel/HRV/slaap van vandaag) en stem je advies daarop af, voordat je verder ingaat op de vraag van de gebruiker. Als de data aanleiding geeft tot een proactieve opmerking (zie instructies boven), neem die mee.
 
 BELANGRIJK — LENGTE: houd antwoorden compact en mobiel-leesbaar: maximaal ~250 woorden. Kies de 2-3 belangrijkste inzichten in plaats van alles op te sommen. Alleen als de gebruiker expliciet om een uitgebreide analyse of volledig plan vraagt mag het langer zijn.`
 
