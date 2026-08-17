@@ -39,6 +39,14 @@ export const handler = async (event) => {
     const a = Buffer.from(String(sig), 'utf8')
     const b = Buffer.from(expected, 'utf8')
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      // Diagnose-logging (geen volledige secrets): helpt vaststellen of het
+      // notification-secret in de portal overeenkomt met SUUNTO_NOTIFICATION_SECRET.
+      console.warn('Suunto webhook: handtekening komt niet overeen', {
+        headerAanwezig: !!sig,
+        headerStart: String(sig).slice(0, 10),
+        berekendStart: expected.slice(0, 10),
+        bodyBytes: raw.length,
+      })
       return { statusCode: 401, body: 'invalid signature' }
     }
   }
