@@ -1,6 +1,6 @@
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
-import { getValidToken, syncSuuntoForUser, syncSuuntoWellnessForUser } from './_suunto.js'
+import { getValidToken, syncSuuntoForUser } from './_suunto.js'
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors({})
@@ -21,15 +21,9 @@ export const handler = async (event) => {
     // Handmatige sync = volledige backfill (geen sindsDagen-venster)
     const workouts = await syncSuuntoForUser(sql, userId, accessToken)
 
-    // Wellness — alleen als subscription key beschikbaar is
-    let wellness = { wellness_dagen: 0, wellness_nieuw: 0, wellness_bijgewerkt: 0, geen_subscription_key: true }
-    if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
-      try {
-        wellness = await syncSuuntoWellnessForUser(sql, userId, accessToken, 28)
-      } catch (err) {
-        wellness = { wellness_dagen: 0, wellness_mislukt: true, debug: { error: err.message } }
-      }
-    }
+    // Gezondheidsdata (slaap/HRV/herstel) komt sinds de Suunto 24/7 API-migratie
+    // via webhooks binnen (zie suunto-webhook.js), niet meer via een pull-sync.
+    const wellness = { via: 'webhook' }
 
     // Grendel-tijdstip bijwerken zodat de achtergrond-sync niet direct opnieuw draait
     await sql`

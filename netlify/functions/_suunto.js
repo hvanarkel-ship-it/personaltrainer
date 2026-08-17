@@ -77,7 +77,7 @@ function localDateFromMs(ms, offsetMinutes = 0) {
   return d.toISOString().slice(0, 10)
 }
 
-function parseWorkout(w) {
+export function parseWorkout(w) {
   const id = String(w.workoutKey || '')
   if (!id) return null
 
@@ -307,7 +307,7 @@ function localDate(iso) {
 // updates gedurende de nacht). Alleen de laatste snapshot bevat de definitieve
 // waarden — zonder deze deduplicatie telt de slaapduur ~8x te hoog op en pakt
 // een HRV-max een tussentijdse piek i.p.v. de eindwaarde die Suunto toont.
-function aggregateSleep(entries) {
+export function aggregateSleep(entries) {
   // Stap 1: per SleepId alleen de meest recente snapshot bewaren
   const perSlaap = new Map()
   for (const e of entries || []) {
@@ -365,7 +365,7 @@ function aggregateSleep(entries) {
 // - kcal = som EnergyConsumption (joules → kcal: /4184)
 // - rust_hartslag  = min HR 03:00-06:00 (slaap)
 // - min_hartslag_dag = min HR 09:00-22:00 (overdag, rust gemeten)
-function aggregateActivity(entries) {
+export function aggregateActivity(entries) {
   const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
@@ -402,7 +402,7 @@ function saneKcal(k) {
 // Recovery: balance + stress + HRV + hulpbronnen per dag
 // hrv_ochtend  = nacht/ochtend venster 22-09 (Nightly Recharge, consistent met Suunto app)
 // hrv_laatste  = meest recente meting van de dag (kan overdag zijn), met tijdstip
-function aggregateRecovery(entries) {
+export function aggregateRecovery(entries) {
   const perDag = new Map()
   for (const e of entries || []) {
     const d = e?.entryData
@@ -704,11 +704,9 @@ export async function autoSyncSuunto(sql, userId, { maxMs = 8000 } = {}) {
   // De grendel wordt pas na volledige voltooiing gezet. Wint de timeout, dan
   // blijft de grendel ongezet → een volgende request maakt idempotent af
   // (workout-inserts zijn ON CONFLICT DO NOTHING, wellness is COALESCE-upsert).
+  // Alleen workouts via pull; gezondheidsdata komt via webhooks (suunto-webhook.js).
   const doSync = (async () => {
     await syncSuuntoForUser(sql, userId, token, { sindsDagen: 14 })
-    if (process.env.SUUNTO_SUBSCRIPTION_KEY) {
-      await syncSuuntoWellnessForUser(sql, userId, token, 3)
-    }
     await sql`UPDATE user_profile SET suunto_laatste_sync = NOW() WHERE user_id = ${userId}`
   })()
 
@@ -717,5 +715,62 @@ export async function autoSyncSuunto(sql, userId, { maxMs = 8000 } = {}) {
     new Promise(res => setTimeout(res, maxMs)),
   ])
   return { ok: true }
+}
+
+// ─── Gedeelde insert/upsert helpers (gebruikt door pull-sync én webhooks) ───
+
+// Voegt één workout-rij toe; dedup op (user_id, suunto_id). Geeft true als nieuw.
+export async function insertWorkoutRow(sql, row) {
+  const result = await sql`
+    INSERT INTO trainingen
+      (user_id, datum, sport, duur_min, km, kcal, gem_hartslag, max_hartslag,
+       zone2_min, zone3_min, zone4_min, stemming, notities, bron, suunto_id)
+    VALUES
+      (${row.user_id}, ${row.datum}, ${row.sport}, ${row.duur_min}, ${row.km}, ${row.kcal},
+       ${row.gem_hartslag}, ${row.max_hartslag}, ${row.zone2_min}, ${row.zone3_min},
+       ${row.zone4_min}, ${row.stemming}, ${row.notities}, ${row.bron}, ${row.suunto_id})
+    ON CONFLICT (user_id, suunto_id) WHERE suunto_id IS NOT NULL DO NOTHING
+    RETURNING suunto_id
+  `
+  return result.length > 0
+}
+
+// Upsert van wellness-dagen. Elke rij bevat 'datum' + een deelverzameling velden;
+// COALESCE zorgt dat losse bronnen (slaap/activiteit/herstel) elkaar per dag
+// aanvullen i.p.v. overschrijven. Geeft { nieuw, bijgewerkt } terug.
+export async function upsertWellnessRows(sql, userId, rows) {
+  if (!rows.length) return { nieuw: 0, bijgewerkt: 0 }
+  const resultaten = await Promise.all(rows.map(row => sql`
+    INSERT INTO dagelijkse_wellness
+      (user_id, datum, slaap_uur, slaap_score, diepe_slaap_min, rem_slaap_min, lichte_slaap_min,
+       hrv_ochtend, hrv_laatste, hrv_laatste_tijd,
+       herstel_balans, stress_pct, rust_hartslag, min_hartslag_dag, stappen, kcal_actief, hulpbronnen_pct, bron)
+    VALUES
+      (${userId}, ${row.datum}, ${row.slaap_uur ?? null}, ${row.slaap_score ?? null}, ${row.diepe_slaap_min ?? null},
+       ${row.rem_slaap_min ?? null}, ${row.lichte_slaap_min ?? null}, ${row.hrv_ochtend ?? null}, ${row.hrv_laatste ?? null}, ${row.hrv_laatste_tijd ?? null},
+       ${row.herstel_balans ?? null}, ${row.stress_pct ?? null}, ${row.rust_hartslag ?? null}, ${row.min_hartslag_dag ?? null}, ${row.stappen ?? null}, ${row.kcal_actief ?? null}, ${row.hulpbronnen_pct ?? null}, 'suunto')
+    ON CONFLICT (user_id, datum) DO UPDATE SET
+      slaap_uur        = COALESCE(EXCLUDED.slaap_uur,        dagelijkse_wellness.slaap_uur),
+      slaap_score      = COALESCE(EXCLUDED.slaap_score,      dagelijkse_wellness.slaap_score),
+      diepe_slaap_min  = COALESCE(EXCLUDED.diepe_slaap_min,  dagelijkse_wellness.diepe_slaap_min),
+      rem_slaap_min    = COALESCE(EXCLUDED.rem_slaap_min,    dagelijkse_wellness.rem_slaap_min),
+      lichte_slaap_min = COALESCE(EXCLUDED.lichte_slaap_min, dagelijkse_wellness.lichte_slaap_min),
+      hrv_ochtend      = COALESCE(EXCLUDED.hrv_ochtend,      dagelijkse_wellness.hrv_ochtend),
+      hrv_laatste      = COALESCE(EXCLUDED.hrv_laatste,      dagelijkse_wellness.hrv_laatste),
+      hrv_laatste_tijd = COALESCE(EXCLUDED.hrv_laatste_tijd, dagelijkse_wellness.hrv_laatste_tijd),
+      herstel_balans   = COALESCE(EXCLUDED.herstel_balans,   dagelijkse_wellness.herstel_balans),
+      stress_pct       = COALESCE(EXCLUDED.stress_pct,       dagelijkse_wellness.stress_pct),
+      rust_hartslag    = COALESCE(EXCLUDED.rust_hartslag,    dagelijkse_wellness.rust_hartslag),
+      min_hartslag_dag = COALESCE(EXCLUDED.min_hartslag_dag, dagelijkse_wellness.min_hartslag_dag),
+      stappen          = COALESCE(EXCLUDED.stappen,          dagelijkse_wellness.stappen),
+      kcal_actief      = COALESCE(EXCLUDED.kcal_actief,      dagelijkse_wellness.kcal_actief),
+      hulpbronnen_pct  = COALESCE(EXCLUDED.hulpbronnen_pct,  dagelijkse_wellness.hulpbronnen_pct),
+      bron             = EXCLUDED.bron,
+      updated_at       = NOW()
+    RETURNING (xmax = 0) AS nieuw
+  `.catch(() => [])))
+  let nieuw = 0, bijgewerkt = 0
+  for (const r of resultaten) for (const row of r) row.nieuw ? nieuw++ : bijgewerkt++
+  return { nieuw, bijgewerkt }
 }
 

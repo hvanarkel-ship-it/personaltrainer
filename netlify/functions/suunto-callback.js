@@ -53,15 +53,19 @@ export const handler = async (event) => {
 
     const tokens = await tokenRes.json()
     const expiry = new Date(Date.now() + (tokens.expires_in || 3600) * 1000)
+    // Suunto user-id (uit het token-antwoord) is nodig om webhook-notificaties
+    // aan de juiste gebruiker te koppelen (payload.username).
+    const suuntoUser = tokens.user || null
 
     const sql = getDb()
     await sql`
-      INSERT INTO user_profile (user_id, suunto_access_token, suunto_refresh_token, suunto_token_expiry)
-      VALUES (${userId}, ${tokens.access_token}, ${tokens.refresh_token}, ${expiry.toISOString()})
+      INSERT INTO user_profile (user_id, suunto_access_token, suunto_refresh_token, suunto_token_expiry, suunto_username)
+      VALUES (${userId}, ${tokens.access_token}, ${tokens.refresh_token}, ${expiry.toISOString()}, ${suuntoUser})
       ON CONFLICT (user_id) DO UPDATE SET
         suunto_access_token  = EXCLUDED.suunto_access_token,
         suunto_refresh_token = EXCLUDED.suunto_refresh_token,
         suunto_token_expiry  = EXCLUDED.suunto_token_expiry,
+        suunto_username      = COALESCE(EXCLUDED.suunto_username, user_profile.suunto_username),
         updated_at = NOW()
     `
 
