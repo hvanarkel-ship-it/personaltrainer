@@ -380,18 +380,20 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     const mergedHerstel = allHerstelDatums.map(datum => {
       const t = tByDatum.get(datum) || {}
       const w = wByDatum.get(datum) || {}
+      // Suunto (webhook, dagelijkse_wellness) is de primaire bron — consistent met
+      // het dashboard. Handmatige logs (trainingen) vullen alleen dagen zonder Suunto.
       return {
         datum,
-        hrv:           t.hrv_ochtend   ?? w.hrv_ochtend   ?? null,
-        slaap:         t.slaap_uur     ?? w.slaap_uur     ?? null,
-        slaap_score:    t.slaap_score    ?? w.slaap_score   ?? null,
-        herstel_balans: t.herstel_balans ?? (w.herstel_balans != null ? parseFloat(w.herstel_balans) * 100 : null),
+        hrv:           w.hrv_ochtend    ?? t.hrv_ochtend   ?? null,
+        slaap:         w.slaap_uur      ?? t.slaap_uur     ?? null,
+        slaap_score:    w.slaap_score    ?? t.slaap_score   ?? null,
+        herstel_balans: w.herstel_balans != null ? parseFloat(w.herstel_balans) * 100 : (t.herstel_balans ?? null),
         diepe_slaap:   w.diepe_slaap_min ?? null,
         rem_slaap:     w.rem_slaap_min   ?? null,
         rust_hartslag: w.rust_hartslag   ?? null,
         stappen:       w.stappen        ?? null,
         stress_pct:    w.stress_pct     ?? null,
-        bron: t.hrv_ochtend ? 'handmatig' : 'suunto',
+        bron: (w.hrv_ochtend != null || w.slaap_uur != null) ? 'suunto' : (t.hrv_ochtend != null ? 'handmatig' : 'suunto'),
       }
     })
 
