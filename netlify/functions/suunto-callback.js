@@ -48,7 +48,11 @@ export const handler = async (event) => {
     if (!tokenRes.ok) {
       const txt = await tokenRes.text().catch(() => '')
       console.error('Suunto token exchange mislukt:', tokenRes.status, txt)
-      return redirect(`${APP_URL}/?suunto=fout&reden=token_exchange_mislukt`)
+      // Neem Suunto's eigen foutcode mee in de reden, zodat de oorzaak direct
+      // zichtbaar is in de app-melding (bijv. invalid_grant / invalid_client).
+      let detail = String(tokenRes.status)
+      try { const j = JSON.parse(txt); if (j.error) detail = j.error } catch { /* geen JSON */ }
+      return redirect(`${APP_URL}/?suunto=fout&reden=${encodeURIComponent('token_' + detail)}`)
     }
 
     const tokens = await tokenRes.json()
