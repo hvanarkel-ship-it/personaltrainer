@@ -219,6 +219,10 @@ export const handler = async (event) => {
     const nu = new Date()
     const tijdStr = nu.toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit' })
     const dagNaamNL = nu.toLocaleDateString('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long' })
+    // Neon geeft DATE-kolommen terug als JS Date-objecten. String(date).slice(0,10)
+    // levert dan "Mon Aug 17" (weekdag!) i.p.v. "2026-08-17" — dat brak de
+    // datum-sortering van de herstel-merge. Altijd via deze helper naar ISO.
+    const isoDag = d => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10))
 
     let opgeslagen
     const [
@@ -338,7 +342,7 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
     // Vast doel (TDEE bevat de activiteit al): trainingscalorieën worden apart
     // vermeld, niet bij het doel opgeteld — geen dubbeltelling.
     const trainingKcalVandaag = weektraining
-      .filter(t => String(t.datum).slice(0, 10) === vandaag && t.sport !== 'herstel')
+      .filter(t => isoDag(t.datum) === vandaag && t.sport !== 'herstel')
       .reduce((s, t) => s + (parseInt(t.kcal) || 0), 0)
     const dagdoelKcal = profiel?.doel_kcal || MACRO_DEFAULTS.kcal
     const dagdoelEiwit = profiel?.doel_eiwit_g || MACRO_DEFAULTS.eiwit_g
@@ -369,13 +373,13 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
             m.visceraal_vet ? `visceraal ${m.visceraal_vet}` : null,
             m.inbody_score ? `score ${m.inbody_score}` : null,
           ].filter(Boolean).join(' | ')
-          return `  • ${m.datum}: ${parts}`
+          return `  • ${isoDag(m.datum)}: ${parts}`
         }).join('\n')
       : '  Geen InBody metingen beschikbaar'
 
     // ── HRV/herstel: merge trainingen (handmatig) + dagelijkse_wellness (Suunto) ──
-    const wByDatum = new Map(wellnessTrend.map(w => [String(w.datum).slice(0, 10), w]))
-    const tByDatum = new Map(hrvTrend.map(h => [String(h.datum).slice(0, 10), h]))
+    const wByDatum = new Map(wellnessTrend.map(w => [isoDag(w.datum), w]))
+    const tByDatum = new Map(hrvTrend.map(h => [isoDag(h.datum), h]))
     const allHerstelDatums = [...new Set([...wByDatum.keys(), ...tByDatum.keys()])].sort().reverse().slice(0, 7)
     const mergedHerstel = allHerstelDatums.map(datum => {
       const t = tByDatum.get(datum) || {}
@@ -428,7 +432,7 @@ Eiwit per kg: ${profiel.gewicht_kg ? (totVandaag.eiwit / profiel.gewicht_kg).toF
               ? `zones Z2:${t.zone2_min||0} Z3:${t.zone3_min||0} Z4:${t.zone4_min||0}min` : null,
           ].filter(Boolean).join(' | ')
           const herstelInfo = t.hrv_ochtend ? ` [HRV ${t.hrv_ochtend}ms slaap ${t.slaap_uur}u]` : ''
-          return `  • ${t.datum} ${t.sport}: ${detail}${herstelInfo}${t.notities ? ` — "${t.notities}"` : ''}`
+          return `  • ${isoDag(t.datum)} ${t.sport}: ${detail}${herstelInfo}${t.notities ? ` — "${t.notities}"` : ''}`
         }).join('\n')
       : '  Geen trainingen deze week'
 
