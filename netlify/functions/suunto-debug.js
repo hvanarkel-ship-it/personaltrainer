@@ -78,9 +78,11 @@ export const handler = async (event) => {
     } catch (e) { opgeslagen = [{ error: e.message }] }
 
     let laatsteSync = null
+    let suuntoUsername = null
     try {
-      const [p] = await sql`SELECT suunto_laatste_sync FROM user_profile WHERE user_id = ${userId}`
+      const [p] = await sql`SELECT suunto_laatste_sync, suunto_username FROM user_profile WHERE user_id = ${userId}`
       laatsteSync = p?.suunto_laatste_sync ?? null
+      suuntoUsername = p?.suunto_username ?? null
     } catch { /* kolom bestaat mogelijk nog niet */ }
 
     // Ruwe workouts: welke activityId/activityName levert Suunto, en wat maken wij ervan?
@@ -110,6 +112,8 @@ export const handler = async (event) => {
     return cors({
       heeftSubscriptionKey: heeftKey,
       hint: heeftKey ? null : 'SUUNTO_SUBSCRIPTION_KEY niet ingesteld in Netlify — 247 API vereist deze',
+      webhook_klaar: !!suuntoUsername,
+      suunto_username: suuntoUsername,
       laatste_sync: laatsteSync,
       dagstats_metrieken: dagstatsMetrieken,
       workouts,
