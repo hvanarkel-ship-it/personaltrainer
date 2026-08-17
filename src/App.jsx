@@ -85,6 +85,7 @@ export default function App() {
   const [toonOnboarding, setToonOnboarding] = useState(false)
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'))
   const [suuntoStatus, setSuuntoStatus] = useState(() => new URLSearchParams(window.location.search).get('suunto'))
+  const [suuntoReden] = useState(() => new URLSearchParams(window.location.search).get('reden'))
   const [dashboardKey, setDashboardKey] = useState(0)
   const [isStyleguide] = useState(() => window.location.pathname === '/styleguide' || new URLSearchParams(window.location.search).has('styleguide'))
 
@@ -256,6 +257,7 @@ export default function App() {
             {...navProps}
             {...(scherm === 'settings' ? {
               suuntoStatus,
+              suuntoReden,
               onSuuntoStatusClear: () => setSuuntoStatus(null),
               onDataVernieuwd: () => setDashboardKey(k => k + 1),
             } : {})}

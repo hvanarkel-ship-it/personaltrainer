@@ -22,7 +22,7 @@ const TABS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, onSuuntoStatusClear, onDataVernieuwd }) {
+export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, suuntoReden, onSuuntoStatusClear, onDataVernieuwd }) {
   const [tab, setTab]       = useState('profiel')
   const [profiel, setProfiel] = useState(null)
   const [laden, setLaden]   = useState(true)
@@ -427,7 +427,7 @@ export default function Settings({ user, onNavigeer, onUitloggen, suuntoStatus, 
                 <p className="t-sm" style={{ color: suuntoStatus === 'verbonden' ? 'var(--green)' : 'var(--red)' }}>
                   {suuntoStatus === 'verbonden'
                     ? '✓ Suunto succesvol gekoppeld! Klik op "Nu synchroniseren" om je workouts te importeren.'
-                    : 'Suunto koppelen mislukt. Probeer opnieuw.'}
+                    : `Suunto koppelen mislukt${suuntoReden ? ` (${suuntoReden})` : ''}. Probeer opnieuw.`}
                 </p>
                 <button
                   onClick={() => { onSuuntoStatusClear?.(); laadProfiel() }}

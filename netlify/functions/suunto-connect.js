@@ -21,11 +21,15 @@ export const handler = async (event) => {
     { expiresIn: '10m' }
   )
 
+  // Suunto's OAuth kent alleen de scope 'workout'. Toegang tot de 24/7 DATA API
+  // (slaap/herstel/activiteit) loopt via de subscription key, niet via een aparte
+  // scope. Een onbekende scope (bijv. 'wellbeing') laat Suunto de autorisatie
+  // weigeren → "kan niet verbinden".
   const params = new URLSearchParams({
     response_type: 'code',
     client_id:     process.env.SUUNTO_CLIENT_ID,
     redirect_uri:  SUUNTO_REDIRECT_URI,
-    scope:         'workout wellbeing',
+    scope:         'workout',
     state,
   })
 
