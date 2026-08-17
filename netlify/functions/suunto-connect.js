@@ -21,15 +21,15 @@ export const handler = async (event) => {
     { expiresIn: '10m' }
   )
 
-  // Scope 'workout wellbeing': 'workout' geeft toegang tot /v2/workouts, en
-  // 'wellbeing' is vereist voor de 24/7 DATA API (/247samples: slaap, herstel,
-  // activiteit). Zonder 'wellbeing' geeft de 247 API "Invalid authentication".
-  // (Bevestigd: alle wellness-data t/m aug 2026 kwam binnen met deze scope.)
+  // Suunto's OAuth kent alléén de scope 'workout' — 'wellbeing' geeft
+  // 'invalid_scope' (bevestigd) en blokkeert het koppelen. De 24/7 DATA API
+  // (/247samples) werkt met een 'workout'-token; toegang daartoe hangt af van
+  // het API-abonnement, niet van een aparte OAuth-scope.
   const params = new URLSearchParams({
     response_type: 'code',
     client_id:     process.env.SUUNTO_CLIENT_ID,
     redirect_uri:  SUUNTO_REDIRECT_URI,
-    scope:         'workout wellbeing',
+    scope:         'workout',
     state,
   })
 
