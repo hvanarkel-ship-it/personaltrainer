@@ -219,7 +219,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className="app">
-      <header className="app-brand"><div className="brand-lockup"><span className="brand-symbol" aria-hidden="true">Λ</span><span>APEX <span className="brand-secondary">Coach</span></span></div><span className="brand-caption">Elke dag een stap vooruit.</span></header>
+      <header className="app-brand"><div className="brand-lockup"><span className="brand-symbol" aria-hidden="true">Λ</span><span>APEX <span className="brand-secondary">Coach</span></span></div><span className="brand-caption">PERFORMANCE / EVERY DAY</span></header>
       <DbStatus />
 
       {/* Offline banner */}

@@ -12,7 +12,7 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('apex_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          var t = localStorage.getItem('apex_theme') || 'dark';
           document.documentElement.setAttribute('data-theme', t);
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute('content', t === 'light' ? '#EEF0F3' : '#0A0A0C');

@@ -17,7 +17,7 @@ export default function MetricRing({
   const c = 2 * Math.PI * r
 
   useEffect(() => {
-    if (!animated) { setDrawn(pct); setNum(value); return }
+    if (!animated || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setDrawn(pct); setNum(value); return }
     const start = performance.now()
     const dur = 900
     const step = now => {
@@ -33,7 +33,7 @@ export default function MetricRing({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <div style={{ position: 'relative', width: size, height: size, filter: `drop-shadow(0 0 14px ${glow})` }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--hairline)" strokeWidth={strokeW} />
           <circle cx={cx} cy={cx} r={r} fill="none" stroke={kleur} strokeWidth={strokeW}
             strokeDasharray={`${c} ${c}`} strokeDashoffset={c * (1 - drawn)} strokeLinecap="round" />
@@ -46,12 +46,12 @@ export default function MetricRing({
             {num.toFixed(decimals)}
           </span>
           {grootLabel && (
-            <span style={{ fontSize: size * 0.10, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{grootLabel}</span>
+            <span style={{ fontSize: size * 0.10, fontWeight: 700, color: 'var(--text-2)', marginTop: 1 }}>{grootLabel}</span>
           )}
         </div>
       </div>
       {subLabel && (
-        <span style={{ fontSize: 'var(--t-xs)', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+        <span style={{ fontSize: 'var(--t-xs)', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
           {subLabel}
         </span>
       )}

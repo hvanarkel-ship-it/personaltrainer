@@ -37,10 +37,10 @@ export default function Login({ onInloggen }) {
     <div className="auth-screen">
       <div className="auth-intro">
         <div className="auth-brand"><span className="brand-symbol" aria-hidden="true">Λ</span> APEX Coach</div>
-        <p className="auth-eyebrow">JOUW PERSOONLIJKE VOORUITGANG</p>
-        <h1>Sterker worden.<br /><span>Op jouw tempo.</span></h1>
-        <p className="auth-description">Training, voeding en herstel. Alles in balans, met een coach die met je meedenkt.</p>
-        <div className="auth-orbits" aria-hidden="true"><div /><div /><div /><span>APEX<small>Vind je balans.</small></span></div>
+        <p className="auth-eyebrow">TRAINING. HERSTEL. VOORUITGANG.</p>
+        <h1>KEN JE LICHAAM.<br /><span>VERLEG JE GRENS.</span></h1>
+        <p className="auth-description">Elke training begint met inzicht. Breng je slaap, herstel en belasting samen. Maak vandaag het verschil.</p>
+        <div className="performance-art" aria-hidden="true"><div className="performance-grid" /><svg viewBox="0 0 500 150"><path d="M0 110 H70 L92 94 L110 110 H170 L188 75 L206 122 L236 22 L262 137 L290 83 L312 110 H360 L385 89 L405 110 H500" /></svg><span>MEET. BEGRIJP. VERBETER.</span></div>
         <div className="auth-pillars"><span>Training</span><span>Voeding</span><span>Herstel</span></div>
       </div>
       <div className="auth-panel">
