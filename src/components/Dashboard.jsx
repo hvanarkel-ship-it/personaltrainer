@@ -337,12 +337,12 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
   })()
 
   return (
-    <div className="page">
+    <div className="page dashboard-page" id="main-content">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="page-header">
         <div>
-          <h1 className="t-xl">Hey, {voornaam}</h1>
+          <h1 className="t-xl">Jouw overzicht, {voornaam}.</h1>
           <p className="t-sm t-muted" style={{ marginTop: 2 }}>{dag}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -372,8 +372,9 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
         </div>
       </div>
 
-      {/* ── Readiness card ─────────────────────────────────────────────── */}
-      <Card>
+      {/* Readiness overview */}
+      <Card className="readiness-card">
+        <div className="readiness-heading"><h2>Vandaag in balans</h2><span>Herstel &amp; energie</span></div>
 
         {/* Herstel-ring (WHOOP-stijl hero) — tikbaar voor uitleg */}
         <div
@@ -399,7 +400,7 @@ export default function Dashboard({ user, onNavigeer, onUitloggen }) {
           {zone && (
             <span style={{
               fontSize: 'var(--t-xs)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: zone.chip === 'green' ? '#16EC5E' : zone.chip === 'amber' ? '#FFD54A' : '#FF3B5C',
+              color: zone.chip === 'green' ? 'var(--green)' : zone.chip === 'amber' ? 'var(--amber)' : 'var(--red)',
             }}>{zone.label}</span>
           )}
           {heeftData && gereedheid !== null && (
@@ -967,4 +968,3 @@ function WeightChart({ trend }) {
     </div>
   )
 }
-

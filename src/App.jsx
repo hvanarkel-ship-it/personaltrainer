@@ -219,6 +219,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className="app">
+      <header className="app-brand"><div className="brand-lockup"><span className="brand-symbol" aria-hidden="true">Λ</span><span>APEX <span className="brand-secondary">Coach</span></span></div><span className="brand-caption">Elke dag een stap vooruit.</span></header>
       <DbStatus />
 
       {/* Offline banner */}
@@ -267,11 +268,12 @@ export default function App() {
 
       {scherm !== 'coach' && <div className="app-versie">{APP_VERSION}</div>}
 
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" aria-label="Hoofdnavigatie">
         {NAV.map(item => (
           <button
             key={item.id}
             className={`nav-btn ${scherm === item.id ? 'active' : ''}`}
+            aria-current={scherm === item.id ? 'page' : undefined}
             onClick={() => setScherm(item.id)}
           >
             <span className="nav-icon"><NavIcoon id={item.id} /></span>

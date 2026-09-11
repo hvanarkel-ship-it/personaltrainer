@@ -35,12 +35,15 @@ export default function Login({ onInloggen }) {
 
   return (
     <div className="auth-screen">
-      <div className="auth-logo">⚡</div>
-      <div style={{ textAlign: 'center' }}>
-        <h1 className="t-xl">APEX Coach</h1>
-        <p className="t-sm t-muted" style={{ marginTop: 4 }}>Jouw AI Personal Trainer</p>
+      <div className="auth-intro">
+        <div className="auth-brand"><span className="brand-symbol" aria-hidden="true">Λ</span> APEX Coach</div>
+        <p className="auth-eyebrow">JOUW PERSOONLIJKE VOORUITGANG</p>
+        <h1>Sterker worden.<br /><span>Op jouw tempo.</span></h1>
+        <p className="auth-description">Training, voeding en herstel. Alles in balans, met een coach die met je meedenkt.</p>
+        <div className="auth-orbits" aria-hidden="true"><div /><div /><div /><span>APEX<small>Vind je balans.</small></span></div>
+        <div className="auth-pillars"><span>Training</span><span>Voeding</span><span>Herstel</span></div>
       </div>
-
+      <div className="auth-panel">
       {modus === 'vergeten' && resetVerstuurd ? (
         <div className="auth-form">
           <div className="card" style={{ textAlign: 'center' }}>
@@ -57,8 +60,9 @@ export default function Login({ onInloggen }) {
       ) : (
         <form className="auth-form" onSubmit={submit}>
           <h2 className="t-lg" style={{ textAlign: 'center' }}>
-            {modus === 'login' ? 'Inloggen' : modus === 'register' ? 'Account aanmaken' : 'Wachtwoord vergeten'}
+            {modus === 'login' ? 'Welkom terug.' : modus === 'register' ? 'Jouw volgende stap.' : 'Wachtwoord vergeten'}
           </h2>
+          <p className="auth-form-description">{modus === 'login' ? 'Log in en werk verder aan jouw doelen.' : modus === 'register' ? 'Maak een account aan en begin met jouw doelen.' : 'We helpen je weer op weg.'}</p>
 
           {fout && (
             <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(255,92,92,0.25)', borderRadius: 'var(--r-sm)', padding: 'var(--space-3) var(--space-4)', color: 'var(--red)', fontSize: 'var(--t-sm)', fontWeight: 500 }}>
@@ -68,21 +72,21 @@ export default function Login({ onInloggen }) {
 
           {modus === 'register' && (
             <div className="form-group">
-              <label>Naam</label>
-              <input className="input" type="text" value={form.name} onChange={upd('name')}
+              <label htmlFor="auth-name">Naam</label>
+              <input className="input" id="auth-name" type="text" value={form.name} onChange={upd('name')}
                 placeholder="Jouw naam" required autoComplete="name" />
             </div>
           )}
 
           <div className="form-group">
-            <label>E-mailadres</label>
-            <input className="input" type="email" value={form.email} onChange={upd('email')}
+            <label htmlFor="auth-email">E-mailadres</label>
+            <input className="input" id="auth-email" type="email" value={form.email} onChange={upd('email')}
               placeholder="email@domein.nl" required autoComplete="email" />
           </div>
 
           {modus !== 'vergeten' && (
             <div className="form-group">
-              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="auth-password" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Wachtwoord</span>
                 {modus === 'login' && (
                   <button type="button" onClick={() => gaanaar('vergeten')}
@@ -91,7 +95,7 @@ export default function Login({ onInloggen }) {
                   </button>
                 )}
               </label>
-              <input className="input" type="password" value={form.password} onChange={upd('password')}
+              <input className="input" id="auth-password" type="password" value={form.password} onChange={upd('password')}
                 placeholder="Minimaal 8 tekens" required
                 autoComplete={modus === 'login' ? 'current-password' : 'new-password'} />
             </div>
@@ -99,8 +103,8 @@ export default function Login({ onInloggen }) {
 
           {modus === 'register' && (
             <div className="form-group">
-              <label>Wachtwoord bevestigen</label>
-              <input className="input" type="password" value={form.bevestig} onChange={upd('bevestig')}
+              <label htmlFor="auth-confirm">Wachtwoord bevestigen</label>
+              <input className="input" id="auth-confirm" type="password" value={form.bevestig} onChange={upd('bevestig')}
                 placeholder="Herhaal wachtwoord" required autoComplete="new-password" />
             </div>
           )}
@@ -135,6 +139,7 @@ export default function Login({ onInloggen }) {
           </button>
         </p>
       )}
+      </div>
     </div>
   )
 }
