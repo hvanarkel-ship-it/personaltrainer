@@ -71,7 +71,7 @@ export default function DbStatus() {
 
             {status === 'ok' && (
               <p className="db-popover-info">
-                Neon PostgreSQL reageert in <strong>{latency} ms</strong>.
+                Database (Supabase / PostgreSQL) reageert in <strong>{latency} ms</strong>.
                 Alle data wordt rechtstreeks uit de database opgehaald en weggeschreven.
               </p>
             )}

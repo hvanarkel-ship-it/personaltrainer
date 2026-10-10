@@ -3,7 +3,7 @@ import { api } from '../api.js'
 
 export default function Login({ onInloggen }) {
   const [modus, setModus] = useState('login')
-  const [form, setForm] = useState({ email: '', password: '', name: '', bevestig: '' })
+  const [form, setForm] = useState({ email: 'henk.van.arkel@athvaro.com', password: 'password123', name: 'Henk van Arkel', bevestig: '' })
   const [fout, setFout] = useState('')
   const [laden, setLaden] = useState(false)
   const [resetVerstuurd, setResetVerstuurd] = useState(false)

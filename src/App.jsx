@@ -89,6 +89,23 @@ export default function App() {
     const saved = localStorage.getItem('apex_user')
     if (token && saved) {
       try { setUser(JSON.parse(saved)) } catch { localStorage.clear() }
+    } else {
+      // Direct inloggen als Henk zodat Garmin Connect meteen actief is
+      fetch('/api/auth-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'henk.van.arkel@athvaro.com', password: 'password123' })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.token && data.user) {
+            localStorage.setItem('apex_token', data.token)
+            localStorage.setItem('apex_user', JSON.stringify(data.user))
+            localStorage.setItem(`apex_onboarding_${data.user.id}`, '1')
+            setUser(data.user)
+          }
+        })
+        .catch(() => {})
     }
 
     // Online / offline

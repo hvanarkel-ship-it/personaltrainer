@@ -202,12 +202,22 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
             <div className="coach-avatar">⚡</div>
             <h3>Hallo {user.name?.split(' ')[0]}!</h3>
             <p>Stel me een vraag, of upload een foto/screenshot voor analyse.</p>
-            <button
-              className="suunto-ochtend-btn"
-              onClick={() => { setUploadType('suunto'); fileRef.current?.click() }}
-            >
-              ⌚ Deel Suunto ochtend dashboard
-            </button>
+            <div style={{ display: 'flex', gap: '8px', width: '100%', marginBottom: '12px' }}>
+              <button
+                className="suunto-ochtend-btn"
+                style={{ flex: 1, margin: 0, background: '#007CC3', color: '#fff', border: 'none' }}
+                onClick={() => { setUploadType('garmin'); fileRef.current?.click() }}
+              >
+                ▲ Deel Garmin data
+              </button>
+              <button
+                className="suunto-ochtend-btn"
+                style={{ flex: 1, margin: 0 }}
+                onClick={() => { setUploadType('suunto'); fileRef.current?.click() }}
+              >
+                ⌚ Deel Suunto data
+              </button>
+            </div>
             <div className="snelle-vragen">
               {SNELLE_VRAGEN.map(v => (
                 <button key={v} className="snelle-vraag-btn" onClick={() => { setInput(v); inputRef.current?.focus() }}>
@@ -230,6 +240,7 @@ export default function Coach({ user, coachTrigger, onCoachTriggerUsed }) {
               if (b.rol === 'systeem' && b.opgeslagen) {
                 const cfg = {
                   inbody:   { icoon: '📊', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' },
+                  garmin:   { icoon: '▲', bg: '#f0f9ff', border: '#bae6fd', kleur: '#0369a1' },
                   suunto:   { icoon: '⌚', bg: '#eff6ff', border: '#bfdbfe', kleur: '#1e40af' },
                   maaltijd: { icoon: '🍽️', bg: '#fff7ed', border: '#fed7aa', kleur: '#9a3412' },
                 }[b.opgeslagen.type] || { icoon: '✓', bg: '#f0fdf4', border: '#bbf7d0', kleur: '#166534' }

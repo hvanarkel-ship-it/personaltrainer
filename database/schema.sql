@@ -1,5 +1,5 @@
 -- APEX Coach v2 — Database Schema
--- Neon PostgreSQL
+-- Supabase / PostgreSQL (Uitvoeren in Supabase Dashboard → SQL Editor)
 
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS user_profile (
   intervals_athlete_id TEXT,
   intervals_api_key TEXT,
   runalyze_api_token TEXT,
+  garmin_connected BOOLEAN DEFAULT FALSE,
+  garmin_username TEXT,
+  garmin_token TEXT,
+  garmin_last_sync TIMESTAMPTZ,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

@@ -1,0 +1,6 @@
+{
+  "name": "APEX Coach",
+  "description": "APEX Coach — Jouw AI personal trainer voor training, voeding en herstel",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

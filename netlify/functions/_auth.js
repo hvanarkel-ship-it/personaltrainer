@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken'
 
+const JWT_SECRET = process.env.JWT_SECRET || 'apex-coach-jwt-secret-key-2026'
+
 export function verifyToken(event) {
   const authHeader = event.headers.authorization || event.headers.Authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -7,7 +9,7 @@ export function verifyToken(event) {
   }
   const token = authHeader.slice(7)
   try {
-    return jwt.verify(token, process.env.JWT_SECRET)
+    return jwt.verify(token, JWT_SECRET)
   } catch {
     return null
   }

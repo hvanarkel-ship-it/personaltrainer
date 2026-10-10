@@ -126,6 +126,12 @@ ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS intervals_api_key TEXT;
 -- user_profile: Runalyze koppeling
 ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS runalyze_api_token TEXT;
 
+-- user_profile: Garmin Connect koppeling
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS garmin_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS garmin_username TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS garmin_token TEXT;
+ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS garmin_last_sync TIMESTAMPTZ;
+
 -- trainingen: hartslagzones, bron en sync IDs
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone2_min INTEGER;
 ALTER TABLE trainingen ADD COLUMN IF NOT EXISTS zone3_min INTEGER;

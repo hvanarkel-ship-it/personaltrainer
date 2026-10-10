@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy_api_key', maxRetries: 3 })
 
 function getMaaltijdType() {
   const h = new Date().getHours()

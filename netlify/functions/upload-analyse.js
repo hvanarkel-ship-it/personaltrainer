@@ -2,12 +2,16 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from './_db.js'
 import { requireAuth, cors } from './_auth.js'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 })
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy_api_key', maxRetries: 2 })
 
 const UPLOAD_PROMPTS = {
   maaltijd: `Analyseer deze maaltijdfoto. Identificeer alle ingrediënten, schat de portiegroottes en bereken de macronutriënten.
 Geef je antwoord ALLEEN als JSON:
 {"beschrijving":"...", "kcal":0, "eiwit_g":0, "koolhydraten_g":0, "vetten_g":0, "foto_analyse":"...", "ai_notities":"kort advies in context van dagdoel"}`,
+
+  garmin: `Lees alle data van deze Garmin Connect schermafbeelding. Extraheer: activiteitstype (sport), duur (minuten), calorieën, gemiddelde hartslag, max hartslag, hartslagzones (zone 2/3/4 minuten), HRV ochtend (ms), slaapscore, herstelbalans / body battery, slaap uren, stappen.
+Geef je antwoord ALLEEN als JSON:
+{"sport":"hardlopen", "duur_min":0, "kcal":0, "gem_hartslag":0, "max_hartslag":0, "hrv_ochtend":0, "slaap_uur":0, "slaapscore":0, "herstelbalans":0, "zone2_min":0, "zone3_min":0, "zone4_min":0, "notities":"samenvatting van Garmin Connect data in het Nederlands"}`,
 
   suunto: `Lees alle data van deze Suunto schermafbeelding. Extraheer: activiteitstype, duur (minuten), calorieën, gemiddelde hartslag, max hartslag, hartslagzones (zone 2/3/4 minuten), HRV, slaapscore, herstelbalans, slaap uren.
 Geef je antwoord ALLEEN als JSON:
